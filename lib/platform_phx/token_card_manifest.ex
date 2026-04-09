@@ -15,7 +15,7 @@ defmodule PlatformPhx.TokenCardManifest do
       {:ok, entry}
     else
       nil ->
-        Logger.warning("token_card_manifest missing token_id=#{token_id}")
+        Logger.info("token_card_manifest missing token_id=#{token_id}")
         {:error, :not_found}
 
       {:error, reason} = error ->

@@ -17,9 +17,7 @@ defmodule PlatformPhxWeb.TokenCardController do
         render(conn, :show, page_title: entry["name"], entry_json: Jason.encode!(entry))
 
       {:error, reason} ->
-        Logger.warning(
-          "token_card_route not_found token_id=#{token_id} reason=#{inspect(reason)}"
-        )
+        Logger.info("token_card_route not_found token_id=#{token_id} reason=#{inspect(reason)}")
 
         send_resp(conn, :not_found, "Not Found")
     end

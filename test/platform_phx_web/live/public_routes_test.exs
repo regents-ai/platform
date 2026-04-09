@@ -208,6 +208,25 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     |> response(404)
   end
 
+  test "metadata route returns token metadata json", %{conn: conn} do
+    body =
+      conn
+      |> put_req_header("accept", "application/json")
+      |> get("/metadata/615")
+      |> response(200)
+
+    assert body =~ "\"name\": \"Regents Club #615\""
+    assert body =~ "\"image\": \"https://regents.sh/images/animata/cards/615.png\""
+    assert body =~ "\"animation_url\": \"https://regents.sh/cards/regents-club/615\""
+  end
+
+  test "metadata route returns not found for unknown token", %{conn: conn} do
+    conn
+    |> put_req_header("accept", "application/json")
+    |> get("/metadata/99999")
+    |> response(404)
+  end
+
   test "heerich demo route renders", %{conn: conn} do
     {:ok, _demo, html} = live(conn, "/heerich-demo")
 

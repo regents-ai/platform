@@ -41,6 +41,12 @@ defmodule PlatformPhxWeb.Router do
     end
   end
 
+  scope "/", PlatformPhxWeb do
+    pipe_through :api
+
+    get "/metadata/:token_id", MetadataController, :show
+  end
+
   scope "/api", PlatformPhxWeb do
     pipe_through :api
 
