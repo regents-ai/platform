@@ -22,6 +22,11 @@ config :platform_phx, PlatformPhxWeb.Endpoint,
   pubsub_server: PlatformPhx.PubSub,
   live_view: [signing_salt: "eGS39NaF"]
 
+config :platform_phx, PlatformPhxWeb.PrometheusExporter,
+  enabled: true,
+  ip: {127, 0, 0, 1},
+  port: 9568
+
 # Configure the mailer
 #
 # By default it uses the "Local" adapter which stores the emails

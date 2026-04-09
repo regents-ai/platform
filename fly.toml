@@ -20,6 +20,10 @@ primary_region = "ewr"
   min_machines_running = 0
   processes = ["app"]
 
+[metrics]
+  port = 9568
+  path = "/metrics"
+
 [[vm]]
   cpu_kind = "shared"
   cpus = 1

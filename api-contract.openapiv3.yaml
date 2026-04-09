@@ -6,6 +6,16 @@ info:
 servers:
   - url: /
 paths:
+  /metrics:
+    get:
+      operationId: prometheusMetrics
+      responses:
+        '200':
+          description: Prometheus scrape payload for app and runtime metrics
+          content:
+            text/plain:
+              schema:
+                type: string
   /api/basenames/config:
     get:
       operationId: basenamesConfig

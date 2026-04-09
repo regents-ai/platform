@@ -209,15 +209,15 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   end
 
   test "metadata route returns token metadata json", %{conn: conn} do
-    body =
+    payload =
       conn
       |> put_req_header("accept", "application/json")
       |> get("/metadata/615")
-      |> response(200)
+      |> json_response(200)
 
-    assert body =~ "\"name\": \"Regents Club #615\""
-    assert body =~ "\"image\": \"https://regents.sh/images/animata/cards/615.png\""
-    assert body =~ "\"animation_url\": \"https://regents.sh/cards/regents-club/615\""
+    assert payload["name"] == "Regents Club #615"
+    assert payload["image"] == "https://regents.sh/images/animata/cards/615.png"
+    assert payload["animation_url"] == "https://regents.sh/cards/regents-club/615"
   end
 
   test "metadata route returns not found for unknown token", %{conn: conn} do

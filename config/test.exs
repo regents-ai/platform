@@ -21,12 +21,16 @@ config :platform_phx,
   ethereum_adapter: PlatformPhx.TestEthereumAdapter,
   opensea_client: PlatformPhx.TestOpenSeaClient
 
+config :platform_phx, :token_metadata_root, Path.expand("../priv/metadata", __DIR__)
+
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
 config :platform_phx, PlatformPhxWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "TgX+zcJTgS+fZ7WpfLZl5A+oda0b8OeYzwge39+575WkMLHtPa0wrqgEY7+EAhPF",
   server: false
+
+config :platform_phx, PlatformPhxWeb.PrometheusExporter, enabled: false
 
 # In test we don't send emails
 config :platform_phx, PlatformPhx.Mailer, adapter: Swoosh.Adapters.Test

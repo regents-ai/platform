@@ -104,6 +104,7 @@ config :platform_phx, PlatformPhxWeb.Endpoint,
 
 # Enable dev routes for dashboard and mailbox
 config :platform_phx, dev_routes: true
+config :platform_phx, :token_metadata_root, Path.expand("../priv/metadata", __DIR__)
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"

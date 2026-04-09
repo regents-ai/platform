@@ -24,9 +24,26 @@ end
 
 port = String.to_integer(System.get_env("PORT", "4000"))
 
+prometheus_enabled =
+  System.get_env("PROMETHEUS_METRICS_ENABLED", "true")
+  |> String.trim()
+  |> String.downcase()
+  |> then(&(&1 in ~w(1 true yes on)))
+
+prometheus_port = String.to_integer(System.get_env("PROMETHEUS_METRICS_PORT", "9568"))
+
 config :platform_phx, PlatformPhxWeb.Endpoint, http: [port: port]
 
+if config_env() != :test and
+     (System.get_env("PROMETHEUS_METRICS_PORT") || System.get_env("PROMETHEUS_METRICS_ENABLED")) do
+  config :platform_phx, PlatformPhxWeb.PrometheusExporter,
+    enabled: prometheus_enabled,
+    port: prometheus_port
+end
+
 if config_env() == :prod do
+  config :platform_phx, :token_metadata_root, Application.app_dir(:platform_phx, "priv/metadata")
+
   database_url =
     System.get_env("DATABASE_URL") ||
       raise """
@@ -73,6 +90,11 @@ if config_env() == :prod do
     end
 
   config :platform_phx, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+
+  config :platform_phx, PlatformPhxWeb.PrometheusExporter,
+    enabled: prometheus_enabled,
+    ip: {0, 0, 0, 0, 0, 0, 0, 0},
+    port: prometheus_port
 
   config :platform_phx, PlatformPhxWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
