@@ -119,8 +119,8 @@ node --experimental-strip-types shaders/animata/animata.ts build-metadata \
 ```
 
 This publishes files like:
-- `https://regents.sh/metadata/1.json`
-- `https://regents.sh/metadata/615.json`
+- `https://regents.sh/metadata/1`
+- `https://regents.sh/metadata/615`
 
 Ask OpenSea to refresh tokens after the hosted images and metadata are live:
 

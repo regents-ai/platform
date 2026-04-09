@@ -17,7 +17,8 @@ defmodule PlatformPhxWeb do
   those modules here.
   """
 
-  def static_paths, do: ~w(assets fonts images metadata favicon.ico robots.txt site.webmanifest regent)
+  def static_paths,
+    do: ~w(assets fonts images metadata favicon.ico robots.txt site.webmanifest regent)
 
   def router do
     quote do

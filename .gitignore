@@ -49,6 +49,10 @@ platform_phx-*.tar
 /priv/static/images/*-[0-9a-f]*.jpg
 /priv/static/images/*-[0-9a-f]*.svg
 /priv/static/images/animata/
+!/priv/static/images/animata/
+!/priv/static/images/animata/cards/
+!/priv/static/images/animata/cards/*.png
+/priv/static/images/animata/cards/*-[0-9a-f]*.png
 /priv/static/regent/*-[0-9a-f]*.svg
 /priv/static/regent/sigils/*-[0-9a-f]*.svg
 /priv/static/robots-[0-9a-f]*.txt

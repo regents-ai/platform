@@ -161,7 +161,7 @@ function buildEdition(
     attributes,
     posterFileName: `${tokenId}.png`,
     videoFileName: `${tokenId}.mp4`,
-    metadataFileName: `${tokenId}.json`,
+    metadataFileName: `${tokenId}`,
   };
 }
 
