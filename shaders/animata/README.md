@@ -115,7 +115,7 @@ node --experimental-strip-types shaders/animata/animata.ts build-metadata \
   --plan ./shaders/animata/out/plan.json \
   --card-manifest ./priv/static/animata/token-card-manifest.json \
   --site-url https://regents.sh \
-  --out-dir ./priv/static/metadata
+  --out-dir ./priv/metadata
 ```
 
 This publishes files like:

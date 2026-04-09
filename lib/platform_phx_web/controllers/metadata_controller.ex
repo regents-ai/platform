@@ -20,6 +20,6 @@ defmodule PlatformPhxWeb.MetadataController do
   end
 
   defp metadata_path(token_id) do
-    Application.app_dir(:platform_phx, "priv/static/metadata/#{token_id}")
+    Path.expand("priv/metadata/#{token_id}", File.cwd!())
   end
 end
