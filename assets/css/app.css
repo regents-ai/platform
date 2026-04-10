@@ -3028,6 +3028,51 @@ html[data-color-mode="dark"] .pp-preview-link {
   font-size: 0.9rem;
 }
 
+.pp-formation-history-drawer {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 180ms ease;
+}
+
+.pp-formation-history-drawer[data-panel-state="open"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.pp-formation-history-drawer-inner {
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 1rem;
+}
+
+.pp-formation-history-scroll {
+  display: grid;
+  gap: 0.8rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  padding-right: 0.35rem;
+  margin-top: 1rem;
+}
+
+.pp-formation-history-scroll::-webkit-scrollbar {
+  width: 0.5rem;
+}
+
+.pp-formation-history-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--foreground) 18%, transparent);
+}
+
+.pp-formation-history-event {
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: color-mix(in oklch, var(--background) 94%, var(--card) 6%);
+  padding: 0.95rem 1rem;
+}
+
 .pp-auction-meta {
   display: grid;
   gap: 0.35rem;

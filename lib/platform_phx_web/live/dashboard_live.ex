@@ -5,6 +5,7 @@ defmodule PlatformPhxWeb.DashboardLive do
   alias PlatformPhx.AgentPlatform.Formation
   alias PlatformPhx.Dashboard
   alias PlatformPhx.RuntimeConfig
+  alias PlatformPhx.TokenCardManifest
 
   @refresh_ms 2_500
 
@@ -28,6 +29,7 @@ defmodule PlatformPhxWeb.DashboardLive do
       |> assign(:requested_claimed_label, nil)
       |> assign(:billing_return_state, nil)
       |> assign(:launching_slug, nil)
+      |> assign(:formation_token_cards, %{})
       |> assign(:phase1_label, "")
       |> assign(:phase2_label, "")
       |> assign(:phase1_state, Dashboard.name_claim_state("", nil, nil))
@@ -181,6 +183,7 @@ defmodule PlatformPhxWeb.DashboardLive do
               <% else %>
                 <.agent_formation_view
                   formation={@formation_data}
+                  formation_token_cards={@formation_token_cards}
                   notice={@formation_notice}
                   stage={@formation_stage}
                   selected_claimed_label={@selected_claimed_label}
@@ -596,6 +599,7 @@ defmodule PlatformPhxWeb.DashboardLive do
   end
 
   attr :formation, :map, default: nil
+  attr :formation_token_cards, :map, default: %{}
   attr :notice, :map, default: nil
   attr :stage, :atom, required: true
   attr :selected_claimed_label, :string, default: nil
@@ -792,7 +796,7 @@ defmodule PlatformPhxWeb.DashboardLive do
           />
         <% end %>
 
-        <div class="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+        <div class="space-y-6">
           <section class="rounded-[1.6rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_95%,var(--card)_5%)] p-5">
             <div class="space-y-3">
               <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
@@ -803,7 +807,7 @@ defmodule PlatformPhxWeb.DashboardLive do
               </h3>
             </div>
 
-            <div class="mt-5 grid gap-3 sm:grid-cols-2">
+            <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <%= if @formation.claimed_names == [] do %>
                 <div class="rounded-2xl border border-dashed border-[color:var(--border)] px-4 py-5 text-sm text-[color:var(--muted-foreground)]">
                   No claimed names yet.
@@ -811,14 +815,18 @@ defmodule PlatformPhxWeb.DashboardLive do
               <% else %>
                 <%= for claim <- @formation.claimed_names do %>
                   <div class="rounded-2xl border border-[color:var(--border)] px-4 py-4">
-                    <p class="font-display break-all text-lg text-[color:var(--foreground)]">
-                      {claim.ens_fqdn || "#{claim.label}.regent.eth"}
-                    </p>
-                    <p class="mt-1 text-sm text-[color:var(--muted-foreground)]">
-                      {if claim.in_use,
-                        do: "Already used by a company.",
-                        else: "Ready for a new company."}
-                    </p>
+                    <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <p class="font-display break-all text-lg text-[color:var(--foreground)]">
+                        {claim.ens_fqdn || "#{claim.label}.regent.eth"}
+                      </p>
+                      <a
+                        :if={active_claim_company(@formation, claim)}
+                        href={active_claim_company_url(@formation, claim)}
+                        class="text-sm underline decoration-[color:var(--foreground)] underline-offset-4 text-[color:var(--foreground)] transition hover:text-[color:var(--muted-foreground)]"
+                      >
+                        Active
+                      </a>
+                    </div>
                   </div>
                 <% end %>
               <% end %>
@@ -826,51 +834,62 @@ defmodule PlatformPhxWeb.DashboardLive do
           </section>
 
           <section class="rounded-[1.6rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_95%,var(--card)_5%)] p-5">
-            <div class="space-y-3">
-              <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
-                Regents Club
-              </p>
-              <h3 class="font-display text-2xl text-[color:var(--foreground)]">
-                Animated pass cards
-              </h3>
+            <div class="flex flex-wrap items-start justify-between gap-4">
+              <div class="space-y-3">
+                <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
+                  Passes Owned
+                </p>
+                <h3 class="font-display text-2xl text-[color:var(--foreground)]">
+                  Regents Club
+                </h3>
+              </div>
+
+              <a
+                href="https://opensea.io/collection/regents-club"
+                target="_blank"
+                rel="noreferrer"
+                class="inline-flex items-center gap-3 rounded-full border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_88%,transparent)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)] hover:-translate-y-0.5"
+              >
+                <.opensea_mark />
+                <span>OpenSea</span>
+              </a>
             </div>
 
-            <div class="mt-5 grid gap-4 sm:grid-cols-2">
+            <div
+              id="agent-formation-pass-gallery"
+              phx-hook="FormationPassGallery"
+              data-token-card-budget="10"
+              data-token-card-chunk="2"
+              class="mt-5 grid justify-items-center gap-x-5 gap-y-6 sm:grid-cols-2 xl:grid-cols-3"
+            >
               <%= if @formation.collections.animata_pass == [] do %>
-                <div class="rounded-2xl border border-dashed border-[color:var(--border)] px-4 py-5 text-sm text-[color:var(--muted-foreground)]">
+                <div class="rounded-2xl border border-dashed border-[color:var(--border)] px-4 py-5 text-sm text-[color:var(--muted-foreground)] sm:col-span-2 xl:col-span-3">
                   No Regents Club passes found for this wallet.
                 </div>
               <% else %>
                 <%= for token_id <- @formation.collections.animata_pass do %>
                   <a
-                    href={~p"/cards/regents-club/#{token_id}"}
+                    href={opensea_item_url(:regents_club, token_id)}
                     target="_blank"
                     rel="noreferrer"
-                    class="group rounded-[1.4rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_90%,transparent)] p-3 transition hover:border-[color:var(--ring)]"
+                    class="group inline-flex shrink-0 transition hover:-translate-y-1"
+                    aria-label={"Open Regents Club ##{token_id} on OpenSea"}
                   >
-                    <div class="relative aspect-[3/4] overflow-hidden rounded-[1rem] border border-[color:var(--border)] bg-black">
-                      <iframe
-                        title={"Regents Club ##{token_id}"}
-                        src={~p"/cards/regents-club/#{token_id}"}
-                        loading="lazy"
-                        scrolling="no"
-                        class="pointer-events-none absolute left-1/2 top-1/2 h-[32rem] w-[24rem] origin-center -translate-x-1/2 -translate-y-1/2 scale-[0.7] border-0 sm:scale-[0.76]"
-                      />
-                    </div>
-
-                    <div class="mt-3 flex items-center justify-between gap-3">
-                      <div>
-                        <p class="font-display text-lg text-[color:var(--foreground)]">
-                          Regents Club #{token_id}
-                        </p>
-                        <p class="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
-                          Animated pass card
-                        </p>
+                    <%= if entry = Map.get(@formation_token_cards, token_id) do %>
+                      <script type="application/json" data-token-card-json>
+                        <%= raw(Jason.encode!(entry)) %>
+                      </script>
+                      <div
+                        data-token-card-root
+                        data-token-card-layout="embedded"
+                        data-token-card-active="false"
+                      >
                       </div>
-                      <span class="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)] transition group-hover:text-[color:var(--foreground)]">
-                        Open
-                      </span>
-                    </div>
+                    <% else %>
+                      <div class="flex min-h-[22rem] min-w-[15rem] items-center justify-center rounded-[1.2rem] border border-dashed border-[color:var(--border)] px-4 text-center text-xs uppercase tracking-[0.2em] text-[color:var(--muted-foreground)]">
+                        Card unavailable
+                      </div>
+                    <% end %>
                   </a>
                 <% end %>
               <% end %>
@@ -879,7 +898,11 @@ defmodule PlatformPhxWeb.DashboardLive do
         </div>
 
         <div class="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-          <section class="rounded-[1.6rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_95%,var(--card)_5%)] p-5">
+          <section
+            id="agent-formation-history"
+            phx-hook="FormationHistory"
+            class="rounded-[1.6rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_95%,var(--card)_5%)] p-5"
+          >
             <div class="flex items-center justify-between gap-3">
               <div class="space-y-2">
                 <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
@@ -915,9 +938,22 @@ defmodule PlatformPhxWeb.DashboardLive do
                           Step: {formation.current_step}
                         </p>
                       </div>
-                      <span class={status_badge_class(formation.status)}>
-                        {formation.status}
-                      </span>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class={status_badge_class(formation.status)}>
+                          {formation.status}
+                        </span>
+                        <button
+                          type="button"
+                          class="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] px-3 py-1.5 text-xs uppercase tracking-[0.14em] text-[color:var(--foreground)] transition hover:border-[color:var(--ring)] hover:bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)]"
+                          data-formation-toggle
+                          data-target-id={formation_history_panel_id(formation)}
+                          aria-expanded="false"
+                          aria-controls={formation_history_panel_id(formation)}
+                        >
+                          <span>Expand</span>
+                          <span aria-hidden="true">↓</span>
+                        </button>
+                      </div>
                     </div>
 
                     <%= if formation.last_error_message do %>
@@ -925,6 +961,67 @@ defmodule PlatformPhxWeb.DashboardLive do
                         {formation.last_error_message}
                       </p>
                     <% end %>
+
+                    <div
+                      id={formation_history_panel_id(formation)}
+                      class="pp-formation-history-drawer"
+                      data-formation-history-panel
+                      hidden
+                    >
+                      <div class="pp-formation-history-drawer-inner">
+                        <div class="flex items-center justify-between gap-3">
+                          <div>
+                            <p class="text-[10px] uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
+                              Past actions
+                            </p>
+                            <p class="mt-1 text-sm text-[color:var(--muted-foreground)]">
+                              Scroll through every launch step for this company.
+                            </p>
+                          </div>
+                          <p
+                            :if={formation.last_heartbeat_at}
+                            class="text-[10px] uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]"
+                          >
+                            Last update {formation_event_time(formation.last_heartbeat_at)}
+                          </p>
+                        </div>
+
+                        <div class="pp-formation-history-scroll">
+                          <%= if Map.get(formation, :events, []) == [] do %>
+                            <div class="rounded-2xl border border-dashed border-[color:var(--border)] px-4 py-5 text-sm text-[color:var(--muted-foreground)]">
+                              No actions recorded yet.
+                            </div>
+                          <% else %>
+                            <%= for event <- Map.get(formation, :events, []) do %>
+                              <article class="pp-formation-history-event">
+                                <div class="flex items-start justify-between gap-3">
+                                  <div class="space-y-1">
+                                    <p class="font-display text-base text-[color:var(--foreground)]">
+                                      {formation_step_title(event.step)}
+                                    </p>
+                                    <p
+                                      :if={event.message}
+                                      class="text-sm leading-6 text-[color:var(--muted-foreground)]"
+                                    >
+                                      {event.message}
+                                    </p>
+                                  </div>
+                                  <span class={formation_event_status_class(event.status)}>
+                                    {event.status}
+                                  </span>
+                                </div>
+                                <p
+                                  :if={formation_event_time(event.created_at)}
+                                  class="mt-3 text-[10px] uppercase tracking-[0.14em] text-[color:var(--muted-foreground)]"
+                                >
+                                  {formation_event_time(event.created_at)}
+                                </p>
+                              </article>
+                            <% end %>
+                          <% end %>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 <% end %>
               <% end %>
@@ -934,17 +1031,17 @@ defmodule PlatformPhxWeb.DashboardLive do
           <section class="rounded-[1.6rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_95%,var(--card)_5%)] p-5">
             <div class="space-y-2">
               <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
-                Companies
+                Live Regents
               </p>
               <h3 class="font-display text-2xl text-[color:var(--foreground)]">
-                Wallet companies
+                Active Agent Companies
               </h3>
             </div>
 
             <div class="mt-5 space-y-3">
               <%= if @formation.owned_companies == [] do %>
                 <div class="rounded-2xl border border-dashed border-[color:var(--border)] px-4 py-5 text-sm text-[color:var(--muted-foreground)]">
-                  No companies yet.
+                  No companies created yet.
                 </div>
               <% else %>
                 <%= for company <- @formation.owned_companies do %>
@@ -1155,6 +1252,7 @@ defmodule PlatformPhxWeb.DashboardLive do
       socket
       |> assign(:formation_data, result.formation)
       |> assign(:formation_notice, result.notice)
+      |> assign(:formation_token_cards, formation_token_cards(result.formation))
       |> sync_selected_claim()
       |> maybe_redirect_to_company_site()
 
@@ -1346,6 +1444,10 @@ defmodule PlatformPhxWeb.DashboardLive do
     "https://opensea.io/item/base/0x903c4c1e8b8532fbd3575482d942d493eb9266e2/#{token_id}"
   end
 
+  defp opensea_item_url(:regents_club, token_id) when is_integer(token_id) do
+    "https://opensea.io/item/base/0x2208aadbdecd47d3b4430b5b75a175f6d885d487/#{token_id}"
+  end
+
   defp claim_island_config do
     %{
       privyAppId: RuntimeConfig.privy_app_id(),
@@ -1391,6 +1493,21 @@ defmodule PlatformPhxWeb.DashboardLive do
       redeem_supply_notice: nil
     }
   end
+
+  defp formation_token_cards(%{collections: %{animata_pass: token_ids}})
+       when is_list(token_ids) do
+    case TokenCardManifest.fetch_many(token_ids) do
+      {:ok, entries} ->
+        entries
+        |> Enum.reject(fn {_token_id, entry} -> is_nil(entry) end)
+        |> Map.new()
+
+      {:error, _reason} ->
+        %{}
+    end
+  end
+
+  defp formation_token_cards(_formation), do: %{}
 
   defp can_free_claim?(services, state, wallet_ready?) do
     wallet_ready? and is_map(services.allowance) and
@@ -1489,6 +1606,92 @@ defmodule PlatformPhxWeb.DashboardLive do
 
   defp active_formation?(formation) do
     Enum.any?(formation.active_formations, &(&1.status in ["queued", "running"]))
+  end
+
+  defp formation_history_panel_id(%{id: id}) when not is_nil(id), do: "formation-history-#{id}"
+  defp formation_history_panel_id(_formation), do: "formation-history"
+
+  defp formation_step_title("reserve_claim"), do: "Reserved the name"
+  defp formation_step_title("create_sprite"), do: "Started the sprite"
+  defp formation_step_title("bootstrap_sprite"), do: "Prepared the sprite"
+  defp formation_step_title("bootstrap_paperclip"), do: "Connected Paperclip"
+  defp formation_step_title("create_company"), do: "Built the company home"
+  defp formation_step_title("create_hermes"), do: "Prepared Hermes"
+  defp formation_step_title("create_checkpoint"), do: "Saved a checkpoint"
+  defp formation_step_title("activate_subdomain"), do: "Turned on the public site"
+  defp formation_step_title("finalize"), do: "Finished launch"
+
+  defp formation_step_title(step) when is_binary(step) do
+    step
+    |> String.replace("_", " ")
+    |> String.split()
+    |> Enum.map_join(" ", &String.capitalize/1)
+  end
+
+  defp formation_step_title(_step), do: "Launch step"
+
+  defp formation_event_status_class("succeeded") do
+    "rounded-full border border-[color:color-mix(in_oklch,var(--positive)_55%,var(--border)_45%)] px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-[color:var(--foreground)]"
+  end
+
+  defp formation_event_status_class("failed") do
+    "rounded-full border border-[color:#a6574f] px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-[color:#a6574f]"
+  end
+
+  defp formation_event_status_class(_status) do
+    "rounded-full border border-[color:var(--border)] px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]"
+  end
+
+  defp formation_event_time(nil), do: nil
+
+  defp formation_event_time(value) when is_binary(value) do
+    case DateTime.from_iso8601(value) do
+      {:ok, datetime, _offset} -> Calendar.strftime(datetime, "%b %-d, %H:%M UTC")
+      _other -> nil
+    end
+  end
+
+  defp formation_event_time(_value), do: nil
+
+  defp active_claim_company(%{owned_companies: companies}, claim) when is_list(companies) do
+    Enum.find(companies, fn company ->
+      company.slug == claim.label and company.status == "published" and
+        get_in(company, [:subdomain, :active]) == true and
+        is_binary(get_in(company, [:subdomain, :hostname]))
+    end)
+  end
+
+  defp active_claim_company(_formation, _claim), do: nil
+
+  defp active_claim_company_url(formation, claim) do
+    case active_claim_company(formation, claim) do
+      %{subdomain: %{hostname: hostname}} when is_binary(hostname) and hostname != "" ->
+        "https://#{hostname}"
+
+      _company ->
+        "#"
+    end
+  end
+
+  defp opensea_mark(assigns) do
+    ~H"""
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      class="h-5 w-5 text-[color:var(--foreground)]"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.8"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <circle cx="12" cy="12" r="9.25"></circle>
+      <path d="M9.4 16.8c1.2-.6 2.35-.9 3.45-.9 1.25 0 2.32.28 3.2.84"></path>
+      <path d="M11.7 6.1l2.8 7.3-5.8-.35 3-6.95Z"></path>
+      <path d="M11.9 13.1v4.2"></path>
+      <path d="M8.7 17.2h6.4"></path>
+    </svg>
+    """
   end
 
   defp launch_company(nil, _slug), do: nil

@@ -36,6 +36,26 @@ defmodule PlatformPhx.TokenCardManifest do
 
   def fetch(_token_id), do: {:error, :invalid_token_id}
 
+  @spec fetch_many([integer() | String.t()]) :: {:ok, %{integer() => map()}} | {:error, term()}
+  def fetch_many(token_ids) when is_list(token_ids) do
+    normalized_ids =
+      token_ids
+      |> Enum.map(&normalize_token_id/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    with {:ok, items} <- load_items() do
+      entries_by_token_id = Map.new(items, &{&1["tokenId"], &1})
+
+      {:ok,
+       Map.new(normalized_ids, fn token_id ->
+         {token_id, Map.get(entries_by_token_id, token_id)}
+       end)}
+    end
+  end
+
+  def fetch_many(_token_ids), do: {:ok, %{}}
+
   defp load_items do
     path = manifest_path()
 
@@ -60,4 +80,15 @@ defmodule PlatformPhx.TokenCardManifest do
   defp manifest_path do
     Application.app_dir(:platform_phx, "priv/token_cards/token-card-manifest.json")
   end
+
+  defp normalize_token_id(token_id) when is_integer(token_id) and token_id > 0, do: token_id
+
+  defp normalize_token_id(token_id) when is_binary(token_id) do
+    case Integer.parse(token_id) do
+      {parsed, ""} when parsed > 0 -> parsed
+      _other -> nil
+    end
+  end
+
+  defp normalize_token_id(_token_id), do: nil
 end

@@ -23,6 +23,11 @@ html[data-color-mode="dark"] .rtc-page {
   flex: 0 0 auto;
 }
 
+.rtc-stage--embedded {
+  width: min(100%, 20rem);
+  max-width: 20rem;
+}
+
 .rtc-card {
   position: relative;
   width: 100%;

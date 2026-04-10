@@ -64,7 +64,7 @@ defmodule PlatformPhx.AgentPlatform do
     Agent
     |> where([agent], agent.owner_human_id == ^id)
     |> order_by([agent], desc: agent.updated_at, asc: agent.slug)
-    |> preload([:subdomain, :services, :connections, :artifacts, :formation_run])
+    |> preload([:subdomain, :services, :connections, :artifacts, formation_run: :events])
     |> Repo.all()
   end
 
@@ -88,7 +88,7 @@ defmodule PlatformPhx.AgentPlatform do
   def get_owned_agent(%HumanUser{} = human, slug) when is_binary(slug) do
     Agent
     |> where([agent], agent.owner_human_id == ^human.id and agent.slug == ^normalize_slug(slug))
-    |> preload([:subdomain, :services, :connections, :artifacts, :formation_run])
+    |> preload([:subdomain, :services, :connections, :artifacts, formation_run: :events])
     |> Repo.one()
   end
 
@@ -97,7 +97,14 @@ defmodule PlatformPhx.AgentPlatform do
   def get_agent(agent_id) when is_integer(agent_id) do
     Agent
     |> where([agent], agent.id == ^agent_id)
-    |> preload([:subdomain, :services, :connections, :artifacts, :formation_run, :owner_human])
+    |> preload([
+      :subdomain,
+      :services,
+      :connections,
+      :artifacts,
+      :owner_human,
+      formation_run: :events
+    ])
     |> Repo.one()
   end
 

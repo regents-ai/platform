@@ -6,7 +6,11 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
 
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform
+  alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.BillingAccount
+  alias PlatformPhx.AgentPlatform.FormationEvent
+  alias PlatformPhx.AgentPlatform.FormationRun
+  alias PlatformPhx.AgentPlatform.Subdomain
   alias PlatformPhx.AgentPlatform.Workers.RunFormationWorker
   alias PlatformPhx.Basenames.Mint
   alias PlatformPhx.OpenSea
@@ -73,14 +77,50 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       |> live("/agent-formation")
 
     assert html =~ "tempo.regent.eth"
-    assert html =~ "/cards/regents-club/11"
+    assert html =~ "https://opensea.io/collection/regents-club"
+    assert html =~ "https://opensea.io/item/base/0x2208aadbdecd47d3b4430b5b75a175f6d885d487/11"
+    assert html =~ "data-token-card-layout=\"embedded\""
+    assert html =~ "data-token-card-budget=\"10\""
     assert html =~ "Passes found"
     assert html =~ "Continue"
+    assert html =~ "Passes Owned"
+    assert html =~ "Regents Club"
     assert html =~ "data-wallet-signed-in=\"true\""
     assert html =~ "Wallet Connected"
     assert html =~ "0xf39f...2266"
+    refute html =~ "<iframe"
+    refute html =~ "Animated pass cards"
+    refute html =~ "Animated pass card"
+    refute html =~ "Ready for a new company."
     refute html =~ "Keep formation updates in one shared room"
     refute html =~ "agent-formation-room"
+  end
+
+  test "agent formation shows active claimed names as profile links", %{conn: conn} do
+    human = insert_human!("active")
+    insert_billing_account!(human, 900)
+    insert_claimed_name!(human, "cloud", is_in_use: true)
+    insert_active_company!(human, "cloud")
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "7"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    {:ok, view, html} =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> live("/agent-formation?stage=setup&claimedLabel=cloud")
+
+    assert html =~ "Names tied to this wallet"
+    assert html =~ "Passes Owned"
+    assert html =~ "Regents Club"
+    assert html =~ "cloud.regent.eth"
+    assert has_element?(view, "a[href=\"https://cloud.regents.sh\"]")
+    refute html =~ "Already used by a company."
+    refute html =~ "Ready for a new company."
   end
 
   test "agent formation continue opens the setup state with the updated billing copy", %{
@@ -147,6 +187,34 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
              "https://opensea.io/item/base/0x903c4c1e8b8532fbd3575482d942d493eb9266e2/588"
 
     assert html =~ "/cards/regents-club/11"
+  end
+
+  test "agent formation lets the owner expand a launch card and review past actions", %{
+    conn: conn
+  } do
+    human = insert_human!("active")
+    insert_billing_account!(human, 900)
+    insert_claimed_name!(human, "tempo")
+    insert_company_with_history!(human, "orbit")
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "7"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    {:ok, _view, html} =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> live("/agent-formation?stage=setup&claimedLabel=tempo")
+
+    assert html =~ "Active formation"
+    assert html =~ "Expand"
+    assert html =~ "Past actions"
+    assert html =~ "Reserved the name"
+    assert html =~ "Completed create sprite."
+    assert html =~ "Scroll through every launch step for this company."
   end
 
   test "billing setup keeps the selected name and launch redirects to the company site", %{
@@ -220,7 +288,8 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     |> Repo.insert!()
   end
 
-  defp insert_claimed_name!(human, label) do
+  defp insert_claimed_name!(human, label, attrs \\ %{}) do
+    attrs = Enum.into(attrs, %{})
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     %Mint{}
@@ -236,8 +305,8 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       tx_hash: "0xtx#{label}",
       ens_tx_hash: "0xenstx#{label}",
       ens_assigned_at: now,
-      is_free: true,
-      is_in_use: false
+      is_free: Map.get(attrs, :is_free, true),
+      is_in_use: Map.get(attrs, :is_in_use, false)
     })
     |> Repo.insert!()
   end
@@ -252,6 +321,142 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       runtime_credit_balance_usd_cents: balance_cents
     })
     |> Repo.insert!()
+  end
+
+  defp insert_company_with_history!(human, slug) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    agent =
+      %Agent{}
+      |> Agent.changeset(%{
+        owner_human_id: human.id,
+        template_key: "start",
+        name: "Orbit Regent",
+        slug: slug,
+        claimed_label: slug,
+        basename_fqdn: "#{slug}.agent.base.eth",
+        ens_fqdn: "#{slug}.regent.eth",
+        status: "forming",
+        public_summary: "A company page for formation history testing.",
+        hero_statement: "Tracks every action during launch.",
+        runtime_status: "forming",
+        checkpoint_status: "pending",
+        stripe_llm_billing_status: "active",
+        stripe_customer_id: "cus_#{slug}",
+        stripe_pricing_plan_subscription_id: "sub_#{slug}",
+        sprite_free_until: DateTime.add(now, 86_400, :second),
+        sprite_metering_status: "paid",
+        wallet_address: human.wallet_address,
+        desired_runtime_state: "active",
+        observed_runtime_state: "active"
+      })
+      |> Repo.insert!()
+
+    %Subdomain{}
+    |> Subdomain.changeset(%{
+      agent_id: agent.id,
+      slug: slug,
+      hostname: "#{slug}.regents.sh",
+      basename_fqdn: "#{slug}.agent.base.eth",
+      ens_fqdn: "#{slug}.regent.eth",
+      active: false
+    })
+    |> Repo.insert!()
+
+    formation =
+      %FormationRun{}
+      |> FormationRun.changeset(%{
+        agent_id: agent.id,
+        human_user_id: human.id,
+        claimed_label: slug,
+        status: "running",
+        current_step: "create_sprite",
+        attempt_count: 1,
+        started_at: now,
+        last_heartbeat_at: now
+      })
+      |> Repo.insert!()
+
+    insert_formation_event!(
+      formation,
+      "reserve_claim",
+      "succeeded",
+      "Reserved the claimed name for Agent Formation.",
+      DateTime.add(now, -30, :second)
+    )
+
+    insert_formation_event!(
+      formation,
+      "create_sprite",
+      "started",
+      "Agent Formation is preparing the runtime.",
+      DateTime.add(now, -10, :second)
+    )
+
+    insert_formation_event!(
+      formation,
+      "create_sprite",
+      "succeeded",
+      "Completed create sprite.",
+      now
+    )
+
+    {agent, formation}
+  end
+
+  defp insert_active_company!(human, slug) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    agent =
+      %Agent{}
+      |> Agent.changeset(%{
+        owner_human_id: human.id,
+        template_key: "start",
+        name: "Cloud Regent",
+        slug: slug,
+        claimed_label: slug,
+        basename_fqdn: "#{slug}.agent.base.eth",
+        ens_fqdn: "#{slug}.regent.eth",
+        status: "published",
+        public_summary: "A live company page for claimed-name testing.",
+        hero_statement: "Lets the claimed name link to a live company page.",
+        runtime_status: "ready",
+        checkpoint_status: "ready",
+        stripe_llm_billing_status: "active",
+        stripe_customer_id: "cus_active_#{slug}",
+        stripe_pricing_plan_subscription_id: "sub_active_#{slug}",
+        sprite_free_until: DateTime.add(now, 86_400, :second),
+        sprite_metering_status: "paid",
+        wallet_address: human.wallet_address,
+        published_at: now,
+        desired_runtime_state: "active",
+        observed_runtime_state: "active"
+      })
+      |> Repo.insert!()
+
+    %Subdomain{}
+    |> Subdomain.changeset(%{
+      agent_id: agent.id,
+      slug: slug,
+      hostname: "#{slug}.regents.sh",
+      basename_fqdn: "#{slug}.agent.base.eth",
+      ens_fqdn: "#{slug}.regent.eth",
+      active: true
+    })
+    |> Repo.insert!()
+  end
+
+  defp insert_formation_event!(formation, step, status, message, created_at) do
+    %FormationEvent{}
+    |> FormationEvent.changeset(%{
+      formation_id: formation.id,
+      step: step,
+      status: status,
+      message: message
+    })
+    |> Repo.insert!()
+    |> Ecto.Changeset.change(created_at: created_at)
+    |> Repo.update!()
   end
 
   defp request_url(address, collection) do

@@ -21,18 +21,48 @@ function readEntry(el: Element): TokenCardManifestEntry {
   return JSON.parse(script.textContent) as TokenCardManifestEntry;
 }
 
-export function mountTokenCardRoot(el: Element): void {
-  const mounted = roots.get(el);
-  if (mounted) return;
+function readLayout(el: Element): "page" | "embedded" {
+  return el.getAttribute("data-token-card-layout") === "embedded" ? "embedded" : "page";
+}
 
+function readActive(el: Element): boolean {
+  return el.getAttribute("data-token-card-active") !== "false";
+}
+
+function renderRoot(mounted: MountedTokenCardRoot, el: Element) {
   const entry = readEntry(el);
-  const root = createRoot(el);
-  root.render(
+  const layout = readLayout(el);
+  const active = readActive(el);
+
+  mounted.root.render(
     <React.StrictMode>
-      <TokenCardPage entry={entry} />
+      <TokenCardPage entry={entry} active={active} layout={layout} />
     </React.StrictMode>,
   );
-  roots.set(el, { root });
+}
+
+export function mountTokenCardRoot(el: Element): void {
+  const mounted = roots.get(el);
+  if (mounted) {
+    renderRoot(mounted, el);
+    return;
+  }
+
+  const root = createRoot(el);
+  const nextMounted = { root };
+  roots.set(el, nextMounted);
+  renderRoot(nextMounted, el);
+}
+
+export function updateTokenCardRoot(el: Element): void {
+  const mounted = roots.get(el);
+
+  if (!mounted) {
+    mountTokenCardRoot(el);
+    return;
+  }
+
+  renderRoot(mounted, el);
 }
 
 export function unmountTokenCardRoot(el: Element): void {

@@ -13,7 +13,7 @@ import {
 } from "./dashboard/islands";
 import { DashboardXmtpRoomHook } from "./dashboard/xmtp_room";
 import { mountShaderRoot, unmountShaderRoot } from "./shader/root";
-import { mountTokenCardRoot, unmountTokenCardRoot } from "./shader/token_card_root";
+import { mountTokenCardRoot, unmountTokenCardRoot, updateTokenCardRoot } from "./shader/token_card_root";
 import {
   hooks as regentHooks,
   installHeerich,
@@ -366,6 +366,94 @@ const RegentCliAtlasHook = {
   },
 };
 
+function mountFormationHistory(root: HTMLElement): () => void {
+  return mountDisclosurePanels(root, "[data-formation-toggle]", "Expand", "Collapse");
+}
+
+const FormationHistoryHook = {
+  mounted(this: HookContext & { __formationHistoryCleanup?: () => void }) {
+    this.__formationHistoryCleanup = mountFormationHistory(this.el as HTMLElement);
+  },
+  updated(this: HookContext & { __formationHistoryCleanup?: () => void }) {
+    this.__formationHistoryCleanup?.();
+    this.__formationHistoryCleanup = mountFormationHistory(this.el as HTMLElement);
+  },
+  destroyed(this: HookContext & { __formationHistoryCleanup?: () => void }) {
+    this.__formationHistoryCleanup?.();
+  },
+};
+
+function mountFormationPassGallery(root: HTMLElement): () => void {
+  const cardRoots = Array.from(root.querySelectorAll<HTMLElement>("[data-token-card-root]"));
+  if (cardRoots.length === 0) return () => undefined;
+
+  const budget = Math.max(1, Number.parseInt(root.dataset.tokenCardBudget ?? "10", 10) || 10);
+  const chunkSize = Math.max(1, Number.parseInt(root.dataset.tokenCardChunk ?? "2", 10) || 2);
+  let frameId = 0;
+
+  const syncActiveWindow = () => {
+    frameId = 0;
+
+    const viewportTop = 0;
+    const firstVisibleIndex = cardRoots.findIndex((cardRoot) => {
+      const rect = cardRoot.getBoundingClientRect();
+      return rect.bottom > viewportTop + 48;
+    });
+
+    const normalizedFirstVisible = firstVisibleIndex === -1 ? 0 : firstVisibleIndex;
+    const maxStart = Math.max(0, cardRoots.length - budget);
+    const windowStart = Math.min(maxStart, Math.floor(normalizedFirstVisible / chunkSize) * chunkSize);
+    const windowEnd = windowStart + budget;
+
+    cardRoots.forEach((cardRoot, index) => {
+      const active = index >= windowStart && index < windowEnd;
+      const nextValue = active ? "true" : "false";
+
+      if (cardRoot.dataset.tokenCardActive === nextValue) return;
+
+      cardRoot.dataset.tokenCardActive = nextValue;
+      updateTokenCardRoot(cardRoot);
+    });
+  };
+
+  const requestSync = () => {
+    if (frameId) return;
+    frameId = window.requestAnimationFrame(syncActiveWindow);
+  };
+
+  cardRoots.forEach((cardRoot, index) => {
+    cardRoot.dataset.tokenCardActive = index < budget ? "true" : "false";
+    mountTokenCardRoot(cardRoot);
+  });
+
+  requestSync();
+  window.addEventListener("scroll", requestSync, { passive: true });
+  window.addEventListener("resize", requestSync);
+
+  return () => {
+    if (frameId) {
+      window.cancelAnimationFrame(frameId);
+    }
+
+    window.removeEventListener("scroll", requestSync);
+    window.removeEventListener("resize", requestSync);
+    cardRoots.forEach((cardRoot) => unmountTokenCardRoot(cardRoot));
+  };
+}
+
+const FormationPassGalleryHook = {
+  mounted(this: HookContext & { __formationPassGalleryCleanup?: () => void }) {
+    this.__formationPassGalleryCleanup = mountFormationPassGallery(this.el as HTMLElement);
+  },
+  updated(this: HookContext & { __formationPassGalleryCleanup?: () => void }) {
+    this.__formationPassGalleryCleanup?.();
+    this.__formationPassGalleryCleanup = mountFormationPassGallery(this.el as HTMLElement);
+  },
+  destroyed(this: HookContext & { __formationPassGalleryCleanup?: () => void }) {
+    this.__formationPassGalleryCleanup?.();
+  },
+};
+
 function mountSidebarCommunity(root: HTMLElement): () => void {
   const button = root.querySelector<HTMLButtonElement>("[data-community-toggle]");
   const panel = root.querySelector<HTMLDivElement>("[data-community-panel]");
@@ -580,13 +668,13 @@ const ColorModeToggleHook = {
 };
 
 function mountStaticTokenCardRoots() {
-  document.querySelectorAll("[data-token-card-root]").forEach((el) => {
+  document.querySelectorAll("[data-token-card-root][data-token-card-autoload]").forEach((el) => {
     mountTokenCardRoot(el);
   });
 }
 
 function unmountStaticTokenCardRoots() {
-  document.querySelectorAll("[data-token-card-root]").forEach((el) => {
+  document.querySelectorAll("[data-token-card-root][data-token-card-autoload]").forEach((el) => {
     unmountTokenCardRoot(el);
   });
 }
@@ -613,6 +701,8 @@ const hooks: HooksOptions = {
   AutolaunchReveal: BridgeRevealHook,
   BugReportLedger: BugReportLedgerHook,
   RegentCliAtlas: RegentCliAtlasHook,
+  FormationHistory: FormationHistoryHook,
+  FormationPassGallery: FormationPassGalleryHook,
   SidebarCommunity: SidebarCommunityHook,
   DashboardReveal: DashboardRevealHook,
   DemoReveal: DemoRevealHook,

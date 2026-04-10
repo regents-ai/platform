@@ -502,6 +502,13 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   defp serialize_formation(nil), do: nil
 
   defp serialize_formation(%FormationRun{} = formation) do
+    events =
+      formation
+      |> maybe_preload_events()
+      |> Map.get(:events, [])
+      |> Enum.sort_by(&event_sort_key/1, :asc)
+      |> Enum.map(&serialize_formation_event/1)
+
     %{
       id: formation.id,
       claimed_label: formation.claimed_label,
@@ -512,9 +519,29 @@ defmodule PlatformPhx.AgentPlatform.Formation do
       last_error_message: formation.last_error_message,
       started_at: AgentPlatform.iso(formation.started_at),
       last_heartbeat_at: AgentPlatform.iso(formation.last_heartbeat_at),
-      completed_at: AgentPlatform.iso(formation.completed_at)
+      completed_at: AgentPlatform.iso(formation.completed_at),
+      events: events
     }
   end
+
+  defp maybe_preload_events(%FormationRun{events: events} = formation) when is_list(events),
+    do: formation
+
+  defp maybe_preload_events(%FormationRun{} = formation), do: Repo.preload(formation, :events)
+
+  defp serialize_formation_event(event) do
+    %{
+      step: event.step,
+      status: event.status,
+      message: event.message,
+      created_at: AgentPlatform.iso(event.created_at)
+    }
+  end
+
+  defp event_sort_key(%{created_at: %DateTime{} = created_at}),
+    do: DateTime.to_unix(created_at, :microsecond)
+
+  defp event_sort_key(_event), do: 0
 
   defp empty_holdings do
     %{
