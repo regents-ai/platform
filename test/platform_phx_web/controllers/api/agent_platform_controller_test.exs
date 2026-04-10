@@ -3,6 +3,8 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
   use Oban.Testing, repo: PlatformPhx.Repo
 
   alias PlatformPhx.Accounts.HumanUser
+  alias PlatformPhx.AgentPlatform.BillingAccount
+  alias PlatformPhx.AgentPlatform.WelcomeCreditGrant
   alias PlatformPhx.AgentPlatform.Workers.RunFormationWorker
   alias PlatformPhx.Basenames.Mint
   alias PlatformPhx.OpenSea
@@ -13,18 +15,29 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
   setup do
     previous_client = Application.get_env(:platform_phx, :opensea_http_client)
     previous_responses = Application.get_env(:platform_phx, :opensea_fake_responses)
-    previous_stripe_client = Application.get_env(:platform_phx, :stripe_llm_client)
+    previous_stripe_client = Application.get_env(:platform_phx, :stripe_billing_client)
     previous_sprite_runner = Application.get_env(:platform_phx, :agent_platform_sprite_runner)
+    previous_sprite_runtime_client = Application.get_env(:platform_phx, :sprite_runtime_client)
+
+    previous_credit_grant_result =
+      Application.get_env(:platform_phx, :stripe_fake_credit_grant_result)
+
     previous_api_key = System.get_env("OPENSEA_API_KEY")
     previous_stripe_secret_key = System.get_env("STRIPE_SECRET_KEY")
     previous_webhook_secret = System.get_env("STRIPE_WEBHOOK_SECRET")
-    previous_pricing_plan_id = System.get_env("STRIPE_LLM_PRICING_PLAN_ID")
-    previous_success_url = System.get_env("STRIPE_LLM_SUCCESS_URL")
-    previous_cancel_url = System.get_env("STRIPE_LLM_CANCEL_URL")
+    previous_pricing_plan_id = System.get_env("STRIPE_BILLING_PRICING_PLAN_ID")
+    previous_topup_success_url = System.get_env("STRIPE_BILLING_TOPUP_SUCCESS_URL")
+    previous_topup_cancel_url = System.get_env("STRIPE_BILLING_TOPUP_CANCEL_URL")
+    previous_runtime_meter_name = System.get_env("STRIPE_RUNTIME_METER_EVENT_NAME")
+    previous_welcome_credit_enabled = System.get_env("WELCOME_CREDIT_ENABLED")
+    previous_welcome_credit_limit = System.get_env("WELCOME_CREDIT_LIMIT")
+    previous_welcome_credit_amount = System.get_env("WELCOME_CREDIT_AMOUNT_USD_CENTS")
+    previous_welcome_credit_expiry = System.get_env("WELCOME_CREDIT_EXPIRY_DAYS")
 
     Application.put_env(:platform_phx, :opensea_http_client, PlatformPhx.OpenSeaFakeClient)
     Application.put_env(:platform_phx, :opensea_fake_responses, %{})
-    Application.put_env(:platform_phx, :stripe_llm_client, PlatformPhx.StripeLlmFakeClient)
+    Application.put_env(:platform_phx, :stripe_billing_client, PlatformPhx.StripeLlmFakeClient)
+    Application.put_env(:platform_phx, :stripe_fake_credit_grant_result, :ok)
 
     Application.put_env(
       :platform_phx,
@@ -32,25 +45,54 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       PlatformPhx.SpriteRunnerFake
     )
 
+    Application.put_env(
+      :platform_phx,
+      :sprite_runtime_client,
+      PlatformPhx.SpriteRuntimeClientFake
+    )
+
     System.put_env("OPENSEA_API_KEY", "test-key")
     System.put_env("STRIPE_SECRET_KEY", "sk_test_agent_formation")
     System.put_env("STRIPE_WEBHOOK_SECRET", "whsec_test")
-    System.put_env("STRIPE_LLM_PRICING_PLAN_ID", "pp_test_agent_formation")
-    System.put_env("STRIPE_LLM_SUCCESS_URL", "https://regents.sh/services?billing=success")
-    System.put_env("STRIPE_LLM_CANCEL_URL", "https://regents.sh/services?billing=cancel")
+    System.put_env("STRIPE_BILLING_PRICING_PLAN_ID", "pp_test_agent_formation")
+
+    System.put_env(
+      "STRIPE_BILLING_TOPUP_SUCCESS_URL",
+      "https://regents.sh/services?topup=success"
+    )
+
+    System.put_env("STRIPE_BILLING_TOPUP_CANCEL_URL", "https://regents.sh/services?topup=cancel")
+    System.put_env("STRIPE_RUNTIME_METER_EVENT_NAME", "sprite_runtime_seconds")
+    System.put_env("WELCOME_CREDIT_ENABLED", "true")
+    System.put_env("WELCOME_CREDIT_LIMIT", "100")
+    System.put_env("WELCOME_CREDIT_AMOUNT_USD_CENTS", "500")
+    System.put_env("WELCOME_CREDIT_EXPIRY_DAYS", "60")
     OpenSea.clear_cache()
 
     on_exit(fn ->
       restore_app_env(:platform_phx, :opensea_http_client, previous_client)
       restore_app_env(:platform_phx, :opensea_fake_responses, previous_responses)
-      restore_app_env(:platform_phx, :stripe_llm_client, previous_stripe_client)
+      restore_app_env(:platform_phx, :stripe_billing_client, previous_stripe_client)
       restore_app_env(:platform_phx, :agent_platform_sprite_runner, previous_sprite_runner)
+      restore_app_env(:platform_phx, :sprite_runtime_client, previous_sprite_runtime_client)
+
+      restore_app_env(
+        :platform_phx,
+        :stripe_fake_credit_grant_result,
+        previous_credit_grant_result
+      )
+
       restore_system_env("OPENSEA_API_KEY", previous_api_key)
       restore_system_env("STRIPE_SECRET_KEY", previous_stripe_secret_key)
       restore_system_env("STRIPE_WEBHOOK_SECRET", previous_webhook_secret)
-      restore_system_env("STRIPE_LLM_PRICING_PLAN_ID", previous_pricing_plan_id)
-      restore_system_env("STRIPE_LLM_SUCCESS_URL", previous_success_url)
-      restore_system_env("STRIPE_LLM_CANCEL_URL", previous_cancel_url)
+      restore_system_env("STRIPE_BILLING_PRICING_PLAN_ID", previous_pricing_plan_id)
+      restore_system_env("STRIPE_BILLING_TOPUP_SUCCESS_URL", previous_topup_success_url)
+      restore_system_env("STRIPE_BILLING_TOPUP_CANCEL_URL", previous_topup_cancel_url)
+      restore_system_env("STRIPE_RUNTIME_METER_EVENT_NAME", previous_runtime_meter_name)
+      restore_system_env("WELCOME_CREDIT_ENABLED", previous_welcome_credit_enabled)
+      restore_system_env("WELCOME_CREDIT_LIMIT", previous_welcome_credit_limit)
+      restore_system_env("WELCOME_CREDIT_AMOUNT_USD_CENTS", previous_welcome_credit_amount)
+      restore_system_env("WELCOME_CREDIT_EXPIRY_DAYS", previous_welcome_credit_expiry)
       OpenSea.clear_cache()
     end)
 
@@ -66,7 +108,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert response["authenticated"] == false
     assert response["eligible"] == false
     assert response["available_claims"] == []
-    assert response["llm_billing"]["connected"] == false
+    assert response["billing_account"]["connected"] == false
   end
 
   test "formation shows eligible holdings and claimed names for a signed-in human", %{conn: conn} do
@@ -92,7 +134,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert Enum.map(response["available_claims"], & &1["label"]) == ["tempo"]
   end
 
-  test "billing checkout, webhook sync, and formation queue a company", %{conn: conn} do
+  test "billing setup, top-up, webhook sync, and formation queue a company", %{conn: conn} do
     human = insert_human!()
     insert_claimed_name!(human, "startline")
 
@@ -107,12 +149,14 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     billing_response =
       conn
-      |> post("/api/agent-platform/formation/llm-billing/checkout")
+      |> post("/api/agent-platform/billing/setup/checkout", %{claimedLabel: "startline"})
       |> json_response(200)
 
     assert billing_response["checkout_url"] =~ "billing.stripe.test"
+    assert billing_response["checkout_url"] =~ "claimedLabel%3Dstartline"
+    assert billing_response["checkout_url"] =~ "billing%3Dsuccess"
 
-    raw_body = stripe_event_body(human.id)
+    raw_body = stripe_setup_event_body(human.id)
 
     webhook_conn =
       Phoenix.ConnTest.build_conn()
@@ -122,8 +166,18 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     assert json_response(webhook_conn, 200)["ok"] == true
 
-    [job] = all_enqueued(worker: PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker)
+    job = find_sync_billing_job!("evt_test_checkout")
     assert :ok == perform_job(worker_module(job.worker), job.args)
+
+    account_response =
+      conn
+      |> get("/api/agent-platform/billing/account")
+      |> json_response(200)
+
+    assert account_response["billing_account"]["runtime_credit_balance_usd_cents"] == 500
+    assert account_response["billing_account"]["welcome_credit"]["amount_usd_cents"] == 500
+    assert account_response["billing_account"]["welcome_credit"]["credit_scope"] == "runtime_only"
+    assert account_response["billing_account"]["welcome_credit"]["stripe_sync_status"] == "synced"
 
     response =
       conn
@@ -135,7 +189,6 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert response["agent"]["status"] == "forming"
     assert response["agent"]["subdomain"]["hostname"] == "startline.regents.sh"
     assert response["agent"]["subdomain"]["active"] == false
-    assert response["agent"]["stripe_llm_billing_status"] == "active"
     assert response["agent"]["runtime_status"] == "queued"
     assert response["formation"]["status"] == "queued"
     assert response["formation"]["current_step"] == "reserve_claim"
@@ -156,7 +209,101 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert runtime_response["runtime"]["sprite"]["owner"] == "regents"
     assert runtime_response["runtime"]["hermes"]["adapter_type"] == "hermes_local"
     assert runtime_response["runtime"]["hermes"]["model"] == "glm-5.1"
+    assert runtime_response["billing_account"]["connected"] == true
     assert runtime_response["formation"]["status"] == "succeeded"
+
+    topup_response =
+      conn
+      |> post("/api/agent-platform/billing/topups/checkout", %{amountUsdCents: 800})
+      |> json_response(200)
+
+    assert topup_response["checkout_url"] =~ "runtime-topup"
+
+    topup_body = stripe_topup_event_body(human.id, 800)
+
+    topup_conn =
+      Phoenix.ConnTest.build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("stripe-signature", stripe_signature(topup_body, "whsec_test"))
+      |> post("/api/agent-platform/stripe/webhooks", topup_body)
+
+    assert json_response(topup_conn, 200)["ok"] == true
+
+    topup_job = find_sync_billing_job!("evt_test_topup")
+    assert :ok == perform_job(worker_module(topup_job.worker), topup_job.args)
+
+    usage_response =
+      conn
+      |> get("/api/agent-platform/billing/usage")
+      |> json_response(200)
+
+    assert usage_response["usage"]["runtime_credit_balance_usd_cents"] == 1300
+    assert usage_response["usage"]["welcome_credit"]["amount_usd_cents"] == 500
+
+    pause_response =
+      conn
+      |> post("/api/agent-platform/sprites/startline/pause")
+      |> json_response(200)
+
+    assert pause_response["sprite"]["desired_runtime_state"] == "paused"
+
+    resume_response =
+      conn
+      |> post("/api/agent-platform/sprites/startline/resume")
+      |> json_response(200)
+
+    assert resume_response["sprite"]["desired_runtime_state"] == "active"
+  end
+
+  test "webhook replay does not duplicate a top-up credit", %{conn: _conn} do
+    human = insert_human!()
+    billing_account = insert_billing_account!(human)
+    raw_body = stripe_topup_event_body(human.id, 500, billing_account.id)
+
+    for _ <- 1..2 do
+      webhook_conn =
+        Phoenix.ConnTest.build_conn()
+        |> put_req_header("content-type", "application/json")
+        |> put_req_header("stripe-signature", stripe_signature(raw_body, "whsec_test"))
+        |> post("/api/agent-platform/stripe/webhooks", raw_body)
+
+      assert json_response(webhook_conn, 200)["ok"] == true
+
+      job = find_sync_billing_job!("evt_test_topup")
+      assert :ok == perform_job(worker_module(job.worker), job.args)
+    end
+
+    account = Repo.get!(BillingAccount, billing_account.id)
+    assert account.runtime_credit_balance_usd_cents == 500
+  end
+
+  test "billing setup replay does not duplicate the welcome credit", %{conn: conn} do
+    human = insert_human!()
+    conn = init_test_session(conn, %{current_human_id: human.id})
+    raw_body = stripe_setup_event_body(human.id)
+
+    for _ <- 1..2 do
+      webhook_conn =
+        Phoenix.ConnTest.build_conn()
+        |> put_req_header("content-type", "application/json")
+        |> put_req_header("stripe-signature", stripe_signature(raw_body, "whsec_test"))
+        |> post("/api/agent-platform/stripe/webhooks", raw_body)
+
+      assert json_response(webhook_conn, 200)["ok"] == true
+
+      job = find_sync_billing_job!("evt_test_checkout")
+      assert :ok == perform_job(worker_module(job.worker), job.args)
+    end
+
+    billing_account =
+      conn
+      |> get("/api/agent-platform/billing/account")
+      |> json_response(200)
+      |> get_in(["billing_account"])
+
+    assert billing_account["runtime_credit_balance_usd_cents"] == 500
+    assert billing_account["welcome_credit"]["amount_usd_cents"] == 500
+    assert Repo.aggregate(WelcomeCreditGrant, :count, :id) == 1
   end
 
   defp insert_human! do
@@ -196,7 +343,19 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     "https://api.opensea.io/api/v2/chain/base/account/#{address}/nfts?collection=#{collection}&limit=100"
   end
 
-  defp stripe_event_body(human_user_id) do
+  defp insert_billing_account!(human) do
+    %BillingAccount{}
+    |> BillingAccount.changeset(%{
+      human_user_id: human.id,
+      billing_status: "active",
+      stripe_customer_id: "cus_test_agent_formation",
+      stripe_pricing_plan_subscription_id: "sub_test_agent_formation",
+      runtime_credit_balance_usd_cents: 0
+    })
+    |> Repo.insert!()
+  end
+
+  defp stripe_setup_event_body(human_user_id) do
     Jason.encode!(%{
       id: "evt_test_checkout",
       type: "checkout.session.completed",
@@ -204,12 +363,44 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
         object: %{
           customer: "cus_test_agent_formation",
           subscription: "sub_test_agent_formation",
+          mode: "subscription",
           status: "active",
-          metadata: %{"human_user_id" => Integer.to_string(human_user_id)}
+          metadata: %{
+            "checkout_kind" => "billing_setup",
+            "human_user_id" => Integer.to_string(human_user_id)
+          }
         }
       }
     })
   end
+
+  defp stripe_topup_event_body(human_user_id, amount_usd_cents, billing_account_id \\ nil) do
+    metadata =
+      %{
+        "checkout_kind" => "runtime_topup",
+        "human_user_id" => Integer.to_string(human_user_id),
+        "amount_usd_cents" => Integer.to_string(amount_usd_cents)
+      }
+      |> maybe_put_billing_account_id(billing_account_id)
+
+    Jason.encode!(%{
+      id: "evt_test_topup",
+      type: "checkout.session.completed",
+      data: %{
+        object: %{
+          customer: "cus_test_agent_formation",
+          mode: "payment",
+          status: "complete",
+          metadata: metadata
+        }
+      }
+    })
+  end
+
+  defp maybe_put_billing_account_id(metadata, nil), do: metadata
+
+  defp maybe_put_billing_account_id(metadata, id),
+    do: Map.put(metadata, "billing_account_id", Integer.to_string(id))
 
   defp stripe_signature(raw_body, secret) do
     timestamp = Integer.to_string(System.system_time(:second))
@@ -223,6 +414,15 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
   defp worker_module(worker) when is_atom(worker), do: worker
   defp worker_module(worker) when is_binary(worker), do: Module.concat([worker])
+
+  defp find_sync_billing_job!(event_id) do
+    all_enqueued(worker: PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker)
+    |> Enum.find(fn job -> job.args["event_id"] == event_id end)
+    |> case do
+      nil -> flunk("expected Stripe billing job for #{event_id}")
+      job -> job
+    end
+  end
 
   defp restore_app_env(app, key, nil), do: Application.delete_env(app, key)
   defp restore_app_env(app, key, value), do: Application.put_env(app, key, value)

@@ -6,16 +6,17 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Agent
+  alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.Connection
-  alias PlatformPhx.AgentPlatform.CreditLedger
   alias PlatformPhx.AgentPlatform.FormationEvent
   alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.AgentPlatform.Service
-  alias PlatformPhx.AgentPlatform.StripeLlmBilling
+  alias PlatformPhx.AgentPlatform.StripeBilling
   alias PlatformPhx.AgentPlatform.Subdomain
   alias PlatformPhx.AgentPlatform.Workers.RunFormationWorker
   alias PlatformPhx.Basenames.Mint
   alias PlatformPhx.Repo
+  alias PlatformPhxWeb.Endpoint
   alias Oban
 
   @default_template_key "start"
@@ -31,8 +32,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
        collections: empty_holdings(),
        claimed_names: [],
        available_claims: [],
-       llm_billing: AgentPlatform.llm_billing_payload("not_connected", nil, nil),
-       credits: AgentPlatform.empty_credit_summary(),
+       billing_account: AgentPlatform.billing_account_payload(nil, []),
        owned_companies: [],
        active_formations: []
      }}
@@ -42,6 +42,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
     with {:ok, holdings} <- AgentPlatform.holdings_for_human(human) do
       claimed_names = AgentPlatform.claimed_names_for_human(human)
       companies = AgentPlatform.list_owned_agents(human)
+      billing_account = AgentPlatform.get_billing_account(human)
 
       {:ok,
        %{
@@ -52,13 +53,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
          collections: holdings,
          claimed_names: claimed_names,
          available_claims: Enum.reject(claimed_names, & &1.in_use),
-         llm_billing:
-           AgentPlatform.llm_billing_payload(
-             human.stripe_llm_billing_status,
-             human.stripe_customer_id,
-             human.stripe_pricing_plan_subscription_id
-           ),
-         credits: credit_summary_map(companies),
+         billing_account: AgentPlatform.billing_account_payload(billing_account, companies),
          owned_companies: Enum.map(companies, &AgentPlatform.serialize_agent(&1, :private)),
          active_formations:
            companies
@@ -69,29 +64,34 @@ defmodule PlatformPhx.AgentPlatform.Formation do
     end
   end
 
-  def start_llm_billing_checkout(nil),
-    do: {:error, {:unauthorized, "Sign in before starting Agent Formation billing"}}
+  def start_billing_setup_checkout(human, attrs \\ %{})
 
-  def start_llm_billing_checkout(%HumanUser{} = human) do
+  def start_billing_setup_checkout(nil, _attrs),
+    do: {:error, {:unauthorized, "Sign in before setting up billing"}}
+
+  def start_billing_setup_checkout(%HumanUser{} = human, attrs) when is_map(attrs) do
     with :ok <- ensure_wallet_connected(human),
-         {:ok, checkout} <- StripeLlmBilling.create_checkout_session(human),
-         {:ok, updated_human} <-
-           human
-           |> HumanUser.changeset(%{
-             stripe_llm_billing_status: "checkout_open",
-             stripe_customer_id: checkout.customer_id || human.stripe_customer_id
+         {:ok, billing_account} <- AgentPlatform.ensure_billing_account(human),
+         {:ok, checkout_urls} <- build_billing_setup_checkout_urls(attrs),
+         {:ok, checkout} <-
+           StripeBilling.create_billing_setup_checkout_session(
+             billing_account,
+             human.id,
+             success_url: checkout_urls.success_url,
+             cancel_url: checkout_urls.cancel_url
+           ),
+         {:ok, updated_account} <-
+           billing_account
+           |> BillingAccount.changeset(%{
+             billing_status: "checkout_open",
+             stripe_customer_id: checkout.customer_id || billing_account.stripe_customer_id
            })
            |> Repo.update() do
       {:ok,
        %{
          ok: true,
          checkout_url: checkout.url,
-         llm_billing:
-           AgentPlatform.llm_billing_payload(
-             updated_human.stripe_llm_billing_status,
-             updated_human.stripe_customer_id,
-             updated_human.stripe_pricing_plan_subscription_id
-           )
+         billing_account: AgentPlatform.billing_account_payload(updated_account)
        }}
     else
       {:error, _reason} = error -> error
@@ -105,12 +105,12 @@ defmodule PlatformPhx.AgentPlatform.Formation do
     with :ok <- ensure_wallet_connected(human),
          {:ok, holdings} <- AgentPlatform.holdings_for_human(human),
          :ok <- ensure_eligible_holdings(holdings),
-         :ok <- ensure_llm_billing_active(human),
+         {:ok, billing_account} <- require_active_billing_account(human),
          {:ok, template} <- require_customer_template(),
          {:ok, mint} <- require_available_claimed_name(human, attrs),
          false <- slug_taken?(mint.label),
          {:ok, %{agent: agent, formation: formation}} <-
-           create_company_records(human, mint, template),
+           create_company_records(human, billing_account, mint, template),
          {:ok, _job} <- enqueue_formation(agent.id) do
       reloaded = AgentPlatform.get_owned_agent(human, agent.slug)
 
@@ -132,11 +132,14 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   def runtime_payload(%HumanUser{} = human, slug) when is_binary(slug) do
     case AgentPlatform.get_owned_agent(human, slug) do
       %Agent{} = agent ->
+        billing_account = AgentPlatform.get_billing_account(human)
+
         {:ok,
          %{
            ok: true,
            agent: AgentPlatform.serialize_agent(agent, :private),
-           runtime: AgentPlatform.runtime_payload_map(agent),
+           runtime: AgentPlatform.runtime_payload_map(agent, billing_account),
+           billing_account: AgentPlatform.billing_account_payload(billing_account, [agent]),
            formation: serialize_formation(agent.formation_run)
          }}
 
@@ -145,48 +148,94 @@ defmodule PlatformPhx.AgentPlatform.Formation do
     end
   end
 
-  def credit_summary(nil),
-    do: {:error, {:unauthorized, "Sign in before reading Sprite credits"}}
+  def billing_account_payload(nil),
+    do: {:error, {:unauthorized, "Sign in before reading billing"}}
 
-  def credit_summary(%HumanUser{} = human) do
-    {:ok, %{ok: true, credits: credit_summary_map(AgentPlatform.list_owned_agents(human))}}
+  def billing_account_payload(%HumanUser{} = human) do
+    companies = AgentPlatform.list_owned_agents(human)
+    billing_account = AgentPlatform.get_billing_account(human)
+
+    {:ok,
+     %{
+       ok: true,
+       billing_account: AgentPlatform.billing_account_payload(billing_account, companies)
+     }}
   end
 
-  def start_credit_checkout(nil, _attrs),
-    do: {:error, {:unauthorized, "Sign in before adding Sprite credits"}}
+  def billing_usage(nil),
+    do: {:error, {:unauthorized, "Sign in before reading billing usage"}}
 
-  def start_credit_checkout(%HumanUser{} = human, attrs) when is_map(attrs) do
-    with slug when is_binary(slug) <- AgentPlatform.normalize_slug(Map.get(attrs, "slug")),
-         amount when is_integer(amount) and amount > 0 <-
+  def billing_usage(%HumanUser{} = human) do
+    companies = AgentPlatform.list_owned_agents(human)
+    billing_account = AgentPlatform.get_billing_account(human)
+
+    usage =
+      case billing_account do
+        %BillingAccount{} = account -> AgentPlatform.billing_usage_payload(account, companies)
+        nil -> AgentPlatform.billing_usage_payload(%BillingAccount{}, companies)
+      end
+
+    {:ok, %{ok: true, usage: usage}}
+  end
+
+  def start_billing_topup_checkout(nil, _attrs),
+    do: {:error, {:unauthorized, "Sign in before adding runtime credit"}}
+
+  def start_billing_topup_checkout(%HumanUser{} = human, attrs) when is_map(attrs) do
+    with amount when is_integer(amount) and amount > 0 <-
            normalize_positive_integer(Map.get(attrs, "amountUsdCents")),
-         %Agent{} = agent <- AgentPlatform.get_owned_agent(human, slug),
-         {:ok, _entry} <- insert_credit_purchase(agent, amount),
-         {:ok, _updated} <-
-           agent
-           |> Agent.changeset(%{
-             sprite_credit_balance_usd_cents:
-               (agent.sprite_credit_balance_usd_cents || 0) + amount,
-             sprite_metering_status: "paid"
-           })
-           |> Repo.update() do
-      reloaded = AgentPlatform.get_owned_agent(human, slug)
-
+         {:ok, billing_account} <- AgentPlatform.ensure_billing_account(human),
+         {:ok, checkout} <- StripeBilling.create_topup_checkout_session(billing_account, amount) do
       {:ok,
        %{
          ok: true,
-         agent: AgentPlatform.serialize_agent(reloaded, :private),
-         credits: credit_summary_map(AgentPlatform.list_owned_agents(human))
+         checkout_url: checkout.url,
+         billing_account: AgentPlatform.billing_account_payload(billing_account)
        }}
     else
-      nil -> {:error, {:bad_request, "Choose a valid company slug"}}
       false -> {:error, {:bad_request, "Amount must be a positive integer"}}
       {:error, _reason} = error -> error
-      _other -> {:error, {:not_found, "Company not found"}}
+    end
+  end
+
+  def pause_sprite(nil, _slug), do: {:error, {:unauthorized, "Sign in before pausing a sprite"}}
+
+  def pause_sprite(%HumanUser{} = human, slug) when is_binary(slug) do
+    with %Agent{} = agent <- AgentPlatform.get_owned_agent(human, slug),
+         {:ok, updated} <-
+           agent
+           |> Agent.changeset(%{desired_runtime_state: "paused", runtime_status: "paused"})
+           |> Repo.update() do
+      {:ok, %{ok: true, sprite: sprite_runtime_control_payload(updated)}}
+    else
+      nil -> {:error, {:not_found, "Company not found"}}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  def resume_sprite(nil, _slug), do: {:error, {:unauthorized, "Sign in before resuming a sprite"}}
+
+  def resume_sprite(%HumanUser{} = human, slug) when is_binary(slug) do
+    with %Agent{} = agent <- AgentPlatform.get_owned_agent(human, slug),
+         {:ok, billing_account} <- require_active_or_funded_billing_account(human, agent),
+         {:ok, updated} <-
+           agent
+           |> Agent.changeset(%{desired_runtime_state: "active", runtime_status: "ready"})
+           |> Repo.update() do
+      {:ok,
+       %{
+         ok: true,
+         sprite: sprite_runtime_control_payload(updated),
+         billing_account: AgentPlatform.billing_account_payload(billing_account, [updated])
+       }}
+    else
+      nil -> {:error, {:not_found, "Company not found"}}
+      {:error, _reason} = error -> error
     end
   end
 
   def handle_stripe_webhook(raw_body, headers) when is_binary(raw_body) and is_map(headers) do
-    with {:ok, event} <- StripeLlmBilling.parse_webhook_event(raw_body, headers),
+    with {:ok, event} <- StripeBilling.parse_webhook_event(raw_body, headers),
          {:ok, _job} <-
            PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker.new(event)
            |> Oban.insert() do
@@ -194,20 +243,12 @@ defmodule PlatformPhx.AgentPlatform.Formation do
     end
   end
 
-  def create_usage_event(%Agent{} = agent, attrs) when is_map(attrs) do
-    %PlatformPhx.AgentPlatform.LlmUsageEvent{}
-    |> PlatformPhx.AgentPlatform.LlmUsageEvent.changeset(
-      Map.merge(attrs, %{
-        agent_id: agent.id,
-        human_user_id: agent.owner_human_id,
-        occurred_at:
-          Map.get(attrs, :occurred_at) || DateTime.utc_now() |> DateTime.truncate(:second)
-      })
-    )
-    |> Repo.insert()
-  end
-
-  defp create_company_records(%HumanUser{} = human, %Mint{} = mint, template) do
+  defp create_company_records(
+         %HumanUser{} = human,
+         %BillingAccount{} = billing_account,
+         %Mint{} = mint,
+         template
+       ) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
     slug = mint.label
 
@@ -235,13 +276,14 @@ defmodule PlatformPhx.AgentPlatform.Formation do
       hermes_shared_skills: template.runtime_defaults[:hermes_shared_skills] || [],
       runtime_status: "queued",
       checkpoint_status: "pending",
-      stripe_llm_billing_status: human.stripe_llm_billing_status,
-      stripe_customer_id: human.stripe_customer_id,
-      stripe_pricing_plan_subscription_id: human.stripe_pricing_plan_subscription_id,
+      stripe_llm_billing_status: billing_account.billing_status,
+      stripe_customer_id: billing_account.stripe_customer_id,
+      stripe_pricing_plan_subscription_id: billing_account.stripe_pricing_plan_subscription_id,
       sprite_free_until: DateTime.add(now, 86_400, :second),
-      sprite_credit_balance_usd_cents: 0,
       sprite_metering_status: "trialing",
-      wallet_address: human.wallet_address
+      wallet_address: human.wallet_address,
+      desired_runtime_state: "active",
+      observed_runtime_state: "unknown"
     }
 
     Repo.transaction(fn ->
@@ -318,11 +360,33 @@ defmodule PlatformPhx.AgentPlatform.Formation do
     end
   end
 
-  defp ensure_llm_billing_active(%HumanUser{} = human) do
-    if human.stripe_llm_billing_status == "active" do
-      :ok
-    else
-      {:error, {:payment_required, "Start Stripe billing before Agent Formation can continue"}}
+  defp require_active_billing_account(%HumanUser{} = human) do
+    case AgentPlatform.ensure_billing_account(human) do
+      {:ok, %BillingAccount{billing_status: "active"} = billing_account} ->
+        {:ok, billing_account}
+
+      {:ok, _billing_account} ->
+        {:error, {:payment_required, "Finish billing setup before starting a company"}}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp require_active_or_funded_billing_account(%HumanUser{} = human, %Agent{} = agent) do
+    case AgentPlatform.ensure_billing_account(human) do
+      {:ok, %BillingAccount{} = billing_account} ->
+        if billing_account.billing_status == "active" or
+             (is_struct(agent.sprite_free_until, DateTime) and
+                DateTime.compare(agent.sprite_free_until, DateTime.utc_now()) == :gt) or
+             (billing_account.runtime_credit_balance_usd_cents || 0) > 0 do
+          {:ok, billing_account}
+        else
+          {:error, {:payment_required, "Add runtime credit before resuming this company"}}
+        end
+
+      {:error, _reason} = error ->
+        error
     end
   end
 
@@ -435,49 +499,12 @@ defmodule PlatformPhx.AgentPlatform.Formation do
     end)
   end
 
-  defp credit_summary_map(companies) do
-    summaries =
-      Enum.map(companies, fn agent ->
-        %{
-          slug: agent.slug,
-          name: agent.name,
-          runtime_status: AgentPlatform.effective_runtime_status(agent),
-          sprite_metering_status: AgentPlatform.effective_metering_status(agent),
-          sprite_credit_balance_usd_cents: agent.sprite_credit_balance_usd_cents || 0,
-          sprite_free_until: AgentPlatform.iso(agent.sprite_free_until)
-        }
-      end)
-
-    %{
-      total_balance_usd_cents:
-        Enum.reduce(summaries, 0, fn company, acc ->
-          acc + company.sprite_credit_balance_usd_cents
-        end),
-      trialing_companies: Enum.count(summaries, &(&1.sprite_metering_status == "trialing")),
-      paid_companies: Enum.count(summaries, &(&1.sprite_metering_status == "paid")),
-      paused_companies: Enum.count(summaries, &(&1.sprite_metering_status == "paused")),
-      companies: summaries
-    }
-  end
-
-  defp insert_credit_purchase(%Agent{} = agent, amount) do
-    %CreditLedger{}
-    |> CreditLedger.changeset(%{
-      agent_id: agent.id,
-      entry_type: "purchase",
-      amount_usd_cents: amount,
-      description: "Sprite runtime credits added through Agent Formation.",
-      source_ref: "manual-top-up",
-      effective_at: DateTime.utc_now() |> DateTime.truncate(:second)
-    })
-    |> Repo.insert()
-  end
-
   defp serialize_formation(nil), do: nil
 
   defp serialize_formation(%FormationRun{} = formation) do
     %{
       id: formation.id,
+      claimed_label: formation.claimed_label,
       status: formation.status,
       current_step: formation.current_step,
       attempt_count: formation.attempt_count,
@@ -507,6 +534,47 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   end
 
   defp normalize_positive_integer(_value), do: false
+
+  defp build_billing_setup_checkout_urls(attrs) do
+    claimed_label =
+      attrs
+      |> Map.get("claimedLabel")
+      |> AgentPlatform.normalize_slug()
+
+    success_path =
+      "/agent-formation?" <>
+        URI.encode_query(
+          %{"stage" => "setup", "billing" => "success"}
+          |> maybe_put_claimed_label(claimed_label)
+        )
+
+    cancel_path =
+      "/agent-formation?" <>
+        URI.encode_query(
+          %{"stage" => "setup", "billing" => "cancel"}
+          |> maybe_put_claimed_label(claimed_label)
+        )
+
+    {:ok,
+     %{
+       success_url: Endpoint.url() <> success_path,
+       cancel_url: Endpoint.url() <> cancel_path
+     }}
+  end
+
+  defp maybe_put_claimed_label(params, nil), do: params
+
+  defp maybe_put_claimed_label(params, claimed_label),
+    do: Map.put(params, "claimedLabel", claimed_label)
+
+  defp sprite_runtime_control_payload(%Agent{} = agent) do
+    %{
+      slug: agent.slug,
+      desired_runtime_state: agent.desired_runtime_state,
+      observed_runtime_state: agent.observed_runtime_state,
+      runtime_status: AgentPlatform.effective_runtime_status(agent)
+    }
+  end
 
   defp titleize_slug(slug) do
     slug

@@ -12,10 +12,10 @@ defmodule PlatformPhxWeb.Api.AgentFormationController do
     |> then(&ApiErrors.respond(conn, &1))
   end
 
-  def llm_billing_checkout(conn, _params) do
+  def billing_setup_checkout(conn, params) do
     conn
     |> current_human()
-    |> Formation.start_llm_billing_checkout()
+    |> Formation.start_billing_setup_checkout(params)
     |> then(&ApiErrors.respond(conn, &1))
   end
 
@@ -33,17 +33,38 @@ defmodule PlatformPhxWeb.Api.AgentFormationController do
     |> then(&ApiErrors.respond(conn, &1))
   end
 
-  def credits(conn, _params) do
+  def billing_account(conn, _params) do
     conn
     |> current_human()
-    |> Formation.credit_summary()
+    |> Formation.billing_account_payload()
     |> then(&ApiErrors.respond(conn, &1))
   end
 
-  def checkout_credits(conn, params) do
+  def billing_usage(conn, _params) do
     conn
     |> current_human()
-    |> Formation.start_credit_checkout(params)
+    |> Formation.billing_usage()
+    |> then(&ApiErrors.respond(conn, &1))
+  end
+
+  def billing_topup_checkout(conn, params) do
+    conn
+    |> current_human()
+    |> Formation.start_billing_topup_checkout(params)
+    |> then(&ApiErrors.respond(conn, &1))
+  end
+
+  def pause_sprite(conn, %{"slug" => slug}) do
+    conn
+    |> current_human()
+    |> Formation.pause_sprite(slug)
+    |> then(&ApiErrors.respond(conn, &1))
+  end
+
+  def resume_sprite(conn, %{"slug" => slug}) do
+    conn
+    |> current_human()
+    |> Formation.resume_sprite(slug)
     |> then(&ApiErrors.respond(conn, &1))
   end
 

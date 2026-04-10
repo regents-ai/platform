@@ -15,6 +15,9 @@ defmodule PlatformPhx.Accounts.HumanUser do
     field :stripe_customer_id, :string
     field :stripe_pricing_plan_subscription_id, :string
 
+    has_one :billing_account, PlatformPhx.AgentPlatform.BillingAccount
+    has_many :welcome_credit_grants, PlatformPhx.AgentPlatform.WelcomeCreditGrant
+
     timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end
 

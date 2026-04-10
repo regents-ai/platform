@@ -443,26 +443,66 @@ paths:
           $ref: '#/components/responses/StatusMessage502'
         '503':
           $ref: '#/components/responses/StatusMessage503'
-  /api/agent-platform/formation/llm-billing/checkout:
+  /api/agent-platform/billing/setup/checkout:
     post:
-      operationId: agentPlatformFormationLlmBillingCheckout
+      operationId: agentPlatformBillingSetupCheckout
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillingSetupCheckoutRequest'
       responses:
         '200':
-          description: Stripe-hosted checkout started for the current human
+          description: Stripe-hosted billing setup started for the current human
           content:
             application/json:
               schema:
                 type: object
-                required: [ok, checkout_url, llm_billing]
+                required: [ok, checkout_url, billing_account]
                 properties:
                   ok: {type: boolean}
                   checkout_url: {type: string}
-                  llm_billing:
-                    $ref: '#/components/schemas/LlmBillingStatus'
+                  billing_account:
+                    $ref: '#/components/schemas/BillingAccount'
         '401':
           $ref: '#/components/responses/StatusMessage401'
         '503':
           $ref: '#/components/responses/StatusMessage503'
+  /api/agent-platform/billing/account:
+    get:
+      operationId: agentPlatformBillingAccount
+      responses:
+        '200':
+          description: Current billing account for the signed-in human
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, billing_account]
+                properties:
+                  ok: {type: boolean}
+                  billing_account:
+                    $ref: '#/components/schemas/BillingAccount'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /api/agent-platform/billing/usage:
+    get:
+      operationId: agentPlatformBillingUsage
+      responses:
+        '200':
+          description: Shared runtime usage summary for the signed-in human
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, usage]
+                properties:
+                  ok: {type: boolean}
+                  usage:
+                    $ref: '#/components/schemas/BillingUsageSummary'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
   /api/agent-platform/formation/companies:
     post:
       operationId: agentPlatformFormationCreateCompany
@@ -516,45 +556,32 @@ paths:
           $ref: '#/components/responses/StatusMessage401'
         '404':
           $ref: '#/components/responses/StatusMessage404'
-  /api/agent-platform/credits:
-    get:
-      operationId: agentPlatformFormationCredits
-      responses:
-        '200':
-          description: Current Sprite credit summary for the signed-in human
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [ok, credits]
-                properties:
-                  ok: {type: boolean}
-                  credits:
-                    $ref: '#/components/schemas/SpriteCreditSummary'
-        '401':
-          $ref: '#/components/responses/StatusMessage401'
-  /api/agent-platform/credits/checkout:
+  /api/agent-platform/billing/topups/checkout:
     post:
-      operationId: agentPlatformFormationCreditsCheckout
+      operationId: agentPlatformBillingTopupCheckout
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SpriteCreditCheckoutRequest'
+              $ref: '#/components/schemas/BillingTopupCheckoutRequest'
       responses:
         '200':
-          description: Sprite runtime credits added to one owned company
+          description: Stripe-hosted checkout started for shared runtime credit
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SpriteCreditCheckoutResponse'
+                type: object
+                required: [ok, checkout_url, billing_account]
+                properties:
+                  ok: {type: boolean}
+                  checkout_url: {type: string}
+                  billing_account:
+                    $ref: '#/components/schemas/BillingAccount'
         '400':
           $ref: '#/components/responses/StatusMessage400'
         '401':
           $ref: '#/components/responses/StatusMessage401'
-        '404':
-          $ref: '#/components/responses/StatusMessage404'
   /api/agent-platform/stripe/webhooks:
     post:
       operationId: agentPlatformStripeWebhook
@@ -572,6 +599,60 @@ paths:
           $ref: '#/components/responses/StatusMessage401'
         '503':
           $ref: '#/components/responses/StatusMessage503'
+  /api/agent-platform/sprites/{slug}/pause:
+    post:
+      operationId: agentPlatformPauseSprite
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sprite runtime marked paused
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, sprite]
+                properties:
+                  ok: {type: boolean}
+                  sprite:
+                    $ref: '#/components/schemas/SpriteRuntimeControl'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '404':
+          $ref: '#/components/responses/StatusMessage404'
+  /api/agent-platform/sprites/{slug}/resume:
+    post:
+      operationId: agentPlatformResumeSprite
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sprite runtime marked active
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, sprite]
+                properties:
+                  ok: {type: boolean}
+                  sprite:
+                    $ref: '#/components/schemas/SpriteRuntimeControl'
+                  billing_account:
+                    $ref: '#/components/schemas/BillingAccount'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '402':
+          $ref: '#/components/responses/StatusMessage402'
+        '404':
+          $ref: '#/components/responses/StatusMessage404'
   /api/opensea:
     get:
       operationId: openSeaHoldings
@@ -940,9 +1021,9 @@ components:
         ens_fqdn: {type: [string, 'null']}
         claimed_at: {type: string, format: date-time}
         in_use: {type: boolean}
-    LlmBillingStatus:
+    BillingAccount:
       type: object
-      required: [status, connected, provider, model_default, margin_bps]
+      required: [status, connected, provider, model_default, margin_bps, runtime_credit_balance_usd_cents, paid_companies, paused_companies, trialing_companies, welcome_credit]
       properties:
         status: {type: string}
         connected: {type: boolean}
@@ -951,9 +1032,65 @@ components:
         subscription_id: {type: [string, 'null']}
         model_default: {type: string}
         margin_bps: {type: integer}
+        runtime_credit_balance_usd_cents: {type: integer}
+        paid_companies: {type: integer}
+        paused_companies: {type: integer}
+        trialing_companies: {type: integer}
+        welcome_credit:
+          oneOf:
+            - $ref: '#/components/schemas/WelcomeCredit'
+            - type: 'null'
+    BillingSetupCheckoutRequest:
+      type: object
+      properties:
+        claimedLabel: {type: string}
+    BillingUsageSummary:
+      type: object
+      required: [runtime_credit_balance_usd_cents, trialing_companies, paid_companies, paused_companies, welcome_credit, companies]
+      properties:
+        runtime_credit_balance_usd_cents: {type: integer}
+        trialing_companies: {type: integer}
+        paid_companies: {type: integer}
+        paused_companies: {type: integer}
+        welcome_credit:
+          oneOf:
+            - $ref: '#/components/schemas/WelcomeCredit'
+            - type: 'null'
+        companies:
+          type: array
+          items:
+            type: object
+            required: [slug, name, runtime_status, desired_runtime_state, observed_runtime_state, sprite_metering_status, sprite_free_until]
+            properties:
+              slug: {type: string}
+              name: {type: string}
+              runtime_status: {type: string}
+              desired_runtime_state: {type: string}
+              observed_runtime_state: {type: string}
+              sprite_metering_status: {type: string}
+              sprite_free_until: {type: [string, 'null'], format: date-time}
+    WelcomeCredit:
+      type: object
+      required: [status, amount_usd_cents, credit_scope, granted_at, expires_at, stripe_sync_status]
+      properties:
+        status: {type: string}
+        amount_usd_cents: {type: integer}
+        credit_scope: {type: string}
+        granted_at: {type: string, format: date-time}
+        expires_at: {type: string, format: date-time}
+        stripe_sync_status: {type: string}
+        stripe_synced_at: {type: [string, 'null'], format: date-time}
+    SpriteRuntimeControl:
+      type: object
+      required: [slug, desired_runtime_state, observed_runtime_state, runtime_status]
+      properties:
+        slug: {type: string}
+        desired_runtime_state: {type: string}
+        observed_runtime_state: {type: string}
+        runtime_status: {type: string}
     CurrentHuman:
       type: object
-      required: [id, privy_user_id, wallet_addresses, llm_billing]
+      required: [id, privy_user_id, wallet_addresses, billing_account]
       properties:
         id: {type: integer}
         privy_user_id: {type: string}
@@ -962,8 +1099,8 @@ components:
           type: array
           items: {type: string}
         display_name: {type: [string, 'null']}
-        llm_billing:
-          $ref: '#/components/schemas/LlmBillingStatus'
+        billing_account:
+          $ref: '#/components/schemas/BillingAccount'
     CurrentHumanProfile:
       type: object
       required: [ok, authenticated, claimed_names, agents]
@@ -982,31 +1119,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AgentRecord'
-    SpriteCreditSummary:
-      type: object
-      required: [total_balance_usd_cents, trialing_companies, paid_companies, paused_companies, companies]
-      properties:
-        total_balance_usd_cents: {type: integer}
-        trialing_companies: {type: integer}
-        paid_companies: {type: integer}
-        paused_companies: {type: integer}
-        companies:
-          type: array
-          items:
-            type: object
-            required: [slug, name, runtime_status, sprite_metering_status, sprite_credit_balance_usd_cents, sprite_free_until]
-            properties:
-              slug: {type: string}
-              name: {type: string}
-              runtime_status: {type: string}
-              sprite_metering_status: {type: string}
-              sprite_credit_balance_usd_cents: {type: integer}
-              sprite_free_until: {type: [string, 'null'], format: date-time}
     AgentFormation:
       type: object
       required: [id, status, current_step, attempt_count]
       properties:
         id: {type: integer}
+        claimed_label: {type: [string, 'null']}
         status: {type: string}
         current_step: {type: string}
         attempt_count: {type: integer}
@@ -1017,7 +1135,7 @@ components:
         completed_at: {type: [string, 'null'], format: date-time}
     AgentFormationResponse:
       type: object
-      required: [ok, authenticated, wallet_address, eligible, collections, claimed_names, available_claims, llm_billing, credits, owned_companies, active_formations]
+      required: [ok, authenticated, wallet_address, eligible, collections, claimed_names, available_claims, billing_account, owned_companies, active_formations]
       properties:
         ok: {type: boolean}
         authenticated: {type: boolean}
@@ -1044,10 +1162,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ClaimedName'
-        llm_billing:
-          $ref: '#/components/schemas/LlmBillingStatus'
-        credits:
-          $ref: '#/components/schemas/SpriteCreditSummary'
+        billing_account:
+          $ref: '#/components/schemas/BillingAccount'
         owned_companies:
           type: array
           items:
@@ -1193,14 +1309,12 @@ components:
       allOf:
         - $ref: '#/components/schemas/PublicAgentRecord'
         - type: object
-          required: [sprite_name, sprite_url, sprite_service_name, paperclip_url, paperclip_company_id, paperclip_agent_id, runtime_status, checkpoint_status, stripe_llm_billing_status, sprite_free_until, sprite_credit_balance_usd_cents, sprite_metering_status]
+          required: [sprite_name, sprite_service_name, paperclip_company_id, paperclip_agent_id, runtime_status, checkpoint_status, desired_runtime_state, observed_runtime_state, sprite_free_until, sprite_metering_status]
           properties:
             sprite_name: {type: [string, 'null']}
-            sprite_url: {type: [string, 'null']}
             sprite_service_name: {type: [string, 'null']}
             sprite_checkpoint_ref: {type: [string, 'null']}
             sprite_created_at: {type: [string, 'null'], format: date-time}
-            paperclip_url: {type: [string, 'null']}
             paperclip_deployment_mode: {type: [string, 'null']}
             paperclip_http_port: {type: [integer, 'null']}
             paperclip_company_id: {type: [string, 'null']}
@@ -1221,11 +1335,9 @@ components:
             checkpoint_status: {type: string}
             runtime_last_checked_at: {type: [string, 'null'], format: date-time}
             last_formation_error: {type: [string, 'null']}
-            stripe_llm_billing_status: {type: string}
-            stripe_customer_id: {type: [string, 'null']}
-            stripe_pricing_plan_subscription_id: {type: [string, 'null']}
+            desired_runtime_state: {type: string}
+            observed_runtime_state: {type: string}
             sprite_free_until: {type: [string, 'null'], format: date-time}
-            sprite_credit_balance_usd_cents: {type: integer}
             sprite_metering_status: {type: string}
             formation:
               oneOf:
@@ -1238,24 +1350,23 @@ components:
         claimedLabel: {type: string}
     AgentRuntime:
       type: object
-      required: [sprite, paperclip, hermes, checkpoint, llm_billing]
+      required: [sprite, paperclip, hermes, checkpoint]
       properties:
         sprite:
           type: object
-          required: [name, url, status, owner, free_until, credit_balance_usd_cents, metering_status]
+          required: [name, status, owner, free_until, metering_status, desired_runtime_state, observed_runtime_state]
           properties:
             name: {type: [string, 'null']}
-            url: {type: [string, 'null']}
             status: {type: string}
             owner: {type: string}
             free_until: {type: [string, 'null'], format: date-time}
-            credit_balance_usd_cents: {type: integer}
             metering_status: {type: string}
+            desired_runtime_state: {type: string}
+            observed_runtime_state: {type: string}
         paperclip:
           type: object
-          required: [url, company_id, status, deployment_mode, http_port]
+          required: [company_id, status, deployment_mode, http_port]
           properties:
-            url: {type: [string, 'null']}
             company_id: {type: [string, 'null']}
             status: {type: string}
             deployment_mode: {type: string}
@@ -1283,36 +1394,26 @@ components:
           required: [status]
           properties:
             status: {type: string}
-        llm_billing:
-          $ref: '#/components/schemas/LlmBillingStatus'
     AgentRuntimeResponse:
       type: object
-      required: [ok, agent, runtime]
+      required: [ok, agent, runtime, billing_account]
       properties:
         ok: {type: boolean}
         agent:
           $ref: '#/components/schemas/AgentRecord'
         runtime:
           $ref: '#/components/schemas/AgentRuntime'
+        billing_account:
+          $ref: '#/components/schemas/BillingAccount'
         formation:
           oneOf:
             - $ref: '#/components/schemas/AgentFormation'
             - type: 'null'
-    SpriteCreditCheckoutRequest:
+    BillingTopupCheckoutRequest:
       type: object
-      required: [slug, amountUsdCents]
+      required: [amountUsdCents]
       properties:
-        slug: {type: string}
         amountUsdCents: {type: integer}
-    SpriteCreditCheckoutResponse:
-      type: object
-      required: [ok, agent, credits]
-      properties:
-        ok: {type: boolean}
-        agent:
-          $ref: '#/components/schemas/AgentRecord'
-        credits:
-          $ref: '#/components/schemas/SpriteCreditSummary'
     OpenSeaHoldings:
       type: object
       required: [address, animata1, animata2, animataPass]

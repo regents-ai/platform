@@ -10,6 +10,8 @@ const response = await fetch(`http://127.0.0.1:${port}/internal/bootstrap-compan
     public_hostname: process.env.FORMATION_PUBLIC_HOSTNAME,
     stripe_customer_id: process.env.FORMATION_STRIPE_CUSTOMER_ID || null,
     stripe_subscription_id: process.env.FORMATION_STRIPE_SUBSCRIPTION_ID || null,
+    stripe_ai_gateway_base_url:
+      process.env.FORMATION_STRIPE_AI_GATEWAY_BASE_URL || "https://llm.stripe.com",
   }),
 });
 

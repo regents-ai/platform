@@ -103,6 +103,8 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
         sprite_checkpoint_ref: result["checkpoint_ref"],
         sprite_created_at: now(),
         runtime_status: "forming",
+        desired_runtime_state: "active",
+        observed_runtime_state: "active",
         checkpoint_status: "ready",
         runtime_last_checked_at: now(),
         last_formation_error: nil
@@ -145,6 +147,8 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
       |> Agent.changeset(%{
         status: "published",
         runtime_status: "ready",
+        desired_runtime_state: "active",
+        observed_runtime_state: "active",
         checkpoint_status: "ready",
         published_at: agent.published_at || now(),
         runtime_last_checked_at: now()
@@ -200,6 +204,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
     |> Agent.changeset(%{
       status: "failed",
       runtime_status: "failed",
+      observed_runtime_state: "unknown",
       checkpoint_status: "failed",
       last_formation_error: message,
       runtime_last_checked_at: now()

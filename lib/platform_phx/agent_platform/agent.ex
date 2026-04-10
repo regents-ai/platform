@@ -5,12 +5,14 @@ defmodule PlatformPhx.AgentPlatform.Agent do
   import Ecto.Changeset
 
   alias PlatformPhx.AgentPlatform.Artifact
+  alias PlatformPhx.AgentPlatform.BillingLedgerEntry
   alias PlatformPhx.AgentPlatform.Connection
   alias PlatformPhx.AgentPlatform.CreditLedger
   alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.AgentPlatform.Job
   alias PlatformPhx.AgentPlatform.LlmUsageEvent
   alias PlatformPhx.AgentPlatform.Service
+  alias PlatformPhx.AgentPlatform.SpriteUsageRecord
   alias PlatformPhx.AgentPlatform.Subdomain
 
   @primary_key {:id, :id, autogenerate: true}
@@ -54,6 +56,8 @@ defmodule PlatformPhx.AgentPlatform.Agent do
     field :sprite_metering_status, :string, default: "trialing"
     field :wallet_address, :string
     field :published_at, :utc_datetime
+    field :desired_runtime_state, :string, default: "active"
+    field :observed_runtime_state, :string, default: "unknown"
 
     belongs_to :owner_human, PlatformPhx.Accounts.HumanUser
     has_one :subdomain, Subdomain
@@ -64,6 +68,8 @@ defmodule PlatformPhx.AgentPlatform.Agent do
     has_one :formation_run, FormationRun
     has_many :credit_ledger_entries, CreditLedger
     has_many :llm_usage_events, LlmUsageEvent
+    has_many :billing_ledger_entries, BillingLedgerEntry
+    has_many :sprite_usage_records, SpriteUsageRecord
 
     timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end
@@ -108,7 +114,9 @@ defmodule PlatformPhx.AgentPlatform.Agent do
       :sprite_credit_balance_usd_cents,
       :sprite_metering_status,
       :wallet_address,
-      :published_at
+      :published_at,
+      :desired_runtime_state,
+      :observed_runtime_state
     ])
     |> validate_required([
       :template_key,
@@ -128,7 +136,8 @@ defmodule PlatformPhx.AgentPlatform.Agent do
       "forming",
       "ready",
       "failed",
-      "paused_for_credits"
+      "paused_for_credits",
+      "paused"
     ])
     |> validate_inclusion(:checkpoint_status, ["pending", "ready", "failed"])
     |> validate_inclusion(:stripe_llm_billing_status, [
@@ -138,6 +147,8 @@ defmodule PlatformPhx.AgentPlatform.Agent do
       "past_due"
     ])
     |> validate_inclusion(:sprite_metering_status, ["trialing", "paid", "paused"])
+    |> validate_inclusion(:desired_runtime_state, ["active", "paused"])
+    |> validate_inclusion(:observed_runtime_state, ["unknown", "active", "paused"])
     |> unique_constraint(:slug)
     |> unique_constraint(:claimed_label)
   end

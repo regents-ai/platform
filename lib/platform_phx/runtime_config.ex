@@ -10,10 +10,15 @@ defmodule PlatformPhx.RuntimeConfig do
   def opensea_api_key, do: fetch("OPENSEA_API_KEY")
   def stripe_secret_key, do: fetch("STRIPE_SECRET_KEY")
   def stripe_webhook_secret, do: fetch("STRIPE_WEBHOOK_SECRET")
-  def stripe_llm_pricing_plan_id, do: fetch("STRIPE_LLM_PRICING_PLAN_ID")
-  def stripe_llm_success_url, do: fetch("STRIPE_LLM_SUCCESS_URL")
-  def stripe_llm_cancel_url, do: fetch("STRIPE_LLM_CANCEL_URL")
-  def stripe_ai_meter_id, do: fetch("STRIPE_AI_METER_ID")
+  def stripe_billing_pricing_plan_id, do: fetch("STRIPE_BILLING_PRICING_PLAN_ID")
+  def stripe_billing_topup_success_url, do: fetch("STRIPE_BILLING_TOPUP_SUCCESS_URL")
+  def stripe_billing_topup_cancel_url, do: fetch("STRIPE_BILLING_TOPUP_CANCEL_URL")
+  def stripe_runtime_meter_event_name, do: fetch("STRIPE_RUNTIME_METER_EVENT_NAME")
+  def welcome_credit_enabled?, do: fetch_bool("WELCOME_CREDIT_ENABLED", true)
+  def welcome_credit_limit, do: fetch_integer("WELCOME_CREDIT_LIMIT", 100)
+  def welcome_credit_amount_usd_cents, do: fetch_integer("WELCOME_CREDIT_AMOUNT_USD_CENTS", 500)
+  def welcome_credit_expiry_days, do: fetch_integer("WELCOME_CREDIT_EXPIRY_DAYS", 60)
+  def sprites_api_token, do: fetch("SPRITES_API_TOKEN")
   def sprite_cli_path, do: fetch("SPRITE_CLI_PATH") || "sprite"
   def paperclip_http_port, do: fetch("PAPERCLIP_HTTP_PORT") || "3100"
   def basename_parent_name, do: fetch("AGENT_BASENAME_PARENT_NAME") || "agent.base.eth"
@@ -43,6 +48,36 @@ defmodule PlatformPhx.RuntimeConfig do
       value ->
         trimmed = String.trim(value)
         if trimmed == "", do: nil, else: trimmed
+    end
+  end
+
+  defp fetch_integer(name, default) do
+    case fetch(name) do
+      nil ->
+        default
+
+      value ->
+        case Integer.parse(value) do
+          {parsed, ""} -> parsed
+          _ -> default
+        end
+    end
+  end
+
+  defp fetch_bool(name, default) do
+    case fetch(name) do
+      nil -> default
+      "1" -> true
+      "true" -> true
+      "TRUE" -> true
+      "yes" -> true
+      "YES" -> true
+      "0" -> false
+      "false" -> false
+      "FALSE" -> false
+      "no" -> false
+      "NO" -> false
+      _ -> default
     end
   end
 end

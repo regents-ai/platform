@@ -6,11 +6,13 @@ defmodule PlatformPhx.AgentPlatform do
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.Artifact
+  alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.Connection
   alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.AgentPlatform.Service
   alias PlatformPhx.AgentPlatform.Subdomain
   alias PlatformPhx.AgentPlatform.TemplateCatalog
+  alias PlatformPhx.AgentPlatform.WelcomeCredits
   alias PlatformPhx.Basenames.Mint
   alias PlatformPhx.OpenSea
   alias PlatformPhx.Repo
@@ -44,11 +46,13 @@ defmodule PlatformPhx.AgentPlatform do
   end
 
   def current_human_payload(%HumanUser{} = human) do
+    billing_account = get_billing_account(human)
+
     {:ok,
      %{
        ok: true,
        authenticated: true,
-       human: serialize_human(human),
+       human: serialize_human(human, billing_account),
        claimed_names: claimed_names_for_human(human),
        agents: Enum.map(list_owned_agents(human), &serialize_agent(&1, :private))
      }}
@@ -106,8 +110,7 @@ defmodule PlatformPhx.AgentPlatform do
       from agent in Agent,
         join: subdomain in assoc(agent, :subdomain),
         where:
-          subdomain.hostname == ^host and subdomain.active == true and
-            agent.status == "published",
+          subdomain.hostname == ^host and subdomain.active == true and agent.status == "published",
         preload: [:subdomain, :services, :connections, :artifacts]
     )
   end
@@ -216,6 +219,7 @@ defmodule PlatformPhx.AgentPlatform do
   def serialize_agent(%Agent{} = agent, scope) do
     subdomain = subdomain_from_agent(agent)
     formation = formation_from_agent(agent)
+    metering_status = effective_metering_status(agent)
 
     base = %{
       id: agent.id,
@@ -252,11 +256,9 @@ defmodule PlatformPhx.AgentPlatform do
       _ ->
         Map.merge(base, %{
           sprite_name: agent.sprite_name,
-          sprite_url: agent.sprite_url,
           sprite_service_name: agent.sprite_service_name,
           sprite_checkpoint_ref: agent.sprite_checkpoint_ref,
           sprite_created_at: iso(agent.sprite_created_at),
-          paperclip_url: agent.paperclip_url,
           paperclip_deployment_mode: agent.paperclip_deployment_mode,
           paperclip_http_port: agent.paperclip_http_port,
           paperclip_company_id: agent.paperclip_company_id,
@@ -271,12 +273,10 @@ defmodule PlatformPhx.AgentPlatform do
           checkpoint_status: agent.checkpoint_status,
           runtime_last_checked_at: iso(agent.runtime_last_checked_at),
           last_formation_error: agent.last_formation_error,
-          stripe_llm_billing_status: agent.stripe_llm_billing_status,
-          stripe_customer_id: agent.stripe_customer_id,
-          stripe_pricing_plan_subscription_id: agent.stripe_pricing_plan_subscription_id,
+          desired_runtime_state: agent.desired_runtime_state,
+          observed_runtime_state: agent.observed_runtime_state,
           sprite_free_until: iso(agent.sprite_free_until),
-          sprite_credit_balance_usd_cents: agent.sprite_credit_balance_usd_cents || 0,
-          sprite_metering_status: effective_metering_status(agent),
+          sprite_metering_status: metering_status,
           formation: serialize_formation_run(formation)
         })
     end
@@ -284,31 +284,62 @@ defmodule PlatformPhx.AgentPlatform do
 
   def serialize_agent(nil, _scope), do: nil
 
-  def runtime_payload_map(%Agent{} = agent) do
+  def runtime_payload_map(agent, billing_account \\ nil)
+
+  def runtime_payload_map(%Agent{} = agent, billing_account) do
     runtime_defaults = runtime_defaults(agent)
 
+    billing_account =
+      billing_account ||
+        Repo.one(
+          from account in BillingAccount, where: account.human_user_id == ^agent.owner_human_id
+        )
+
     %{
-      sprite: runtime_sprite_payload(agent),
+      sprite: runtime_sprite_payload(agent, billing_account),
       paperclip: runtime_paperclip_payload(agent, runtime_defaults),
       hermes: runtime_hermes_payload(agent, runtime_defaults),
-      checkpoint: runtime_checkpoint_payload(agent),
-      llm_billing:
-        llm_billing_payload(
-          agent.stripe_llm_billing_status,
-          agent.stripe_customer_id,
-          agent.stripe_pricing_plan_subscription_id
-        )
+      checkpoint: runtime_checkpoint_payload(agent)
     }
   end
 
-  def runtime_payload_map(_agent), do: nil
+  def runtime_payload_map(_agent, _billing_account), do: nil
 
-  def llm_billing_payload(status, customer_id, subscription_id) do
+  def billing_account_payload(account, companies \\ [])
+
+  def billing_account_payload(nil, companies) do
+    paid_companies =
+      Enum.count(List.wrap(companies), &(effective_metering_status(&1, nil) == "paid"))
+
+    paused_companies =
+      Enum.count(List.wrap(companies), &(effective_metering_status(&1, nil) == "paused"))
+
+    trialing_companies =
+      Enum.count(List.wrap(companies), &(effective_metering_status(&1, nil) == "trialing"))
+
+    %{
+      status: "not_connected",
+      connected: false,
+      provider: "stripe",
+      customer_id: nil,
+      subscription_id: nil,
+      model_default: @default_hermes_model,
+      margin_bps: 0,
+      runtime_credit_balance_usd_cents: 0,
+      paid_companies: paid_companies,
+      paused_companies: paused_companies,
+      trialing_companies: trialing_companies,
+      welcome_credit: nil
+    }
+  end
+
+  def billing_account_payload(%BillingAccount{} = account, companies) do
     resolved_status =
-      case status do
+      case account.billing_status do
         "checkout_open" -> "checkout_open"
         "active" -> "active"
         "past_due" -> "past_due"
+        "paused" -> "paused"
         _ -> "not_connected"
       end
 
@@ -316,45 +347,96 @@ defmodule PlatformPhx.AgentPlatform do
       status: resolved_status,
       connected: resolved_status == "active",
       provider: "stripe",
-      customer_id: customer_id,
-      subscription_id: subscription_id,
+      customer_id: account.stripe_customer_id,
+      subscription_id: account.stripe_pricing_plan_subscription_id,
       model_default: @default_hermes_model,
-      margin_bps: 0
-    }
-  end
-
-  def empty_credit_summary do
-    %{
-      total_balance_usd_cents: 0,
-      trialing_companies: 0,
-      paid_companies: 0,
-      paused_companies: 0,
-      companies: []
+      margin_bps: 0,
+      runtime_credit_balance_usd_cents: account.runtime_credit_balance_usd_cents || 0,
+      paid_companies:
+        Enum.count(List.wrap(companies), &(effective_metering_status(&1, account) == "paid")),
+      paused_companies:
+        Enum.count(List.wrap(companies), &(effective_metering_status(&1, account) == "paused")),
+      trialing_companies:
+        Enum.count(List.wrap(companies), &(effective_metering_status(&1, account) == "trialing")),
+      welcome_credit: account |> WelcomeCredits.latest_grant() |> WelcomeCredits.payload()
     }
   end
 
   def effective_runtime_status(%Agent{} = agent) do
-    if effective_metering_status(agent) == "paused" do
-      "paused_for_credits"
+    if agent.desired_runtime_state == "paused" or effective_metering_status(agent) == "paused" do
+      "paused"
     else
       agent.runtime_status
     end
   end
 
-  def effective_metering_status(%Agent{} = agent) do
-    balance = agent.sprite_credit_balance_usd_cents || 0
+  def effective_metering_status(%Agent{} = agent, billing_account \\ nil) do
+    balance =
+      case billing_account do
+        %BillingAccount{} = account -> account.runtime_credit_balance_usd_cents || 0
+        _ -> 0
+      end
 
     cond do
-      balance > 0 ->
-        "paid"
-
       is_struct(agent.sprite_free_until, DateTime) and
           DateTime.compare(agent.sprite_free_until, DateTime.utc_now()) == :gt ->
         "trialing"
 
+      balance > 0 ->
+        "paid"
+
       true ->
         "paused"
     end
+  end
+
+  def get_billing_account(%HumanUser{} = human) do
+    Repo.one(from account in BillingAccount, where: account.human_user_id == ^human.id)
+  end
+
+  def get_billing_account(_human), do: nil
+
+  def ensure_billing_account(%HumanUser{} = human) do
+    case get_billing_account(human) do
+      %BillingAccount{} = account ->
+        {:ok, account}
+
+      nil ->
+        %BillingAccount{}
+        |> BillingAccount.changeset(%{
+          human_user_id: human.id,
+          stripe_customer_id: human.stripe_customer_id,
+          stripe_pricing_plan_subscription_id: human.stripe_pricing_plan_subscription_id,
+          billing_status: human.stripe_llm_billing_status || "not_connected",
+          runtime_credit_balance_usd_cents: 0
+        })
+        |> Repo.insert()
+    end
+  end
+
+  def billing_usage_payload(%BillingAccount{} = account, companies) do
+    company_summaries =
+      Enum.map(companies, fn company ->
+        %{
+          slug: company.slug,
+          name: company.name,
+          runtime_status: effective_runtime_status(company),
+          desired_runtime_state: company.desired_runtime_state,
+          observed_runtime_state: company.observed_runtime_state,
+          sprite_metering_status: effective_metering_status(company, account),
+          sprite_free_until: iso(company.sprite_free_until)
+        }
+      end)
+
+    %{
+      runtime_credit_balance_usd_cents: account.runtime_credit_balance_usd_cents || 0,
+      paid_companies: Enum.count(company_summaries, &(&1.sprite_metering_status == "paid")),
+      paused_companies: Enum.count(company_summaries, &(&1.sprite_metering_status == "paused")),
+      trialing_companies:
+        Enum.count(company_summaries, &(&1.sprite_metering_status == "trialing")),
+      welcome_credit: account |> WelcomeCredits.latest_grant() |> WelcomeCredits.payload(),
+      companies: company_summaries
+    }
   end
 
   def normalize_slug(value) when is_binary(value) do
@@ -385,19 +467,14 @@ defmodule PlatformPhx.AgentPlatform do
     |> Enum.map_join("; ", fn {field, messages} -> "#{field} #{Enum.join(messages, ", ")}" end)
   end
 
-  defp serialize_human(%HumanUser{} = human) do
+  defp serialize_human(%HumanUser{} = human, billing_account) do
     %{
       id: human.id,
       privy_user_id: human.privy_user_id,
       wallet_address: human.wallet_address,
       wallet_addresses: linked_wallet_addresses(human),
       display_name: human.display_name,
-      llm_billing:
-        llm_billing_payload(
-          human.stripe_llm_billing_status,
-          human.stripe_customer_id,
-          human.stripe_pricing_plan_subscription_id
-        )
+      billing_account: billing_account_payload(billing_account)
     }
   end
 
@@ -457,21 +534,20 @@ defmodule PlatformPhx.AgentPlatform do
     end
   end
 
-  defp runtime_sprite_payload(%Agent{} = agent) do
+  defp runtime_sprite_payload(%Agent{} = agent, billing_account) do
     %{
       name: agent.sprite_name,
-      url: agent.sprite_url,
       status: effective_runtime_status(agent),
       owner: @default_sprite_owner,
       free_until: iso(agent.sprite_free_until),
-      credit_balance_usd_cents: agent.sprite_credit_balance_usd_cents || 0,
-      metering_status: effective_metering_status(agent)
+      metering_status: effective_metering_status(agent, billing_account),
+      desired_runtime_state: agent.desired_runtime_state,
+      observed_runtime_state: agent.observed_runtime_state
     }
   end
 
   defp runtime_paperclip_payload(%Agent{} = agent, runtime_defaults) do
     %{
-      url: agent.paperclip_url,
       company_id: agent.paperclip_company_id,
       status: effective_runtime_status(agent),
       deployment_mode:

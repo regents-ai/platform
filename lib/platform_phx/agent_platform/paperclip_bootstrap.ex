@@ -18,6 +18,9 @@ defmodule PlatformPhx.AgentPlatform.PaperclipBootstrap do
   end
 
   def build_env(%Agent{} = agent, %FormationRun{} = formation) do
+    billing_account =
+      agent.owner_human && PlatformPhx.AgentPlatform.get_billing_account(agent.owner_human)
+
     %{
       "FORMATION_SLUG" => agent.slug,
       "FORMATION_SPRITE_NAME" => agent.sprite_name || "#{agent.slug}-sprite",
@@ -32,8 +35,11 @@ defmodule PlatformPhx.AgentPlatform.PaperclipBootstrap do
       "FORMATION_HERMES_TOOLSETS" => Jason.encode!(agent.hermes_toolsets || []),
       "FORMATION_HERMES_RUNTIME_PLUGINS" => Jason.encode!(agent.hermes_runtime_plugins || []),
       "FORMATION_HERMES_SHARED_SKILLS" => Jason.encode!(agent.hermes_shared_skills || []),
-      "FORMATION_STRIPE_CUSTOMER_ID" => agent.stripe_customer_id || "",
-      "FORMATION_STRIPE_SUBSCRIPTION_ID" => agent.stripe_pricing_plan_subscription_id || "",
+      "FORMATION_STRIPE_CUSTOMER_ID" =>
+        (billing_account && billing_account.stripe_customer_id) || "",
+      "FORMATION_STRIPE_SUBSCRIPTION_ID" =>
+        (billing_account && billing_account.stripe_pricing_plan_subscription_id) || "",
+      "FORMATION_STRIPE_AI_GATEWAY_BASE_URL" => "https://llm.stripe.com",
       "FORMATION_BUNDLE_DIR" => bundle_dir(),
       "FORMATION_LOG_PATH" => formation.sprite_command_log_path || "",
       "SPRITE_CLI_PATH" => RuntimeConfig.sprite_cli_path(),
