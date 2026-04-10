@@ -4,7 +4,14 @@ import { Socket } from "phoenix";
 import { LiveSocket, type HooksOptions } from "phoenix_live_view";
 import { Heerich } from "heerich";
 import topbar from "../vendor/topbar.cjs";
-import { mountDashboardRoot, unmountDashboardRoot } from "./dashboard/root";
+import {
+  bindDashboardNameClaim,
+  bindDashboardRedeem,
+  bindDashboardWallet,
+  mountDashboardPrivyBridge,
+  unmountDashboardPrivyBridge,
+} from "./dashboard/islands";
+import { DashboardXmtpRoomHook } from "./dashboard/xmtp_room";
 import { mountShaderRoot, unmountShaderRoot } from "./shader/root";
 import { mountTokenCardRoot, unmountTokenCardRoot } from "./shader/token_card_root";
 import {
@@ -30,6 +37,8 @@ import { VoxelBackgroundHook } from "./voxel_background";
 type HookContext = {
   el: Element;
   __regentAnimation?: ReturnType<typeof mountHomeReveal>;
+  __dashboardCleanup?: () => void;
+  __launchProgressCleanup?: () => void;
 };
 
 function resetReveal(context: HookContext): void {
@@ -51,17 +60,102 @@ function createRevealHook(
   };
 }
 
-const DashboardRootHook = {
+function mountDashboardHook(
+  context: HookContext,
+  binder: (el: HTMLElement) => () => void,
+) {
+  context.__dashboardCleanup?.();
+  context.__dashboardCleanup = binder(context.el as HTMLElement);
+}
+
+const DashboardPrivyBridgeHook = {
   mounted(this: HookContext) {
-    mountDashboardRoot(this.el);
-  },
-  updated(this: HookContext) {
-    mountDashboardRoot(this.el);
+    mountDashboardPrivyBridge(this.el);
   },
   destroyed(this: HookContext) {
-    unmountDashboardRoot(this.el);
+    unmountDashboardPrivyBridge(this.el);
   },
 };
+
+const DashboardWalletHook = {
+  mounted(this: HookContext) {
+    mountDashboardHook(this, bindDashboardWallet);
+  },
+  updated(this: HookContext) {
+    mountDashboardHook(this, bindDashboardWallet);
+  },
+  destroyed(this: HookContext) {
+    this.__dashboardCleanup?.();
+  },
+};
+
+const DashboardNameClaimHook = {
+  mounted(this: HookContext) {
+    mountDashboardHook(this, bindDashboardNameClaim);
+  },
+  updated(this: HookContext) {
+    mountDashboardHook(this, bindDashboardNameClaim);
+  },
+  destroyed(this: HookContext) {
+    this.__dashboardCleanup?.();
+  },
+};
+
+const DashboardRedeemHook = {
+  mounted(this: HookContext) {
+    mountDashboardHook(this, bindDashboardRedeem);
+  },
+  updated(this: HookContext) {
+    mountDashboardHook(this, bindDashboardRedeem);
+  },
+  destroyed(this: HookContext) {
+    this.__dashboardCleanup?.();
+  },
+};
+
+function mountLaunchProgress(root: HTMLElement): () => void {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    return () => undefined;
+  }
+
+  const targets = Array.from(
+    root.querySelectorAll<HTMLElement>(".pp-launch-progress-card, .pp-launch-progress-copy"),
+  );
+
+  if (targets.length === 0) {
+    return () => undefined;
+  }
+
+  animate(targets, {
+    opacity: [{ from: 0, to: 1 }],
+    translateY: [{ from: 18, to: 0 }],
+    delay: (_, index) => index * 70,
+    duration: 520,
+    ease: "outExpo",
+  });
+
+  return () => {
+    targets.forEach((target) => {
+      target.style.opacity = "";
+      target.style.transform = "";
+    });
+  };
+}
+
+const LaunchProgressHook = {
+  mounted(this: HookContext) {
+    this.__launchProgressCleanup?.();
+    this.__launchProgressCleanup = mountLaunchProgress(this.el as HTMLElement);
+  },
+  updated(this: HookContext) {
+    this.__launchProgressCleanup?.();
+    this.__launchProgressCleanup = mountLaunchProgress(this.el as HTMLElement);
+  },
+  destroyed(this: HookContext) {
+    this.__launchProgressCleanup?.();
+  },
+};
+
 const ShaderRootHook = {
   mounted(this: HookContext) {
     mountShaderRoot(this.el);
@@ -281,24 +375,32 @@ function mountSidebarCommunity(root: HTMLElement): () => void {
   if (!button || !panel) return () => undefined;
 
   const motionReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const closedOffset = -8;
+  const closedOffset = 10;
+  const openDuration = 260;
+  const closeDuration = 220;
+  const iconDuration = 220;
   let iconAnimation: ReturnType<typeof animate> | undefined;
   let gridAnimation: ReturnType<typeof animate> | undefined;
+  let panelAnimation: ReturnType<typeof animate> | undefined;
 
   const syncExpanded = (expanded: boolean) => {
     button.setAttribute("aria-expanded", expanded ? "true" : "false");
+    button.dataset.communityOpen = expanded ? "true" : "false";
   };
 
   const resetClosed = () => {
     panel.hidden = true;
     panel.dataset.panelState = "closed";
+    panel.style.height = "0px";
   };
 
   const stopMotion = () => {
     iconAnimation?.cancel();
     gridAnimation?.cancel();
+    panelAnimation?.cancel();
     iconAnimation = undefined;
     gridAnimation = undefined;
+    panelAnimation = undefined;
   };
 
   const setIconRotation = (expanded: boolean) => {
@@ -312,13 +414,6 @@ function mountSidebarCommunity(root: HTMLElement): () => void {
     grid.style.transform = expanded ? "translate3d(0, 0, 0)" : `translate3d(0, ${closedOffset}px, 0)`;
   };
 
-  const hideOnClose = (event: TransitionEvent) => {
-    if (event.target !== panel || event.propertyName !== "grid-template-rows") return;
-    if (panel.dataset.panelState === "closed") {
-      panel.hidden = true;
-    }
-  };
-
   syncExpanded(false);
   setIconRotation(false);
   setGridState(false);
@@ -327,27 +422,40 @@ function mountSidebarCommunity(root: HTMLElement): () => void {
   const open = () => {
     syncExpanded(true);
     stopMotion();
-    panel.removeEventListener("transitionend", hideOnClose);
 
     if (motionReduced) {
       panel.hidden = false;
       panel.dataset.panelState = "open";
+      panel.style.height = "auto";
       setIconRotation(true);
       setGridState(true);
       return;
     }
 
+    const startHeight = panel.hidden ? 0 : panel.getBoundingClientRect().height;
     panel.hidden = false;
+    panel.style.height = `${startHeight}px`;
+    panel.dataset.panelState = "opening";
     setIconRotation(false);
     setGridState(false);
 
     requestAnimationFrame(() => {
-      panel.dataset.panelState = "open";
+      const targetHeight = Math.max(panel.scrollHeight, grid?.scrollHeight ?? 0);
+
+      panelAnimation = animate(panel, {
+        height: [startHeight, targetHeight],
+        duration: openDuration,
+        ease: "outQuint",
+        onComplete: () => {
+          panel.style.height = "auto";
+          panel.dataset.panelState = "open";
+        },
+      });
 
       if (icon) {
         iconAnimation = animate(icon, {
           rotate: "180deg",
-          duration: 260,
+          duration: iconDuration,
           ease: "outQuint",
         });
       }
@@ -356,7 +464,7 @@ function mountSidebarCommunity(root: HTMLElement): () => void {
         gridAnimation = animate(grid, {
           opacity: [0, 1],
           translateY: [closedOffset, 0],
-          duration: 220,
+          duration: openDuration - 10,
           ease: "outQuart",
         });
       }
@@ -372,17 +480,21 @@ function mountSidebarCommunity(root: HTMLElement): () => void {
       panel.dataset.panelState = "closed";
       setIconRotation(false);
       setGridState(false);
+      panel.style.height = "0px";
       panel.hidden = true;
       return;
     }
 
+    const startHeight = panel.getBoundingClientRect().height || panel.scrollHeight;
+
     panel.hidden = false;
-    panel.addEventListener("transitionend", hideOnClose);
+    panel.style.height = `${startHeight}px`;
+    panel.dataset.panelState = "closing";
 
     if (icon) {
       iconAnimation = animate(icon, {
         rotate: "0deg",
-        duration: 180,
+        duration: iconDuration,
         ease: "outQuart",
       });
     }
@@ -391,13 +503,22 @@ function mountSidebarCommunity(root: HTMLElement): () => void {
       gridAnimation = animate(grid, {
         opacity: [1, 0],
         translateY: [0, closedOffset],
-        duration: 160,
+        duration: closeDuration - 20,
         ease: "outQuart",
       });
     }
 
     requestAnimationFrame(() => {
-      panel.dataset.panelState = "closed";
+      panelAnimation = animate(panel, {
+        height: [startHeight, 0],
+        duration: closeDuration,
+        ease: "inOutQuart",
+        onComplete: () => {
+          panel.dataset.panelState = "closed";
+          panel.style.height = "0px";
+          panel.hidden = true;
+        },
+      });
     });
   };
 
@@ -414,7 +535,6 @@ function mountSidebarCommunity(root: HTMLElement): () => void {
   button.addEventListener("click", toggle);
 
   return () => {
-    panel.removeEventListener("transitionend", hideOnClose);
     stopMotion();
     button.removeEventListener("click", toggle);
   };
@@ -478,7 +598,12 @@ installHeerich(Heerich);
 
 const hooks: HooksOptions = {
   ...regentHooks,
-  DashboardRoot: DashboardRootHook,
+  DashboardPrivyBridge: DashboardPrivyBridgeHook,
+  DashboardWallet: DashboardWalletHook,
+  DashboardNameClaim: DashboardNameClaimHook,
+  DashboardRedeem: DashboardRedeemHook,
+  DashboardXmtpRoom: DashboardXmtpRoomHook,
+  LaunchProgress: LaunchProgressHook,
   ShaderRoot: ShaderRootHook,
   AnimatedHomeLogoScene: AnimatedHomeLogoSceneHook,
   HomeRegentScene,

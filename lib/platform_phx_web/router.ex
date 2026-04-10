@@ -23,15 +23,18 @@ defmodule PlatformPhxWeb.Router do
     pipe_through :browser
 
     get "/cards/regents-club/:token_id", TokenCardController, :show
-    live "/demo", DemoLive
-    live "/heerich-demo", HeerichDemoLive
 
-    live_session :platform_app, session: {PlatformPhxWeb.LiveSessionData, :session, []} do
+    live_session :platform_app,
+      session: {PlatformPhxWeb.LiveSessionData, :session, []},
+      on_mount: [{PlatformPhxWeb.LiveCurrentHuman, :default}] do
+      live "/demo", DemoLive
+      live "/heerich-demo", HeerichDemoLive
       live "/", HomeLive
       live "/agents/:slug", AgentSiteLive
       live "/overview", OverviewLive
       live "/logos", LogosLive
-      live "/services", DashboardLive
+      live "/services", DashboardLive, :services
+      live "/agent-formation", DashboardLive, :agent_formation
       live "/shader", ShaderLive
       live "/bug-report", BugReportLive
       live "/techtree", TechtreeLive
@@ -84,11 +87,14 @@ defmodule PlatformPhxWeb.Router do
     pipe_through :session_api
 
     get "/formation", AgentFormationController, :formation
-    post "/formation/llm-billing/checkout", AgentFormationController, :llm_billing_checkout
+    post "/billing/setup/checkout", AgentFormationController, :billing_setup_checkout
+    get "/billing/account", AgentFormationController, :billing_account
+    get "/billing/usage", AgentFormationController, :billing_usage
+    post "/billing/topups/checkout", AgentFormationController, :billing_topup_checkout
     post "/formation/companies", AgentFormationController, :create_company
     get "/agents/:slug/runtime", AgentFormationController, :runtime
-    get "/credits", AgentFormationController, :credits
-    post "/credits/checkout", AgentFormationController, :checkout_credits
+    post "/sprites/:slug/pause", AgentFormationController, :pause_sprite
+    post "/sprites/:slug/resume", AgentFormationController, :resume_sprite
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
