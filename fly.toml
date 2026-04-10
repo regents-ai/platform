@@ -1,4 +1,4 @@
-app = "web-phoenix-123"
+app = "platform-phx"
 primary_region = "ewr"
 
 [build]
@@ -8,7 +8,7 @@ primary_region = "ewr"
   release_command = "/app/bin/migrate"
 
 [env]
-  PHX_HOST = "web-phoenix-123.fly.dev"
+  PHX_HOST = "platform-phx.fly.dev"
   PHX_SERVER = "true"
   PORT = "4000"
 
@@ -25,6 +25,6 @@ primary_region = "ewr"
   path = "/metrics"
 
 [[vm]]
-  cpu_kind = "shared"
-  cpus = 1
-  memory_mb = 512
+  cpu_kind = "performance"
+  cpus = 2
+  memory_mb = 4096

@@ -1,4 +1,4 @@
-defmodule Web.Repo.Migrations.CutoverAgentWizardToWebOnly do
+defmodule PlatformPhx.Repo.Migrations.CutoverAgentWizardToWebOnly do
   use Ecto.Migration
 
   def up, do: :ok

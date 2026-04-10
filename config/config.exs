@@ -7,34 +7,34 @@
 # General application configuration
 import Config
 
-config :web,
-  ecto_repos: [Web.Repo],
+config :platform_phx,
+  ecto_repos: [PlatformPhx.Repo],
   generators: [timestamp_type: :utc_datetime]
 
 # Configure the endpoint
-config :web, WebWeb.Endpoint,
+config :platform_phx, PlatformPhxWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [html: WebWeb.ErrorHTML, json: WebWeb.ErrorJSON],
+    formats: [html: PlatformPhxWeb.ErrorHTML, json: PlatformPhxWeb.ErrorJSON],
     layout: false
   ],
-  pubsub_server: Web.PubSub,
+  pubsub_server: PlatformPhx.PubSub,
   live_view: [signing_salt: "eGS39NaF"]
 
-config :web, WebWeb.PrometheusExporter,
+config :platform_phx, PlatformPhxWeb.PrometheusExporter,
   enabled: true,
   ip: {127, 0, 0, 1},
   port: 9568
 
-config :web, Oban,
-  repo: Web.Repo,
+config :platform_phx, Oban,
+  repo: PlatformPhx.Repo,
   queues: [agent_formation: 1, billing: 5, runtime_metering: 1],
   plugins: [
     {Oban.Plugins.Pruner, max_age: 86_400},
     {Oban.Plugins.Cron,
      crontab: [
-       {"0 * * * *", Web.AgentPlatform.Workers.SpriteMeteringWorker}
+       {"0 * * * *", PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker}
      ]}
   ]
 
@@ -45,12 +45,12 @@ config :web, Oban,
 #
 # For production it's recommended to configure a different adapter
 # at the `config/runtime.exs`.
-config :web, Web.Mailer, adapter: Swoosh.Adapters.Local
+config :platform_phx, PlatformPhx.Mailer, adapter: Swoosh.Adapters.Local
 
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",
-  web: [
+  platform_phx: [
     args:
       ~w(js/app.ts --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
     cd: Path.expand("../assets", __DIR__),
@@ -60,7 +60,7 @@ config :esbuild,
 # Configure tailwind (the version is required)
 config :tailwind,
   version: "4.1.12",
-  web: [
+  platform_phx: [
     args: ~w(
       --input=assets/css/app.css
       --output=priv/static/assets/css/app.css

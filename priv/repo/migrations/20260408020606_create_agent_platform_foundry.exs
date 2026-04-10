@@ -1,4 +1,4 @@
-defmodule Web.Repo.Migrations.CreateAgentPlatformFoundry do
+defmodule PlatformPhx.Repo.Migrations.CreateAgentPlatformFoundry do
   use Ecto.Migration
 
   def change do

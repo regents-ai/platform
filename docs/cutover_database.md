@@ -2,7 +2,7 @@
 
 ## Goal
 
-Allow the Phoenix web app in `/web` to attach to the existing `/platform` Postgres data without copying or reshaping the live basenames and auction records by hand.
+Allow the Phoenix app in `/platform` to attach to the existing `/platform` Postgres data without copying or reshaping the live basenames and auction records by hand.
 
 ## What changed
 
@@ -12,14 +12,14 @@ Allow the Phoenix web app in `/web` to attach to the existing `/platform` Postgr
 
 ## Cutover flow
 
-1. Point the app in `/web` at the existing production `DATABASE_URL`.
+1. Point the app in `/platform` at the existing production `DATABASE_URL`.
 2. Run `mix ecto.migrate`.
 3. Phoenix will:
    - adopt the old retained tables if they are already present
    - create any missing retained tables
    - rename Phoenix-only `inserted_at` columns to `created_at` when needed
    - normalize the retained timestamp columns to the old platform style
-4. Start the app from `/web`.
+4. Start the app from `/platform`.
 
 ## Expected retained tables after cutover
 

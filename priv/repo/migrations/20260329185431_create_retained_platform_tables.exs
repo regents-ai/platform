@@ -1,4 +1,4 @@
-defmodule Web.Repo.Migrations.CreateRetainedPlatformTables do
+defmodule PlatformPhx.Repo.Migrations.CreateRetainedPlatformTables do
   use Ecto.Migration
 
   def change do

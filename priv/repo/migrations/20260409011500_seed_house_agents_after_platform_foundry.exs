@@ -1,4 +1,4 @@
-defmodule Web.Repo.Migrations.SeedHouseAgentsAfterPlatformFoundry do
+defmodule PlatformPhx.Repo.Migrations.SeedHouseAgentsAfterPlatformFoundry do
   use Ecto.Migration
 
   def up do

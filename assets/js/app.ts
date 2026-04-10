@@ -1,4 +1,5 @@
 import "phoenix_html";
+import { animate } from "animejs";
 import { Socket } from "phoenix";
 import { LiveSocket, type HooksOptions } from "phoenix_live_view";
 import { Heerich } from "heerich";
@@ -274,16 +275,18 @@ const RegentCliAtlasHook = {
 function mountSidebarCommunity(root: HTMLElement): () => void {
   const button = root.querySelector<HTMLButtonElement>("[data-community-toggle]");
   const panel = root.querySelector<HTMLDivElement>("[data-community-panel]");
+  const grid = panel?.querySelector<HTMLElement>(".pp-sidebar-community-grid") ?? null;
   const icon = root.querySelector<HTMLElement>("[data-community-icon]");
-  let closeTimer: number | undefined;
 
   if (!button || !panel) return () => undefined;
 
   const motionReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const closedOffset = -8;
+  let iconAnimation: ReturnType<typeof animate> | undefined;
+  let gridAnimation: ReturnType<typeof animate> | undefined;
 
   const syncExpanded = (expanded: boolean) => {
     button.setAttribute("aria-expanded", expanded ? "true" : "false");
-    if (icon) icon.textContent = expanded ? "↑" : "↓";
   };
 
   const resetClosed = () => {
@@ -291,28 +294,111 @@ function mountSidebarCommunity(root: HTMLElement): () => void {
     panel.dataset.panelState = "closed";
   };
 
+  const stopMotion = () => {
+    iconAnimation?.cancel();
+    gridAnimation?.cancel();
+    iconAnimation = undefined;
+    gridAnimation = undefined;
+  };
+
+  const setIconRotation = (expanded: boolean) => {
+    if (!icon) return;
+    icon.style.transform = expanded ? "rotate(180deg)" : "rotate(0deg)";
+  };
+
+  const setGridState = (expanded: boolean) => {
+    if (!grid) return;
+    grid.style.opacity = expanded ? "1" : "0";
+    grid.style.transform = expanded ? "translate3d(0, 0, 0)" : `translate3d(0, ${closedOffset}px, 0)`;
+  };
+
+  const hideOnClose = (event: TransitionEvent) => {
+    if (event.target !== panel || event.propertyName !== "grid-template-rows") return;
+    if (panel.dataset.panelState === "closed") {
+      panel.hidden = true;
+    }
+  };
+
   syncExpanded(false);
+  setIconRotation(false);
+  setGridState(false);
   resetClosed();
 
   const open = () => {
     syncExpanded(true);
-    if (closeTimer) {
-      window.clearTimeout(closeTimer);
-      closeTimer = undefined;
-    }
+    stopMotion();
+    panel.removeEventListener("transitionend", hideOnClose);
 
     if (motionReduced) {
       panel.hidden = false;
       panel.dataset.panelState = "open";
+      setIconRotation(true);
+      setGridState(true);
       return;
     }
 
-    openCollapsiblePanel(panel);
+    panel.hidden = false;
+    setIconRotation(false);
+    setGridState(false);
+
+    requestAnimationFrame(() => {
+      panel.dataset.panelState = "open";
+
+      if (icon) {
+        iconAnimation = animate(icon, {
+          rotate: "180deg",
+          duration: 260,
+          ease: "outQuint",
+        });
+      }
+
+      if (grid) {
+        gridAnimation = animate(grid, {
+          opacity: [0, 1],
+          translateY: [closedOffset, 0],
+          duration: 220,
+          ease: "outQuart",
+        });
+      }
+    });
   };
 
   const close = () => {
     syncExpanded(false);
-    closeTimer = closeCollapsiblePanel(panel, motionReduced, closeTimer);
+
+    stopMotion();
+
+    if (motionReduced) {
+      panel.dataset.panelState = "closed";
+      setIconRotation(false);
+      setGridState(false);
+      panel.hidden = true;
+      return;
+    }
+
+    panel.hidden = false;
+    panel.addEventListener("transitionend", hideOnClose);
+
+    if (icon) {
+      iconAnimation = animate(icon, {
+        rotate: "0deg",
+        duration: 180,
+        ease: "outQuart",
+      });
+    }
+
+    if (grid) {
+      gridAnimation = animate(grid, {
+        opacity: [1, 0],
+        translateY: [0, closedOffset],
+        duration: 160,
+        ease: "outQuart",
+      });
+    }
+
+    requestAnimationFrame(() => {
+      panel.dataset.panelState = "closed";
+    });
   };
 
   const toggle = () => {
@@ -328,7 +414,8 @@ function mountSidebarCommunity(root: HTMLElement): () => void {
   button.addEventListener("click", toggle);
 
   return () => {
-    if (closeTimer) window.clearTimeout(closeTimer);
+    panel.removeEventListener("transitionend", hideOnClose);
+    stopMotion();
     button.removeEventListener("click", toggle);
   };
 }

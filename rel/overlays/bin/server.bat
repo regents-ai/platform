@@ -1,2 +1,2 @@
 set PHX_SERVER=true
-call "%~dp0\web" start
+call "%~dp0\platform_phx" start

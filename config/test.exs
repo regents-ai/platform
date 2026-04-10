@@ -9,37 +9,37 @@ pg_hostname = System.get_env("PGHOST") || "localhost"
 # The MIX_TEST_PARTITION environment variable can be used
 # to provide built-in test partitioning in CI environment.
 # Run `mix help test` for more information.
-config :web, Web.Repo,
+config :platform_phx, PlatformPhx.Repo,
   username: pg_username,
   password: pg_password,
   hostname: pg_hostname,
-  database: "web_test#{System.get_env("MIX_TEST_PARTITION")}",
+  database: "platform_phx_test#{System.get_env("MIX_TEST_PARTITION")}",
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: 10
 
-config :web,
-  ethereum_adapter: Web.TestEthereumAdapter,
-  opensea_client: Web.TestOpenSeaClient
+config :platform_phx,
+  ethereum_adapter: PlatformPhx.TestEthereumAdapter,
+  opensea_client: PlatformPhx.TestOpenSeaClient
 
-config :web, :token_metadata_root, Path.expand("../priv/metadata", __DIR__)
+config :platform_phx, :token_metadata_root, Path.expand("../priv/metadata", __DIR__)
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
-config :web, WebWeb.Endpoint,
+config :platform_phx, PlatformPhxWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "TgX+zcJTgS+fZ7WpfLZl5A+oda0b8OeYzwge39+575WkMLHtPa0wrqgEY7+EAhPF",
   server: false
 
-config :web, WebWeb.PrometheusExporter, enabled: false
+config :platform_phx, PlatformPhxWeb.PrometheusExporter, enabled: false
 
-config :web, Oban,
-  repo: Web.Repo,
+config :platform_phx, Oban,
+  repo: PlatformPhx.Repo,
   testing: :manual,
   queues: false,
   plugins: false
 
 # In test we don't send emails
-config :web, Web.Mailer, adapter: Swoosh.Adapters.Test
+config :platform_phx, PlatformPhx.Mailer, adapter: Swoosh.Adapters.Test
 
 # Disable swoosh api client as it is only required for production adapters
 config :swoosh, :api_client, false

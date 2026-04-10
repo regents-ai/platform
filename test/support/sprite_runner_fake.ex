@@ -1,4 +1,4 @@
-defmodule Web.SpriteRunnerFake do
+defmodule PlatformPhx.SpriteRunnerFake do
   @moduledoc false
 
   def run(agent, _formation) do

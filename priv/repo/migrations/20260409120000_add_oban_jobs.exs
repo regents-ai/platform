@@ -1,4 +1,4 @@
-defmodule Web.Repo.Migrations.AddObanJobs do
+defmodule PlatformPhx.Repo.Migrations.AddObanJobs do
   use Ecto.Migration
 
   def up do

@@ -52,7 +52,7 @@ WORKDIR /app
 
 COPY --from=build /usr/local/bin/cast /usr/local/bin/cast
 COPY --from=build /app/priv/metadata /app/priv/metadata
-COPY --from=build /app/_build/prod/rel/web ./
+COPY --from=build /app/_build/prod/rel/platform_phx ./
 
 EXPOSE 4000
 

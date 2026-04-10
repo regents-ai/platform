@@ -1,9 +1,9 @@
-defmodule Web.MixProject do
+defmodule PlatformPhx.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :web,
+      app: :platform_phx,
       version: "0.1.0",
       elixir: "~> 1.19.5",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -20,7 +20,7 @@ defmodule Web.MixProject do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {Web.Application, []},
+      mod: {PlatformPhx.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end
@@ -92,11 +92,11 @@ defmodule Web.MixProject do
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test --max-cases 8"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "public.sync": [&sync_public_assets/1],
-      "assets.build": ["compile", "public.sync", "tailwind web", "esbuild web"],
+      "assets.build": ["compile", "public.sync", "tailwind platform_phx", "esbuild platform_phx"],
       "assets.deploy": [
         "public.sync",
-        "tailwind web --minify",
-        "esbuild web --minify",
+        "tailwind platform_phx --minify",
+        "esbuild platform_phx --minify",
         "phx.digest"
       ],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]

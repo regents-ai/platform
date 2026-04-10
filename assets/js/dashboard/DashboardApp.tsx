@@ -125,6 +125,9 @@ type MaybeRequestProvider = {
 };
 
 const REGENTS_CLUB_OPENSEA_BASE = "https://opensea.io/collection/regents-club";
+const ANIMATA_COLLECTION_I_OPENSEA = "https://opensea.io/collection/animata";
+const ANIMATA_COLLECTION_II_OPENSEA =
+  "https://opensea.io/collection/regent-animata-ii";
 
 export function DashboardFallback({ config }: { config: DashboardConfig }) {
   return (
@@ -144,13 +147,17 @@ export function DashboardFallback({ config }: { config: DashboardConfig }) {
             Dashboard needs Privy to turn on
           </h2>
           <p className="max-w-3xl text-sm leading-6 text-[color:var(--muted-foreground)] sm:text-base sm:leading-7">
-            The Phoenix shell and APIs are live, but wallet actions stay disabled until a
-            Privy app id is set. Once that is present, this page mounts the combined
-            redeem and name-claim flow automatically.
+            The Phoenix shell and APIs are live, but wallet actions stay
+            disabled until a Privy app id is set. Once that is present, this
+            page mounts the combined redeem and name-claim flow automatically.
           </p>
         </div>
         <dl className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricTile label="Privy" value="Missing app id" copy="Required for wallet auth" />
+          <MetricTile
+            label="Privy"
+            value="Missing app id"
+            copy="Required for wallet auth"
+          />
           <MetricTile
             label="Base RPC"
             value={config.baseRpcUrl ?? "Missing"}
@@ -161,7 +168,11 @@ export function DashboardFallback({ config }: { config: DashboardConfig }) {
             value={shortValue(config.redeemerAddress)}
             copy="Redeem contract"
           />
-          <MetricTile label="API owner" value="Phoenix" copy="No Node fallback" />
+          <MetricTile
+            label="API owner"
+            value="Phoenix"
+            copy="No Node fallback"
+          />
         </dl>
       </section>
     </div>
@@ -169,34 +180,51 @@ export function DashboardFallback({ config }: { config: DashboardConfig }) {
 }
 
 export function DashboardApp({ config }: { config: DashboardConfig }) {
-  const {
-    ready: privyReady,
-    authenticated,
-    login,
-    logout,
-    user,
-  } = usePrivy();
-  const { account, chainId, wallet, walletClient, privyId } = usePrivyWalletClient();
-  const [formation, setFormation] = React.useState<AgentFormationResponse | null>(null);
-  const [formationNotice, setFormationNotice] = React.useState<Notice | null>(null);
+  const { ready: privyReady, authenticated, login, logout, user } = usePrivy();
+  const { account, chainId, wallet, walletClient, privyId } =
+    usePrivyWalletClient();
+  const [formation, setFormation] =
+    React.useState<AgentFormationResponse | null>(null);
+  const [formationNotice, setFormationNotice] = React.useState<Notice | null>(
+    null,
+  );
   const [formationOpen, setFormationOpen] = React.useState(false);
   const [formationBusy, setFormationBusy] = React.useState(false);
-  const [selectedClaimedLabel, setSelectedClaimedLabel] = React.useState<string | null>(null);
-  const [runtime, setRuntime] = React.useState<AgentRuntimeResponse["runtime"] | null>(null);
-  const [latestFormation, setLatestFormation] =
-    React.useState<AgentRuntimeResponse["formation"] | null>(null);
-  const [latestCompanySlug, setLatestCompanySlug] = React.useState<string | null>(null);
+  const [selectedClaimedLabel, setSelectedClaimedLabel] = React.useState<
+    string | null
+  >(null);
+  const [runtime, setRuntime] = React.useState<
+    AgentRuntimeResponse["runtime"] | null
+  >(null);
+  const [latestFormation, setLatestFormation] = React.useState<
+    AgentRuntimeResponse["formation"] | null
+  >(null);
+  const [latestCompanySlug, setLatestCompanySlug] = React.useState<
+    string | null
+  >(null);
+  const [formationStage, setFormationStage] = React.useState<"gate" | "setup">(
+    "gate",
+  );
+  const [formationRefreshBusy, setFormationRefreshBusy] = React.useState(false);
   const autoOpenedFormationRef = React.useRef(false);
   const sessionSignatureRef = React.useRef<string | null>(null);
-  const sessionWalletAddresses = React.useMemo(() => getWalletAddressesFromPrivyUser(user), [user]);
+  const sessionWalletAddresses = React.useMemo(
+    () => getWalletAddressesFromPrivyUser(user),
+    [user],
+  );
 
   const loadFormation = React.useCallback(async () => {
     try {
-      const payload = await fetchJson<AgentFormationResponse>(config.endpoints.formation);
+      const payload = await fetchJson<AgentFormationResponse>(
+        config.endpoints.formation,
+      );
       setFormation(payload);
       setFormationNotice(null);
       setSelectedClaimedLabel((current) => {
-        if (current && payload.available_claims.some((claim) => claim.label === current)) {
+        if (
+          current &&
+          payload.available_claims.some((claim) => claim.label === current)
+        ) {
           return current;
         }
         return payload.available_claims[0]?.label ?? null;
@@ -205,20 +233,25 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
       setFormation(null);
       setFormationNotice({
         tone: "error",
-        message: getErrorMessage(error, "Agent Formation is unavailable right now."),
+        message: getErrorMessage(
+          error,
+          "Agent Formation is unavailable right now.",
+        ),
       });
     }
   }, [config.endpoints.formation]);
 
   React.useEffect(() => {
+    if (!privyReady) return;
+
     if (!authenticated || !privyId) {
       sessionSignatureRef.current = null;
       autoOpenedFormationRef.current = false;
-      setFormation(null);
-      setFormationOpen(false);
+      setFormationStage("gate");
       setLatestCompanySlug(null);
       setLatestFormation(null);
       setRuntime(null);
+      void loadFormation();
       return;
     }
 
@@ -227,6 +260,24 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
       account,
       wallets: sessionWalletAddresses,
     });
+
+    if (
+      sessionSignatureRef.current &&
+      sessionSignatureRef.current !== nextSignature
+    ) {
+      sessionSignatureRef.current = null;
+      autoOpenedFormationRef.current = false;
+      setFormationStage("gate");
+      setFormationOpen(false);
+      setLatestCompanySlug(null);
+      setLatestFormation(null);
+      setRuntime(null);
+      void fetchJson(config.endpoints.privySession, { method: "DELETE" }).catch(
+        () => {},
+      );
+      window.location.replace("/services");
+      return;
+    }
 
     if (sessionSignatureRef.current === nextSignature) {
       void loadFormation();
@@ -252,9 +303,62 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
       .catch((error) => {
         setFormationNotice({
           tone: "error",
-          message: getErrorMessage(error, "Could not start your Regents session."),
+          message: getErrorMessage(
+            error,
+            "Could not start your Regents session.",
+          ),
         });
       });
+  }, [
+    account,
+    authenticated,
+    config.endpoints.privySession,
+    loadFormation,
+    privyReady,
+    privyId,
+    sessionWalletAddresses,
+    user,
+  ]);
+
+  React.useEffect(() => {
+    if (!formation || autoOpenedFormationRef.current) return;
+    autoOpenedFormationRef.current = true;
+    setFormationStage("gate");
+    setFormationOpen(true);
+  }, [formation]);
+
+  const refreshFormationAccess = React.useCallback(async () => {
+    setFormationRefreshBusy(true);
+
+    try {
+      if (authenticated && privyId) {
+        await fetchJson<CurrentHumanProfileResponse>(
+          config.endpoints.privySession,
+          {
+            method: "POST",
+            headers: {
+              accept: "application/json",
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              privyUserId: privyId,
+              walletAddress: account,
+              walletAddresses: sessionWalletAddresses,
+              displayName: getPrivyDisplayName(user),
+            }),
+          },
+        );
+      }
+
+      await loadFormation();
+    } catch (error) {
+      setFormationNotice({
+        tone: "error",
+        message: getErrorMessage(error, "Pass check could not be refreshed."),
+      });
+    } finally {
+      setFormationRefreshBusy(false);
+    }
   }, [
     account,
     authenticated,
@@ -264,12 +368,6 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
     sessionWalletAddresses,
     user,
   ]);
-
-  React.useEffect(() => {
-    if (!formation?.eligible || autoOpenedFormationRef.current) return;
-    autoOpenedFormationRef.current = true;
-    setFormationOpen(true);
-  }, [formation?.eligible]);
 
   const connectLlmBilling = React.useCallback(async () => {
     setFormationBusy(true);
@@ -312,7 +410,10 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
       } catch (error) {
         setFormationNotice({
           tone: "error",
-          message: getErrorMessage(error, "Runtime status could not be loaded."),
+          message: getErrorMessage(
+            error,
+            "Runtime status could not be loaded.",
+          ),
         });
       }
     },
@@ -348,11 +449,17 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
     } finally {
       setFormationBusy(false);
     }
-  }, [config.endpoints.formationCompanies, loadRuntime, loadFormation, selectedClaimedLabel]);
+  }, [
+    config.endpoints.formationCompanies,
+    loadRuntime,
+    loadFormation,
+    selectedClaimedLabel,
+  ]);
 
   const handleClaimedNameCreated = React.useCallback(
     async (claimedName: ClaimedNameRecord) => {
       setSelectedClaimedLabel(claimedName.label);
+      setFormationStage("setup");
       await loadFormation();
       setFormationOpen(true);
     },
@@ -383,7 +490,11 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
         onConnect={() => login()}
         onDisconnect={() => {
           sessionSignatureRef.current = null;
-          void fetchJson(config.endpoints.privySession, { method: "DELETE" }).catch(() => {});
+          autoOpenedFormationRef.current = false;
+          setFormationStage("gate");
+          void fetchJson(config.endpoints.privySession, {
+            method: "DELETE",
+          }).catch(() => {});
           void logout();
         }}
       />
@@ -418,14 +529,21 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
       {formationOpen && formation ? (
         <AgentCompanyWizard
           wizard={formation}
+          authenticated={authenticated}
+          privyReady={privyReady}
           busy={formationBusy}
+          refreshBusy={formationRefreshBusy}
+          stage={formationStage}
           selectedClaimedLabel={selectedClaimedLabel}
           latestCompanySlug={latestCompanySlug}
           formationState={latestFormation}
           runtime={runtime}
           onSelectClaimedLabel={setSelectedClaimedLabel}
+          onContinue={() => setFormationStage("setup")}
           onConnectBilling={() => void connectLlmBilling()}
           onCreateCompany={() => void createCompany()}
+          onRefresh={() => void refreshFormationAccess()}
+          onRequestSignIn={() => login()}
           onClose={() => setFormationOpen(false)}
           onJumpToNameClaim={() => {
             setFormationOpen(false);
@@ -452,7 +570,8 @@ function WalletStatus({
   const hasSessionWallet = hasPrivySessionWallet({ authenticated, account });
 
   React.useEffect(() => {
-    if (!copiedAccount || !checkIconRef.current || prefersReducedMotion()) return;
+    if (!copiedAccount || !checkIconRef.current || prefersReducedMotion())
+      return;
 
     animate(checkIconRef.current, {
       opacity: [0, 1, 0],
@@ -472,7 +591,7 @@ function WalletStatus({
 
   return (
     <section className="rounded-[1.75rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--card)_96%,var(--background)_4%)] p-6 shadow-[0_24px_70px_-48px_color-mix(in_oklch,var(--brand-ink)_55%,transparent)]">
-      <div className="flex flex-col items-start gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-[0.24em] text-[color:var(--muted-foreground)]">
             onchain account
@@ -501,7 +620,7 @@ function WalletStatus({
                     viewBox="0 0 16 16"
                     className={[
                       "absolute h-4 w-4 fill-none stroke-current transition-opacity duration-150",
-                      copiedAccount ? "opacity-0" : "opacity-100"
+                      copiedAccount ? "opacity-0" : "opacity-100",
                     ].join(" ")}
                   >
                     <rect
@@ -522,11 +641,14 @@ function WalletStatus({
                     ref={checkIconRef}
                     className={[
                       "absolute inline-flex opacity-0",
-                      copiedAccount ? "text-[color:var(--positive)]" : ""
+                      copiedAccount ? "text-[color:var(--positive)]" : "",
                     ].join(" ")}
                     style={{ transform: "scale(0.72)" }}
                   >
-                    <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current">
+                    <svg
+                      viewBox="0 0 16 16"
+                      className="h-4 w-4 fill-none stroke-current"
+                    >
                       <path
                         d="m3.5 8.5 2.4 2.4L12.5 4.8"
                         strokeWidth="1.7"
@@ -573,18 +695,14 @@ function WalletStatus({
           )}
         </div>
 
-        <div className="flex shrink-0 flex-wrap justify-start gap-3">
+        <div className="flex shrink-0 flex-wrap justify-end gap-3 self-start">
           {hasSessionWallet ? (
             <Button tone="secondary" onClick={onDisconnect}>
               Disconnect
             </Button>
           ) : (
-            <Button
-              disabled={!privyReady}
-              onClick={onConnect}
-              tone="primary"
-            >
-              {privyReady ? "Connect Account" : "Loading wallet"}
+            <Button disabled={!privyReady} onClick={onConnect} tone="primary">
+              {privyReady ? "Sign in" : "Loading wallet"}
             </Button>
           )}
         </div>
@@ -610,30 +728,42 @@ function RedeemSection({
   >("idle");
   const [notice, setNotice] = React.useState<Notice | null>(null);
   const [holdings, setHoldings] = React.useState<HoldingList | null>(null);
-  const [holdingsFetched, setHoldingsFetched] = React.useState<HoldingsFetched>({
-    ANIMATA1: false,
-    ANIMATA2: false,
-  });
+  const [holdingsFetched, setHoldingsFetched] = React.useState<HoldingsFetched>(
+    {
+      ANIMATA1: false,
+      ANIMATA2: false,
+    },
+  );
   const [isFetchingHoldings, setIsFetchingHoldings] = React.useState(false);
-  const [accessPassHoldings, setAccessPassHoldings] = React.useState<number[] | null>(null);
-  const [accessPassNotice, setAccessPassNotice] = React.useState<Notice | null>(null);
+  const [accessPassHoldings, setAccessPassHoldings] = React.useState<
+    number[] | null
+  >(null);
+  const [accessPassNotice, setAccessPassNotice] = React.useState<Notice | null>(
+    null,
+  );
   const [isFetchingAccessPassHoldings, setIsFetchingAccessPassHoldings] =
     React.useState(false);
   const [redeemSupply, setRedeemSupply] = React.useState<RedeemSupplyState>({
     animata: null,
     "regent-animata-ii": null,
   });
-  const [isFetchingRedeemSupply, setIsFetchingRedeemSupply] = React.useState(false);
-  const [redeemSupplyNotice, setRedeemSupplyNotice] = React.useState<Notice | null>(null);
+  const [isFetchingRedeemSupply, setIsFetchingRedeemSupply] =
+    React.useState(false);
+  const [redeemSupplyNotice, setRedeemSupplyNotice] =
+    React.useState<Notice | null>(null);
   const [claimable, setClaimable] = React.useState<bigint | null>(null);
   const [remaining, setRemaining] = React.useState<bigint | null>(null);
   const [nftApproved, setNftApproved] = React.useState(false);
   const [usdcAllowanceOk, setUsdcAllowanceOk] = React.useState(false);
-  const [ownsSelectedToken, setOwnsSelectedToken] = React.useState<boolean | null>(null);
+  const [ownsSelectedToken, setOwnsSelectedToken] = React.useState<
+    boolean | null
+  >(null);
   const [showSuccess, setShowSuccess] = React.useState(false);
   const [successTotal, setSuccessTotal] = React.useState<bigint | null>(null);
   const [showClaimSuccess, setShowClaimSuccess] = React.useState(false);
-  const [claimSuccessAmount, setClaimSuccessAmount] = React.useState<bigint | null>(null);
+  const [claimSuccessAmount, setClaimSuccessAmount] = React.useState<
+    bigint | null
+  >(null);
   const publicClient = React.useMemo(
     () =>
       createPublicClient({
@@ -644,7 +774,8 @@ function RedeemSection({
   );
 
   const redeemerAddress = React.useMemo(() => {
-    if (!config.redeemerAddress || !isAddress(config.redeemerAddress)) return null;
+    if (!config.redeemerAddress || !isAddress(config.redeemerAddress))
+      return null;
     return config.redeemerAddress as `0x${string}`;
   }, [config.redeemerAddress]);
 
@@ -746,7 +877,10 @@ function RedeemSection({
 
   const fetchHoldings = React.useCallback(async () => {
     if (!connectedAccount) {
-      setNotice({ tone: "error", message: "Connect your wallet to load holdings." });
+      setNotice({
+        tone: "error",
+        message: "Connect your wallet to load holdings.",
+      });
       return;
     }
 
@@ -755,23 +889,26 @@ function RedeemSection({
     setNotice(null);
 
     try {
-      const collection = source === "ANIMATA1" ? "animata" : "regent-animata-ii";
+      const collection =
+        source === "ANIMATA1" ? "animata" : "regent-animata-ii";
       const url = new URL(config.endpoints.opensea, window.location.origin);
       url.searchParams.set("address", connectedAccount);
       url.searchParams.set("collection", collection);
 
-      const data = await fetchJson<OpenSeaResponse>(url.toString(), { cache: "no-store" });
+      const data = await fetchJson<OpenSeaResponse>(url.toString(), {
+        cache: "no-store",
+      });
       if (requestId !== holdingsRequestRef.current) return;
 
       setHoldings((current) => ({
         animata1:
           collection === "animata"
-            ? data.animata1 ?? []
-            : current?.animata1 ?? [],
+            ? (data.animata1 ?? [])
+            : (current?.animata1 ?? []),
         animata2:
           collection === "regent-animata-ii"
-            ? data.animata2 ?? []
-            : current?.animata2 ?? [],
+            ? (data.animata2 ?? [])
+            : (current?.animata2 ?? []),
       }));
       setHoldingsFetched((current) => ({ ...current, [source]: true }));
     } catch (error) {
@@ -802,10 +939,14 @@ function RedeemSection({
       url.searchParams.set("address", connectedAccount);
       url.searchParams.set("collection", "regents-club");
 
-      const data = await fetchJson<OpenSeaResponse>(url.toString(), { cache: "no-store" });
+      const data = await fetchJson<OpenSeaResponse>(url.toString(), {
+        cache: "no-store",
+      });
       if (requestId !== accessPassRequestRef.current) return;
 
-      setAccessPassHoldings(Array.isArray(data.animataPass) ? data.animataPass : []);
+      setAccessPassHoldings(
+        Array.isArray(data.animataPass) ? data.animataPass : [],
+      );
     } catch (error) {
       if (requestId !== accessPassRequestRef.current) return;
       setAccessPassNotice({
@@ -825,7 +966,10 @@ function RedeemSection({
     setRedeemSupplyNotice(null);
 
     try {
-      const url = new URL(config.endpoints.openseaRedeemStats, window.location.origin);
+      const url = new URL(
+        config.endpoints.openseaRedeemStats,
+        window.location.origin,
+      );
       const data = await fetchJson<OpenSeaRedeemStatsResponse>(url.toString(), {
         cache: "no-store",
       });
@@ -835,7 +979,9 @@ function RedeemSection({
       setRedeemSupply({
         animata: typeof data.animata === "number" ? data.animata : null,
         "regent-animata-ii":
-          typeof data["regent-animata-ii"] === "number" ? data["regent-animata-ii"] : null,
+          typeof data["regent-animata-ii"] === "number"
+            ? data["regent-animata-ii"]
+            : null,
       });
     } catch (error) {
       if (requestId !== redeemSupplyRequestRef.current) return;
@@ -845,7 +991,10 @@ function RedeemSection({
       });
       setRedeemSupplyNotice({
         tone: "error",
-        message: getErrorMessage(error, "Remaining Animata counts are unavailable right now."),
+        message: getErrorMessage(
+          error,
+          "Remaining Animata counts are unavailable right now.",
+        ),
       });
     } finally {
       if (requestId === redeemSupplyRequestRef.current) {
@@ -861,13 +1010,18 @@ function RedeemSection({
     if (connectedChainId !== base.id) {
       throw new Error("Switch your wallet to Base to continue.");
     }
-    return { wallet: walletClient, account: connectedAccount, chainId: connectedChainId };
+    return {
+      wallet: walletClient,
+      account: connectedAccount,
+      chainId: connectedChainId,
+    };
   }, [connectedAccount, connectedChainId, walletClient]);
 
   const ensureNftApproval = React.useCallback(
     async (snapshot?: WalletSnapshot) => {
       const current = snapshot ?? ensureWallet();
-      if (!current.wallet || !current.account) throw new Error("Connect your wallet first.");
+      if (!current.wallet || !current.account)
+        throw new Error("Connect your wallet first.");
       if (!redeemerAddress) throw new Error("Redeemer not configured.");
 
       const collection = source === "ANIMATA1" ? ANIMATA1 : ANIMATA2;
@@ -905,7 +1059,8 @@ function RedeemSection({
 
     try {
       const current = ensureWallet();
-      if (!current.wallet || !current.account) throw new Error("Connect your wallet first.");
+      if (!current.wallet || !current.account)
+        throw new Error("Connect your wallet first.");
       if (!redeemerAddress) throw new Error("Redeemer not configured.");
 
       setStatus("approving");
@@ -935,7 +1090,8 @@ function RedeemSection({
 
     try {
       const current = ensureWallet();
-      if (!current.wallet || !current.account) throw new Error("Wallet not ready.");
+      if (!current.wallet || !current.account)
+        throw new Error("Wallet not ready.");
       if (!redeemerAddress) throw new Error("Redeemer not configured.");
 
       let beforeOutstanding: bigint | null = null;
@@ -1044,7 +1200,8 @@ function RedeemSection({
 
     try {
       const current = ensureWallet();
-      if (!current.wallet || !current.account) throw new Error("Wallet not ready.");
+      if (!current.wallet || !current.account)
+        throw new Error("Wallet not ready.");
       if (!redeemerAddress) throw new Error("Redeemer not configured.");
 
       const claimableSnapshot = claimable ?? null;
@@ -1161,13 +1318,22 @@ function RedeemSection({
         })) as `0x${string}`;
 
         if (requestId !== ownershipRequestRef.current) return;
-        setOwnsSelectedToken(owner.toLowerCase() === connectedAccount.toLowerCase());
+        setOwnsSelectedToken(
+          owner.toLowerCase() === connectedAccount.toLowerCase(),
+        );
       } catch {
         if (requestId !== ownershipRequestRef.current) return;
         setOwnsSelectedToken(null);
       }
     })();
-  }, [connectedAccount, holdings, holdingsFetched, publicClient, source, tokenId]);
+  }, [
+    connectedAccount,
+    holdings,
+    holdingsFetched,
+    publicClient,
+    source,
+    tokenId,
+  ]);
 
   return (
     <section className="space-y-6 rounded-[1.75rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--card)_96%,var(--background)_4%)] p-6 shadow-[0_24px_70px_-48px_color-mix(in_oklch,var(--brand-ink)_55%,transparent)]">
@@ -1180,7 +1346,8 @@ function RedeemSection({
             Redeem Animata Pass for $REGENT
           </h3>
           <p className="max-w-3xl text-sm leading-6 text-[color:var(--muted-foreground)]">
-            Steps: Connect wallet on Base. Choose a token you own (or buy one) from{" "}
+            Steps: Connect wallet on Base. Choose a token you own (or buy one)
+            from{" "}
             <a
               href="https://opensea.io/collection/animata"
               target="_blank"
@@ -1198,9 +1365,9 @@ function RedeemSection({
             >
               Animata Collection II
             </a>
-            . Approve the Animata transfer, and approve 80 USDC transfer. Redeem your
-            NFT with the USDC to receive 5 million $REGENT streamed over 7 days, as
-            well as an{" "}
+            . Approve the Animata transfer, and approve 80 USDC transfer. Redeem
+            your NFT with the USDC to receive 5 million $REGENT streamed over 7
+            days, as well as an{" "}
             <a
               href={REGENTS_CLUB_OPENSEA_BASE}
               target="_blank"
@@ -1220,7 +1387,12 @@ function RedeemSection({
             </span>
           ) : null}
           {connectedAccount && !isOnBase && wallet ? (
-            <Button onClick={() => void switchToChain(wallet, base, config.baseRpcUrl)} tone="secondary">
+            <Button
+              onClick={() =>
+                void switchToChain(wallet, base, config.baseRpcUrl)
+              }
+              tone="secondary"
+            >
               Switch to Base
             </Button>
           ) : null}
@@ -1229,11 +1401,16 @@ function RedeemSection({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)]">
         <SurfaceBlock title="Eligibility checklist">
-          <ChecklistItem label="Wallet connected" status={Boolean(connectedAccount)} />
+          <ChecklistItem
+            label="Wallet connected"
+            status={Boolean(connectedAccount)}
+          />
           <ChecklistItem
             label="On Base network"
             status={connectedAccount ? isOnBase : null}
-            detail={connectedAccount && !isOnBase ? "Switch to Base" : undefined}
+            detail={
+              connectedAccount && !isOnBase ? "Switch to Base" : undefined
+            }
           />
           <ChecklistItem
             label={tokenIdValid ? "Owns selected token" : "Select a token ID"}
@@ -1248,7 +1425,9 @@ function RedeemSection({
             label="Approvals ready"
             status={connectedAccount ? approvalsReady : null}
             detail={
-              connectedAccount && !approvalsReady ? "Approve NFT and USDC" : undefined
+              connectedAccount && !approvalsReady
+                ? "Approve NFT and USDC"
+                : undefined
             }
           />
           <ChecklistItem
@@ -1268,13 +1447,18 @@ function RedeemSection({
                 <select
                   className="w-full min-w-0 appearance-none rounded-xl border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_84%,transparent)] px-4 py-3 pr-12 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--ring)]"
                   value={source}
-                  onChange={(event) => setSource(event.currentTarget.value as SourceKey)}
+                  onChange={(event) =>
+                    setSource(event.currentTarget.value as SourceKey)
+                  }
                 >
                   <option value="ANIMATA1">Animata I</option>
                   <option value="ANIMATA2">Animata II</option>
                 </select>
                 <span className="pointer-events-none absolute inset-y-0 right-0 flex w-11 items-center justify-center text-[color:var(--muted-foreground)]">
-                  <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current">
+                  <svg
+                    viewBox="0 0 16 16"
+                    className="h-4 w-4 fill-none stroke-current"
+                  >
                     <path
                       d="m4.25 6.5 3.75 3.75 3.75-3.75"
                       strokeWidth="1.5"
@@ -1299,14 +1483,18 @@ function RedeemSection({
                 )}
                 placeholder="123"
                 value={tokenId}
-                onChange={(event) => setTokenId(event.currentTarget.value.trim())}
+                onChange={(event) =>
+                  setTokenId(event.currentTarget.value.trim())
+                }
               />
               {tokenId.length > 0 && !tokenIdValid ? (
                 <p className="mt-2 text-sm text-[color:#a6574f]">
                   Enter a whole number from 1 to 999.
                 </p>
               ) : null}
-              {connectedAccount && ownsSelectedToken === false && tokenIdValid ? (
+              {connectedAccount &&
+              ownsSelectedToken === false &&
+              tokenIdValid ? (
                 <p className="mt-2 text-sm text-[color:#a6574f]">
                   That token is not owned by the connected wallet.
                 </p>
@@ -1319,7 +1507,8 @@ function RedeemSection({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="space-y-1">
                   <div className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
-                    Your {source === "ANIMATA1" ? "Animata I" : "Animata II"} NFTs
+                    Your {source === "ANIMATA1" ? "Animata I" : "Animata II"}{" "}
+                    NFTs
                   </div>
                   <p className="text-sm text-[color:var(--muted-foreground)]">
                     Pick a chip or enter a token id manually.
@@ -1335,27 +1524,33 @@ function RedeemSection({
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                {(source === "ANIMATA1" ? holdings?.animata1 : holdings?.animata2)?.length ? (
-                  (source === "ANIMATA1" ? holdings?.animata1 : holdings?.animata2)?.map(
-                    (id) => (
-                      <button
-                        key={`${source}-${id}`}
-                        type="button"
-                        className={classNames(
-                          "rounded-full border px-3 py-1.5 text-sm transition",
-                          tokenId === String(id)
-                            ? "border-[color:var(--ring)] bg-[color:color-mix(in_oklch,var(--accent)_16%,transparent)]"
-                            : "border-[color:var(--border)] hover:border-[color:var(--ring)]",
-                        )}
-                        onClick={() => setTokenId(String(id))}
-                      >
-                        #{id}
-                      </button>
-                    ),
-                  )
+                {(source === "ANIMATA1"
+                  ? holdings?.animata1
+                  : holdings?.animata2
+                )?.length ? (
+                  (source === "ANIMATA1"
+                    ? holdings?.animata1
+                    : holdings?.animata2
+                  )?.map((id) => (
+                    <button
+                      key={`${source}-${id}`}
+                      type="button"
+                      className={classNames(
+                        "rounded-full border px-3 py-1.5 text-sm transition",
+                        tokenId === String(id)
+                          ? "border-[color:var(--ring)] bg-[color:color-mix(in_oklch,var(--accent)_16%,transparent)]"
+                          : "border-[color:var(--border)] hover:border-[color:var(--ring)]",
+                      )}
+                      onClick={() => setTokenId(String(id))}
+                    >
+                      #{id}
+                    </button>
+                  ))
                 ) : (
                   <span className="text-sm text-[color:var(--muted-foreground)]">
-                    {isFetchingHoldings ? "Loading holdings..." : "No tokens found for this collection."}
+                    {isFetchingHoldings
+                      ? "Loading holdings..."
+                      : "No tokens found for this collection."}
                   </span>
                 )}
               </div>
@@ -1432,7 +1627,9 @@ function RedeemSection({
                   Refresh
                 </Button>
                 <Button
-                  disabled={status === "claiming" || !claimable || claimable === 0n}
+                  disabled={
+                    status === "claiming" || !claimable || claimable === 0n
+                  }
                   onClick={() => void claimRegent()}
                   tone="primary"
                 >
@@ -1456,12 +1653,16 @@ function RedeemSection({
               </div>
             </div>
 
-            {accessPassNotice ? <InlineNotice notice={accessPassNotice} className="mt-4" /> : null}
+            {accessPassNotice ? (
+              <InlineNotice notice={accessPassNotice} className="mt-4" />
+            ) : null}
 
             <div className="mt-4 flex flex-wrap gap-2">
               {accessPassHoldings === null ? (
                 <span className="text-sm text-[color:var(--muted-foreground)]">
-                  {isFetchingAccessPassHoldings ? "Loading..." : "Holdings not loaded yet."}
+                  {isFetchingAccessPassHoldings
+                    ? "Loading..."
+                    : "Holdings not loaded yet."}
                 </span>
               ) : accessPassHoldings.length === 0 ? (
                 <span className="text-sm text-[color:var(--muted-foreground)]">
@@ -1510,7 +1711,9 @@ function RedeemSection({
             </p>
           </div>
         </div>
-        {redeemSupplyNotice ? <InlineNotice notice={redeemSupplyNotice} /> : null}
+        {redeemSupplyNotice ? (
+          <InlineNotice notice={redeemSupplyNotice} />
+        ) : null}
       </div>
 
       <div className="text-center text-xs text-[color:var(--muted-foreground)]">
@@ -1533,10 +1736,13 @@ function RedeemSection({
           <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">
             You now have{" "}
             <span className="text-[color:var(--foreground)]">
-              {successTotal !== null ? formatRegentRounded2(successTotal) : "---"} REGENT
+              {successTotal !== null
+                ? formatRegentRounded2(successTotal)
+                : "---"}{" "}
+              REGENT
             </span>{" "}
-            streaming over 7 days. Claim any part of your unlocked amount early, and
-            after 7 days the full amount is available to claim.
+            streaming over 7 days. Claim any part of your unlocked amount early,
+            and after 7 days the full amount is available to claim.
           </p>
           <div className="mt-6 flex flex-wrap justify-end gap-3">
             <Button
@@ -1627,12 +1833,23 @@ function NamesSection({
   const [basenamesConfig, setBasenamesConfig] =
     React.useState<BasenamesConfigResponse | null>(null);
   const [configNotice, setConfigNotice] = React.useState<Notice | null>(null);
-  const [allowance, setAllowance] = React.useState<AllowanceResponse | null>(null);
-  const [allowanceNotice, setAllowanceNotice] = React.useState<Notice | null>(null);
-  const [ownedNames, setOwnedNames] = React.useState<OwnedNamesResponse["names"]>([]);
-  const [ownedNamesNotice, setOwnedNamesNotice] = React.useState<Notice | null>(null);
-  const [recentNames, setRecentNames] = React.useState<RecentNamesResponse["names"]>([]);
-  const [recentNamesNotice, setRecentNamesNotice] = React.useState<Notice | null>(null);
+  const [allowance, setAllowance] = React.useState<AllowanceResponse | null>(
+    null,
+  );
+  const [allowanceNotice, setAllowanceNotice] = React.useState<Notice | null>(
+    null,
+  );
+  const [ownedNames, setOwnedNames] = React.useState<
+    OwnedNamesResponse["names"]
+  >([]);
+  const [ownedNamesNotice, setOwnedNamesNotice] = React.useState<Notice | null>(
+    null,
+  );
+  const [recentNames, setRecentNames] = React.useState<
+    RecentNamesResponse["names"]
+  >([]);
+  const [recentNamesNotice, setRecentNamesNotice] =
+    React.useState<Notice | null>(null);
   const [notice, setNotice] = React.useState<Notice | null>(null);
   const [phase1Label, setPhase1Label] = React.useState("");
   const [phase2Label, setPhase2Label] = React.useState("");
@@ -1644,7 +1861,9 @@ function NamesSection({
     ensFqdn: null,
     paymentTxHash: null,
   });
-  const [mintStatus, setMintStatus] = React.useState<"idle" | "free" | "paid">("idle");
+  const [mintStatus, setMintStatus] = React.useState<"idle" | "free" | "paid">(
+    "idle",
+  );
   const [copiedName, setCopiedName] = React.useState<string | null>(null);
   const signatureCacheRef = React.useRef<{
     signature: `0x${string}`;
@@ -1681,14 +1900,19 @@ function NamesSection({
       const nextConfig = await fetchJson<BasenamesConfigResponse>(
         config.endpoints.basenamesConfig,
       );
-      if (!isTrackedRequestCurrent(basenamesConfigRequestRef, requestId)) return;
+      if (!isTrackedRequestCurrent(basenamesConfigRequestRef, requestId))
+        return;
       setBasenamesConfig(nextConfig);
       setConfigNotice(null);
     } catch (error) {
-      if (!isTrackedRequestCurrent(basenamesConfigRequestRef, requestId)) return;
+      if (!isTrackedRequestCurrent(basenamesConfigRequestRef, requestId))
+        return;
       setConfigNotice({
         tone: "error",
-        message: getErrorMessage(error, "Basenames configuration is unavailable."),
+        message: getErrorMessage(
+          error,
+          "Basenames configuration is unavailable.",
+        ),
       });
     }
   }, [config.endpoints.basenamesConfig]);
@@ -1723,7 +1947,10 @@ function NamesSection({
     }
 
     try {
-      const url = new URL(config.endpoints.basenamesAllowance, window.location.origin);
+      const url = new URL(
+        config.endpoints.basenamesAllowance,
+        window.location.origin,
+      );
       url.searchParams.set("address", account);
 
       const nextAllowance = await fetchJson<AllowanceResponse>(url.toString());
@@ -1750,7 +1977,10 @@ function NamesSection({
     }
 
     try {
-      const url = new URL(config.endpoints.basenamesOwned, window.location.origin);
+      const url = new URL(
+        config.endpoints.basenamesOwned,
+        window.location.origin,
+      );
       url.searchParams.set("address", account);
 
       const payload = await fetchJson<OwnedNamesResponse>(url.toString());
@@ -1771,7 +2001,10 @@ function NamesSection({
     const requestId = startTrackedRequest(recentNamesRequestRef);
 
     try {
-      const url = new URL(config.endpoints.basenamesRecent, window.location.origin);
+      const url = new URL(
+        config.endpoints.basenamesRecent,
+        window.location.origin,
+      );
       url.searchParams.set("limit", "15");
       const payload = await fetchJson<RecentNamesResponse>(url.toString());
       if (!isTrackedRequestCurrent(recentNamesRequestRef, requestId)) return;
@@ -1861,7 +2094,11 @@ function NamesSection({
       hasPulsedFreeRef.current = false;
       return;
     }
-    if (!freeButtonRef.current || hasPulsedFreeRef.current || prefersReducedMotion()) {
+    if (
+      !freeButtonRef.current ||
+      hasPulsedFreeRef.current ||
+      prefersReducedMotion()
+    ) {
       return;
     }
 
@@ -1878,7 +2115,11 @@ function NamesSection({
       hasPulsedPaidRef.current = false;
       return;
     }
-    if (!paidButtonRef.current || hasPulsedPaidRef.current || prefersReducedMotion()) {
+    if (
+      !paidButtonRef.current ||
+      hasPulsedPaidRef.current ||
+      prefersReducedMotion()
+    ) {
       return;
     }
 
@@ -1963,15 +2204,17 @@ function NamesSection({
 
     if (!isPending) return;
 
-    void attemptWalletCancel({ wallet, txHash: paymentTxHash }).then((result) => {
-      if (result === "unsupported" || result === "unavailable") {
-        setNotice({
-          tone: "info",
-          message:
-            "Closed the claim window. If your wallet still shows a pending action, cancel it there.",
-        });
-      }
-    });
+    void attemptWalletCancel({ wallet, txHash: paymentTxHash }).then(
+      (result) => {
+        if (result === "unsupported" || result === "unavailable") {
+          setNotice({
+            tone: "info",
+            message:
+              "Closed the claim window. If your wallet still shows a pending action, cancel it there.",
+          });
+        }
+      },
+    );
   }, [
     claimDialog.open,
     claimDialog.paymentTxHash,
@@ -1990,10 +2233,16 @@ function NamesSection({
     ): Promise<MintResponse> => {
       if (!account || !walletClient) throw new Error("Connect a wallet first.");
       if (state.isReservedLabel) throw new Error("That name is reserved.");
-      if (!state.fqdn || !state.validation.isValid) throw new Error("Enter a valid name.");
+      if (!state.fqdn || !state.validation.isValid)
+        throw new Error("Enter a valid name.");
 
       const timestamp = Date.now();
-      const message = createMintMessage(account, state.fqdn, base.id, timestamp);
+      const message = createMintMessage(
+        account,
+        state.fqdn,
+        base.id,
+        timestamp,
+      );
       const signature = await walletClient.signMessage({ account, message });
 
       return fetchJson<MintResponse>(config.endpoints.basenamesMint, {
@@ -2053,7 +2302,10 @@ function NamesSection({
     }
     if (!canPhase2Mint) return;
     if (!paymentRecipient) {
-      setNotice({ tone: "error", message: "Paid claims are not configured yet." });
+      setNotice({
+        tone: "error",
+        message: "Paid claims are not configured yet.",
+      });
       return;
     }
 
@@ -2086,7 +2338,12 @@ function NamesSection({
         timestamp = cached.timestamp;
       } else {
         timestamp = Date.now();
-        const message = createMintMessage(account, phase2State.fqdn ?? "", base.id, timestamp);
+        const message = createMintMessage(
+          account,
+          phase2State.fqdn ?? "",
+          base.id,
+          timestamp,
+        );
         signature = await walletClient.signMessage({ account, message });
         signatureCacheRef.current = {
           signature,
@@ -2107,30 +2364,38 @@ function NamesSection({
 
       const paymentClient = createPublicClient({
         chain: paymentChain,
-        transport: http(paymentChain.id === base.id ? config.baseRpcUrl ?? undefined : undefined),
+        transport: http(
+          paymentChain.id === base.id
+            ? (config.baseRpcUrl ?? undefined)
+            : undefined,
+        ),
       });
 
       const receipt = await paymentClient.waitForTransactionReceipt({
         hash: txHash,
         timeout: PAYMENT_RECEIPT_TIMEOUT_MS,
       });
-      if (receipt.status !== "success") throw new Error("Payment transaction reverted.");
+      if (receipt.status !== "success")
+        throw new Error("Payment transaction reverted.");
 
-      const result = await fetchJson<MintResponse>(config.endpoints.basenamesMint, {
-        method: "POST",
-        headers: {
-          accept: "application/json",
-          "content-type": "application/json",
+      const result = await fetchJson<MintResponse>(
+        config.endpoints.basenamesMint,
+        {
+          method: "POST",
+          headers: {
+            accept: "application/json",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            address: account,
+            label: normalizedLabel,
+            signature,
+            timestamp,
+            paymentTxHash: txHash,
+            paymentChainId: paymentChain.id,
+          }),
         },
-        body: JSON.stringify({
-          address: account,
-          label: normalizedLabel,
-          signature,
-          timestamp,
-          paymentTxHash: txHash,
-          paymentChainId: paymentChain.id,
-        }),
-      });
+      );
 
       signatureCacheRef.current = null;
       setPhase2Label("");
@@ -2202,9 +2467,9 @@ function NamesSection({
           Claim your Regent identity
         </h3>
         <p className="max-w-3xl text-sm leading-6 text-[color:var(--muted-foreground)]">
-          Claim a Regent subname on Ethereum ENS for 0.0025 eth. These can be used by
-          your agent within the Techtree and Autolaunch apps, and display as a unique
-          color.
+          Claim a Regent subname on Ethereum ENS for 0.0025 eth. These can be
+          used by your agent within the Techtree and Autolaunch apps, and
+          display as a unique color.
         </p>
       </div>
 
@@ -2215,15 +2480,17 @@ function NamesSection({
         <SurfaceBlock title="Claimed names" className="lg:col-span-2">
           <div className="space-y-4">
             <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">
-              A Regent agent can change its identity later. Any claimed name can be
-              swapped onto any Regent you create.
+              A Regent agent can change its identity later. Any claimed name can
+              be swapped onto any Regent you create.
             </p>
 
             <div className="space-y-3">
               <div className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
                 Latest subnames registered
               </div>
-              {recentNamesNotice ? <InlineNotice notice={recentNamesNotice} /> : null}
+              {recentNamesNotice ? (
+                <InlineNotice notice={recentNamesNotice} />
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 {recentNames.length ? (
                   recentNames.map((item) => (
@@ -2246,7 +2513,9 @@ function NamesSection({
               <div className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
                 My identities
               </div>
-              {ownedNamesNotice ? <InlineNotice notice={ownedNamesNotice} className="mt-3" /> : null}
+              {ownedNamesNotice ? (
+                <InlineNotice notice={ownedNamesNotice} className="mt-3" />
+              ) : null}
               {account ? (
                 hasOwnedNames ? (
                   <div className="mt-3 flex flex-wrap gap-3">
@@ -2264,11 +2533,15 @@ function NamesSection({
                         <div className="mt-3 flex flex-wrap gap-2">
                           <Button
                             onClick={() =>
-                              void copyText(item.displayFqdn).then(() => setCopiedName(item.displayFqdn))
+                              void copyText(item.displayFqdn).then(() =>
+                                setCopiedName(item.displayFqdn),
+                              )
                             }
                             tone="ghost"
                           >
-                            {copiedName === item.displayFqdn ? "Copied" : "Copy"}
+                            {copiedName === item.displayFqdn
+                              ? "Copied"
+                              : "Copy"}
                           </Button>
                           {item.ensFqdn ? (
                             <ActionLink
@@ -2298,7 +2571,10 @@ function NamesSection({
           </div>
         </SurfaceBlock>
 
-        <SurfaceBlock title="Phase 1: Animata Snapshot" className="lg:col-span-2">
+        <SurfaceBlock
+          title="Phase 1: Animata Snapshot"
+          className="lg:col-span-2"
+        >
           <div className="space-y-5">
             <div className="grid gap-3 md:grid-cols-3">
               <MetricTile
@@ -2306,7 +2582,11 @@ function NamesSection({
                 value={String(freeMintsRemaining)}
                 copy="Still available to this wallet"
               />
-              <MetricTile label="Used" value={String(freeMintsUsed)} copy="Already consumed" />
+              <MetricTile
+                label="Used"
+                value={String(freeMintsUsed)}
+                copy="Already consumed"
+              />
               <MetricTile
                 label="Snapshot total"
                 value={String(snapshotTotal)}
@@ -2327,15 +2607,23 @@ function NamesSection({
               <>
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
-                    <span className="rounded-full border border-[color:var(--border)] px-3 py-1">1. Pick name</span>
-                    <span className="rounded-full border border-[color:var(--border)] px-3 py-1">2. Check availability</span>
-                    <span className="rounded-full border border-[color:var(--border)] px-3 py-1">3. Sign and claim</span>
+                    <span className="rounded-full border border-[color:var(--border)] px-3 py-1">
+                      1. Pick name
+                    </span>
+                    <span className="rounded-full border border-[color:var(--border)] px-3 py-1">
+                      2. Check availability
+                    </span>
+                    <span className="rounded-full border border-[color:var(--border)] px-3 py-1">
+                      3. Sign and claim
+                    </span>
                   </div>
 
                   <input
                     ref={phase1InputRef}
                     value={phase1Label}
-                    onChange={(event) => setPhase1Label(event.currentTarget.value)}
+                    onChange={(event) =>
+                      setPhase1Label(event.currentTarget.value)
+                    }
                     placeholder="alice"
                     autoCapitalize="none"
                     autoCorrect="off"
@@ -2344,7 +2632,9 @@ function NamesSection({
                   />
 
                   {phase1State.isLabelInvalid && phase1State.labelError ? (
-                    <p className="text-sm text-[color:#a6574f]">{phase1State.labelError}</p>
+                    <p className="text-sm text-[color:#a6574f]">
+                      {phase1State.labelError}
+                    </p>
                   ) : null}
 
                   <AvailabilityBadges state={phase1State} />
@@ -2373,14 +2663,22 @@ function NamesSection({
           <div className="space-y-5">
             <p className="text-sm text-[color:var(--muted-foreground)]">
               Price:{" "}
-              <span className="text-[color:var(--foreground)]">{formatEthFromWei(priceWei)}</span>
+              <span className="text-[color:var(--foreground)]">
+                {formatEthFromWei(priceWei)}
+              </span>
             </p>
 
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
-                <span className="rounded-full border border-[color:var(--border)] px-3 py-1">1. Pick name</span>
-                <span className="rounded-full border border-[color:var(--border)] px-3 py-1">2. Check availability</span>
-                <span className="rounded-full border border-[color:var(--border)] px-3 py-1">3. Pay and claim</span>
+                <span className="rounded-full border border-[color:var(--border)] px-3 py-1">
+                  1. Pick name
+                </span>
+                <span className="rounded-full border border-[color:var(--border)] px-3 py-1">
+                  2. Check availability
+                </span>
+                <span className="rounded-full border border-[color:var(--border)] px-3 py-1">
+                  3. Pay and claim
+                </span>
               </div>
 
               <input
@@ -2395,7 +2693,9 @@ function NamesSection({
               />
 
               {phase2State.isLabelInvalid && phase2State.labelError ? (
-                <p className="text-sm text-[color:#a6574f]">{phase2State.labelError}</p>
+                <p className="text-sm text-[color:#a6574f]">
+                  {phase2State.labelError}
+                </p>
               ) : null}
 
               <AvailabilityBadges state={phase2State} />
@@ -2431,9 +2731,14 @@ function NamesSection({
         >
           <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">
             You are claiming{" "}
-            <span className="text-[color:var(--foreground)]">{phase1State.fqdn}</span> and{" "}
-            <span className="text-[color:var(--foreground)]">{phase1State.ensFqdn}</span>.
-            You can assign this identity to any Regent later.
+            <span className="text-[color:var(--foreground)]">
+              {phase1State.fqdn}
+            </span>{" "}
+            and{" "}
+            <span className="text-[color:var(--foreground)]">
+              {phase1State.ensFqdn}
+            </span>
+            . You can assign this identity to any Regent later.
           </p>
           <div className="mt-6 flex flex-wrap justify-end gap-3">
             <Button
@@ -2456,7 +2761,11 @@ function NamesSection({
 
       {claimDialog.open ? (
         <OverlayCard
-          title={claimDialog.status === "success" ? "Success" : "Claiming your subname"}
+          title={
+            claimDialog.status === "success"
+              ? "Success"
+              : "Claiming your subname"
+          }
           onClose={closeClaimDialog}
         >
           {claimDialog.status === "success" ? (
@@ -2489,38 +2798,54 @@ function NamesSection({
             </div>
           ) : null}
         </OverlayCard>
-  ) : null}
+      ) : null}
     </section>
   );
 }
 
 function AgentCompanyWizard({
   wizard,
+  authenticated,
+  privyReady,
   busy,
+  refreshBusy,
+  stage,
   selectedClaimedLabel,
   latestCompanySlug,
   formationState,
   runtime,
   onSelectClaimedLabel,
+  onContinue,
   onConnectBilling,
   onCreateCompany,
+  onRefresh,
+  onRequestSignIn,
   onClose,
   onJumpToNameClaim,
 }: {
   wizard: AgentFormationResponse;
+  authenticated: boolean;
+  privyReady: boolean;
   busy: boolean;
+  refreshBusy: boolean;
+  stage: "gate" | "setup";
   selectedClaimedLabel: string | null;
   latestCompanySlug: string | null;
   formationState: AgentRuntimeResponse["formation"] | null;
   runtime: AgentRuntimeResponse["runtime"] | null;
   onSelectClaimedLabel: (value: string | null) => void;
+  onContinue: () => void;
   onConnectBilling: () => void;
   onCreateCompany: () => void;
+  onRefresh: () => void;
+  onRequestSignIn: () => void;
   onClose: () => void;
   onJumpToNameClaim: () => void;
 }) {
   const selectedClaim =
-    wizard.available_claims.find((claim) => claim.label === selectedClaimedLabel) ?? null;
+    wizard.available_claims.find(
+      (claim) => claim.label === selectedClaimedLabel,
+    ) ?? null;
   const totalEligibleTokens =
     wizard.collections.animata1.length +
     wizard.collections.animata2.length +
@@ -2532,9 +2857,15 @@ function AgentCompanyWizard({
         <div className="space-y-4">
           <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">
             Your company is live at{" "}
-            <span className="text-[color:var(--foreground)]">{latestCompanySlug}.regents.sh</span>.
-            The public page is ready, the first Sprite day is active, and your model is{" "}
-            <span className="text-[color:var(--foreground)]">{runtime.hermes.model}</span>.
+            <span className="text-[color:var(--foreground)]">
+              {latestCompanySlug}.regents.sh
+            </span>
+            . The public page is ready, the first Sprite day is active, and your
+            model is{" "}
+            <span className="text-[color:var(--foreground)]">
+              {runtime.hermes.model}
+            </span>
+            .
           </p>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -2561,7 +2892,10 @@ function AgentCompanyWizard({
           </div>
 
           <div className="flex flex-wrap justify-end gap-3">
-            <ActionLink href={`https://${latestCompanySlug}.regents.sh`} label="Open public page" />
+            <ActionLink
+              href={`https://${latestCompanySlug}.regents.sh`}
+              label="Open public page"
+            />
             <Button onClick={onClose} tone="primary">
               Close
             </Button>
@@ -2571,18 +2905,34 @@ function AgentCompanyWizard({
     );
   }
 
-  if (latestCompanySlug && formationState && formationState.status !== "succeeded") {
+  if (
+    latestCompanySlug &&
+    formationState &&
+    formationState.status !== "succeeded"
+  ) {
     return (
       <OverlayCard title="Agent Formation in progress" onClose={onClose}>
         <div className="space-y-4">
           <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">
-            Regents is preparing <span className="text-[color:var(--foreground)]">{latestCompanySlug}.regents.sh</span>.
-            This covers the private runtime, the worker, the checkpoint, and the public page.
+            Regents is preparing{" "}
+            <span className="text-[color:var(--foreground)]">
+              {latestCompanySlug}.regents.sh
+            </span>
+            . This covers the private runtime, the worker, the checkpoint, and
+            the public page.
           </p>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <MetricTile label="Status" value={formationState.status} copy="Current formation state" />
-            <MetricTile label="Step" value={formationState.current_step} copy="Current formation step" />
+            <MetricTile
+              label="Status"
+              value={formationState.status}
+              copy="Current formation state"
+            />
+            <MetricTile
+              label="Step"
+              value={formationState.current_step}
+              copy="Current formation step"
+            />
             <MetricTile
               label="Attempts"
               value={String(formationState.attempt_count)}
@@ -2597,7 +2947,10 @@ function AgentCompanyWizard({
 
           {formationState.last_error_message ? (
             <InlineNotice
-              notice={{ tone: "error", message: formationState.last_error_message }}
+              notice={{
+                tone: "error",
+                message: formationState.last_error_message,
+              }}
             />
           ) : (
             <InlineNotice
@@ -2619,14 +2972,113 @@ function AgentCompanyWizard({
     );
   }
 
+  if (stage !== "setup") {
+    const accessMessage = !authenticated
+      ? "Sign in with your wallet to check whether you already hold a pass for this beta phase."
+      : wizard.eligible
+        ? "This wallet qualifies for beta access. You can continue into Agent Formation."
+        : "No qualifying pass was found for this wallet yet. If you just bought one, press refresh and check again.";
+
+    const signInLabel =
+      authenticated && wizard.wallet_address
+        ? shortValue(wizard.wallet_address)
+        : authenticated
+          ? "Signed in"
+          : privyReady
+            ? "Sign in"
+            : "Loading wallet";
+
+    return (
+      <OverlayCard
+        title="Agent Company Formation"
+        headerActions={
+          <Button
+            disabled={!privyReady || authenticated}
+            onClick={authenticated ? undefined : onRequestSignIn}
+            tone="secondary"
+          >
+            {signInLabel}
+          </Button>
+        }
+        onClose={onClose}
+      >
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">
+            Agent Company Formation is in beta access for Regents community
+            members. You must own one digital pass from{" "}
+            <InlineTextLink href={ANIMATA_COLLECTION_I_OPENSEA}>
+              Collection I
+            </InlineTextLink>
+            ,{" "}
+            <InlineTextLink href={ANIMATA_COLLECTION_II_OPENSEA}>
+              Collection II
+            </InlineTextLink>
+            , or{" "}
+            <InlineTextLink href={REGENTS_CLUB_OPENSEA_BASE}>
+              the Regents Club
+            </InlineTextLink>{" "}
+            for this phase.
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <MetricTile
+              label="Connected wallet"
+              value={
+                wizard.wallet_address
+                  ? shortValue(wizard.wallet_address)
+                  : "Not signed in"
+              }
+              copy="This is the wallet Regents will check"
+            />
+            <MetricTile
+              label="Passes found"
+              value={String(totalEligibleTokens)}
+              copy="Across Collection I, Collection II, and Regents Club"
+            />
+          </div>
+
+          <InlineNotice
+            notice={{
+              tone: wizard.eligible ? "success" : "info",
+              message: accessMessage,
+            }}
+          />
+
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <ActionLink href={REGENTS_CLUB_OPENSEA_BASE} label="Buy Pass" />
+            <div className="flex items-center gap-2">
+              <RefreshButton
+                busy={refreshBusy}
+                disabled={!authenticated}
+                onClick={onRefresh}
+                title={
+                  authenticated
+                    ? "Refresh pass check"
+                    : "Sign in first to refresh"
+                }
+              />
+              <Button
+                disabled={!wizard.eligible}
+                onClick={onContinue}
+                tone="primary"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        </div>
+      </OverlayCard>
+    );
+  }
+
   return (
     <OverlayCard title="Start Agent Formation" onClose={onClose}>
       <div className="space-y-5">
         <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">
-          Eligible wallets can launch one Regents-owned company with a private runtime
-          and a public `slug.regents.sh` page. The first Sprite day is free. After that,
-          runtime time uses Regents prepaid credits. Model usage is billed to you through
-          Stripe with no Regents margin.
+          Eligible wallets can launch one Regents-owned company with a private
+          runtime and a public `slug.regents.sh` page. The first Sprite day is
+          free. After that, runtime time uses Regents prepaid credits. Model
+          usage is billed to you through Stripe with no Regents margin.
         </p>
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -2685,7 +3137,10 @@ function AgentCompanyWizard({
                   ))}
                 </select>
                 <span className="pointer-events-none absolute inset-y-0 right-0 flex w-11 items-center justify-center text-[color:var(--muted-foreground)]">
-                  <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current">
+                  <svg
+                    viewBox="0 0 16 16"
+                    className="h-4 w-4 fill-none stroke-current"
+                  >
                     <path
                       d="m4.25 6.5 3.75 3.75 3.75-3.75"
                       strokeWidth="1.5"
@@ -2708,7 +3163,8 @@ function AgentCompanyWizard({
                 <p className="mt-2">
                   Identity:{" "}
                   <span className="text-[color:var(--foreground)]">
-                    {selectedClaim.ens_fqdn ?? `${selectedClaim.label}.regent.eth`}
+                    {selectedClaim.ens_fqdn ??
+                      `${selectedClaim.label}.regent.eth`}
                   </span>
                 </p>
               </div>
@@ -2724,7 +3180,11 @@ function AgentCompanyWizard({
                   }}
                 />
                 <div className="flex justify-end">
-                  <Button disabled={busy} onClick={onConnectBilling} tone="primary">
+                  <Button
+                    disabled={busy}
+                    onClick={onConnectBilling}
+                    tone="primary"
+                  >
                     {busy ? "Opening..." : "Start Stripe billing"}
                   </Button>
                 </div>
@@ -2765,7 +3225,9 @@ function AvailabilityBadges({ state }: { state: NameAvailabilityState }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {state.isReservedLabel ? <Pill tone="error">Reserved</Pill> : null}
-      {!state.isReservedLabel && state.isChecking ? <Pill tone="muted">Checking...</Pill> : null}
+      {!state.isReservedLabel && state.isChecking ? (
+        <Pill tone="muted">Checking...</Pill>
+      ) : null}
       {!state.isReservedLabel && state.isAvailable === true ? (
         <Pill tone="success">Available</Pill>
       ) : null}
@@ -2799,8 +3261,7 @@ function ChecklistItem({
               ? "border-[color:var(--positive)] bg-[color:var(--positive)] shadow-[0_0_12px_color-mix(in_oklch,var(--positive)_70%,transparent)]"
               : "border-[color:var(--muted-foreground)] bg-transparent",
           )}
-        >
-        </span>
+        ></span>
         <span>{label}</span>
       </div>
       {detail ? (
@@ -2822,9 +3283,16 @@ function SurfaceBlock({
   className?: string;
 }) {
   return (
-    <section className={classNames("rounded-[1.5rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_94%,var(--card)_6%)] p-5", className)}>
+    <section
+      className={classNames(
+        "rounded-[1.5rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_94%,var(--card)_6%)] p-5",
+        className,
+      )}
+    >
       <div className="mb-4">
-        <h4 className="font-display text-xl text-[color:var(--foreground)]">{title}</h4>
+        <h4 className="font-display text-xl text-[color:var(--foreground)]">
+          {title}
+        </h4>
       </div>
       <div className="space-y-3">{children}</div>
     </section>
@@ -2848,19 +3316,19 @@ function MetricTile({
       <div className="font-display mt-3 break-all text-2xl text-[color:var(--foreground)]">
         {value}
       </div>
-      <p className="mt-2 text-sm leading-6 text-[color:var(--muted-foreground)]">{copy}</p>
+      <p className="mt-2 text-sm leading-6 text-[color:var(--muted-foreground)]">
+        {copy}
+      </p>
     </div>
   );
 }
 
-function ConnectHint({
-  message,
-}: {
-  message: string;
-}) {
+function ConnectHint({ message }: { message: string }) {
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_94%,var(--card)_6%)] p-4">
-      <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">{message}</p>
+      <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">
+        {message}
+      </p>
     </div>
   );
 }
@@ -2878,6 +3346,25 @@ function ActionLink({ href, label }: { href: string; label: string }) {
   );
 }
 
+function InlineTextLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="text-[color:var(--foreground)] underline decoration-[color:color-mix(in_oklch,var(--ring)_58%,transparent)] underline-offset-4 transition hover:text-[color:var(--ring)]"
+    >
+      {children}
+    </a>
+  );
+}
+
 const buttonBase =
   "inline-flex items-center justify-center rounded-full border px-4 py-2 text-sm transition disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -2890,12 +3377,15 @@ const buttonTones: Record<"primary" | "secondary" | "ghost", string> = {
     "border-[color:var(--border)] bg-transparent text-[color:var(--foreground)] hover:border-[color:var(--ring)]",
 };
 
-const Button = React.forwardRef<HTMLButtonElement, {
-  children: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  tone: "primary" | "secondary" | "ghost";
-}>(({ children, onClick, disabled, tone }, ref) => (
+const Button = React.forwardRef<
+  HTMLButtonElement,
+  {
+    children: React.ReactNode;
+    onClick?: () => void;
+    disabled?: boolean;
+    tone: "primary" | "secondary" | "ghost";
+  }
+>(({ children, onClick, disabled, tone }, ref) => (
   <button
     ref={ref}
     type="button"
@@ -2908,6 +3398,65 @@ const Button = React.forwardRef<HTMLButtonElement, {
 ));
 
 Button.displayName = "Button";
+
+function RefreshButton({
+  busy,
+  disabled,
+  onClick,
+  title,
+}: {
+  busy: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  title: string;
+}) {
+  const iconRef = React.useRef<SVGSVGElement | null>(null);
+
+  React.useEffect(() => {
+    if (!busy || !iconRef.current || prefersReducedMotion()) return;
+
+    const animation = animate(iconRef.current, {
+      rotate: 360,
+      duration: 800,
+      ease: "linear",
+      loop: true,
+    });
+
+    return () => {
+      animation.cancel();
+    };
+  }, [busy]);
+
+  return (
+    <button
+      type="button"
+      disabled={disabled || busy}
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--button-secondary-bg)] text-[color:var(--foreground)] transition hover:border-[color:var(--ring)] disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <svg
+        ref={iconRef}
+        viewBox="0 0 20 20"
+        className="h-4 w-4 fill-none stroke-current"
+      >
+        <path
+          d="M15.75 8a6 6 0 1 0 1.08 4.38"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M13.75 3.75h2.5v2.5"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  );
+}
 
 function Pill({
   children,
@@ -2967,10 +3516,12 @@ function InlineNotice({
 function OverlayCard({
   title,
   children,
+  headerActions,
   onClose,
 }: {
   title: string;
   children: React.ReactNode;
+  headerActions?: React.ReactNode;
   onClose: () => void;
 }) {
   const backdropRef = React.useRef<HTMLDivElement | null>(null);
@@ -2978,7 +3529,8 @@ function OverlayCard({
   const titleId = React.useId();
 
   React.useEffect(() => {
-    if (!backdropRef.current || !cardRef.current || prefersReducedMotion()) return;
+    if (!backdropRef.current || !cardRef.current || prefersReducedMotion())
+      return;
 
     backdropRef.current.style.opacity = "0";
     cardRef.current.style.opacity = "0";
@@ -3029,12 +3581,36 @@ function OverlayCard({
         aria-labelledby={titleId}
         onClick={(event) => event.stopPropagation()}
       >
-        <h4
-          id={titleId}
-          className="font-display text-2xl text-[color:var(--foreground)]"
-        >
-          {title}
-        </h4>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 pr-2">
+            <h4
+              id={titleId}
+              className="font-display text-2xl text-[color:var(--foreground)]"
+            >
+              {title}
+            </h4>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {headerActions}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--button-secondary-bg)] text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
+            >
+              <svg
+                viewBox="0 0 16 16"
+                className="h-4 w-4 fill-none stroke-current"
+              >
+                <path
+                  d="M4 4l8 8M12 4 4 12"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
         <div className="mt-4">{children}</div>
       </div>
     </div>
@@ -3076,7 +3652,8 @@ function useNameAvailability({
   const ensFqdn = validation.isValid
     ? toSubnameFqdn(validation.normalizedLabel, ensParentName)
     : null;
-  const [availability, setAvailability] = React.useState<AvailabilityResponse | null>(null);
+  const [availability, setAvailability] =
+    React.useState<AvailabilityResponse | null>(null);
   const [isChecking, setIsChecking] = React.useState(false);
   const [refreshNonce, setRefreshNonce] = React.useState(0);
 
@@ -3097,7 +3674,9 @@ function useNameAvailability({
       const url = new URL(endpoint, window.location.origin);
       url.searchParams.set("label", validation.normalizedLabel);
 
-      void fetchJson<AvailabilityResponse>(url.toString(), { signal: controller.signal })
+      void fetchJson<AvailabilityResponse>(url.toString(), {
+        signal: controller.signal,
+      })
         .then((response) => {
           setAvailability(response);
         })
@@ -3117,15 +3696,24 @@ function useNameAvailability({
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [endpoint, ensFqdn, fqdn, refreshNonce, validation.isValid, validation.normalizedLabel]);
+  }, [
+    endpoint,
+    ensFqdn,
+    fqdn,
+    refreshNonce,
+    validation.isValid,
+    validation.normalizedLabel,
+  ]);
 
   const isReservedLabel = availability?.reserved === true;
   const labelError = !validation.isValid
-    ? validation.reason ?? "Invalid name"
+    ? (validation.reason ?? "Invalid name")
     : isReservedLabel
       ? "This name is reserved."
       : null;
-  const isAvailable = isReservedLabel ? false : availability?.available ?? null;
+  const isAvailable = isReservedLabel
+    ? false
+    : (availability?.available ?? null);
   const isLabelInvalid = label.trim().length > 0 && Boolean(labelError);
 
   return {
@@ -3289,23 +3877,35 @@ function getWalletAddressesFromPrivyUser(privyUser: unknown): `0x${string}`[] {
     }
   });
 
-  return Array.from(candidateAddresses).filter((address): address is `0x${string}` =>
-    isAddress(address),
+  return Array.from(candidateAddresses).filter(
+    (address): address is `0x${string}` => isAddress(address),
   );
 }
 
 function getPrivyDisplayName(privyUser: unknown): string | null {
   if (!privyUser || typeof privyUser !== "object") return null;
 
-  if ("email" in privyUser && privyUser.email && typeof privyUser.email === "object") {
+  if (
+    "email" in privyUser &&
+    privyUser.email &&
+    typeof privyUser.email === "object"
+  ) {
     const email =
-      "address" in privyUser.email ? (privyUser.email.address as unknown) : null;
+      "address" in privyUser.email
+        ? (privyUser.email.address as unknown)
+        : null;
     if (typeof email === "string" && email.trim()) return email.trim();
   }
 
-  if ("twitter" in privyUser && privyUser.twitter && typeof privyUser.twitter === "object") {
+  if (
+    "twitter" in privyUser &&
+    privyUser.twitter &&
+    typeof privyUser.twitter === "object"
+  ) {
     const username =
-      "username" in privyUser.twitter ? (privyUser.twitter.username as unknown) : null;
+      "username" in privyUser.twitter
+        ? (privyUser.twitter.username as unknown)
+        : null;
     if (typeof username === "string" && username.trim()) return username.trim();
   }
 
@@ -3432,7 +4032,9 @@ async function switchToChain(
           chainName: chain.name,
           nativeCurrency: chain.nativeCurrency,
           rpcUrls: [baseRpcUrl ?? "https://mainnet.base.org"],
-          blockExplorerUrls: [chain.blockExplorers?.default.url ?? "https://basescan.org"],
+          blockExplorerUrls: [
+            chain.blockExplorers?.default.url ?? "https://basescan.org",
+          ],
         },
       ],
     });

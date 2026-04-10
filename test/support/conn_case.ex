@@ -1,4 +1,4 @@
-defmodule WebWeb.ConnCase do
+defmodule PlatformPhxWeb.ConnCase do
   @moduledoc """
   This module defines the test case to be used by
   tests that require setting up a connection.
@@ -11,7 +11,7 @@ defmodule WebWeb.ConnCase do
   we enable the SQL sandbox, so changes done to the database
   are reverted at the end of every test. If you are using
   PostgreSQL, you can even run database tests asynchronously
-  by setting `use WebWeb.ConnCase, async: true`, although
+  by setting `use PlatformPhxWeb.ConnCase, async: true`, although
   this option is not recommended for other databases.
   """
 
@@ -20,19 +20,19 @@ defmodule WebWeb.ConnCase do
   using do
     quote do
       # The default endpoint for testing
-      @endpoint WebWeb.Endpoint
+      @endpoint PlatformPhxWeb.Endpoint
 
-      use WebWeb, :verified_routes
+      use PlatformPhxWeb, :verified_routes
 
       # Import conveniences for testing with connections
       import Plug.Conn
       import Phoenix.ConnTest
-      import WebWeb.ConnCase
+      import PlatformPhxWeb.ConnCase
     end
   end
 
   setup tags do
-    sandbox_owner = Web.DataCase.setup_sandbox(tags)
+    sandbox_owner = PlatformPhx.DataCase.setup_sandbox(tags)
     {:ok, conn: Phoenix.ConnTest.build_conn(), sandbox_owner: sandbox_owner}
   end
 end

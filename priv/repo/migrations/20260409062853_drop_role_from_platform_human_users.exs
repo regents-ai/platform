@@ -1,4 +1,4 @@
-defmodule Web.Repo.Migrations.DropRoleFromPlatformHumanUsers do
+defmodule PlatformPhx.Repo.Migrations.DropRoleFromPlatformHumanUsers do
   use Ecto.Migration
 
   def up do

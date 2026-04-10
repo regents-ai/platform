@@ -1,4 +1,4 @@
-defmodule Web.StripeLlmFakeClient do
+defmodule PlatformPhx.StripeLlmFakeClient do
   @moduledoc false
 
   def create_checkout_session(_params) do

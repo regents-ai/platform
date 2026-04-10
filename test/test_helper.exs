@@ -1,3 +1,3 @@
 ExUnit.start()
-Ecto.Adapters.SQL.Sandbox.mode(Web.Repo, :manual)
-Application.put_env(:web, :ethereum_adapter, Web.TestEthereumAdapter)
+Ecto.Adapters.SQL.Sandbox.mode(PlatformPhx.Repo, :manual)
+Application.put_env(:platform_phx, :ethereum_adapter, PlatformPhx.TestEthereumAdapter)

@@ -1,4 +1,4 @@
-defmodule Web.Repo.Migrations.CutAgentPlatformToAgentFormation do
+defmodule PlatformPhx.Repo.Migrations.CutAgentPlatformToAgentFormation do
   use Ecto.Migration
 
   def up do
