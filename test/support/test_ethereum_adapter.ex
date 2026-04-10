@@ -1,6 +1,6 @@
-defmodule PlatformPhx.TestEthereumAdapter do
+defmodule Web.TestEthereumAdapter do
   @moduledoc false
-  @behaviour PlatformPhx.Ethereum.Adapter
+  @behaviour Web.Ethereum.Adapter
 
   @spec sign_message(String.t(), String.t()) :: String.t()
   def sign_message(address, message) do

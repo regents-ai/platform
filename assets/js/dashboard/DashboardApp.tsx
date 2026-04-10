@@ -34,8 +34,8 @@ import {
 } from "./requests";
 import { attemptWalletCancel } from "./tx-cancel";
 import type {
+  AgentFormationResponse,
   AgentRuntimeResponse,
-  AgentWizardResponse,
   AllowanceResponse,
   AvailabilityResponse,
   BasenamesConfigResponse,
@@ -177,22 +177,24 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
     user,
   } = usePrivy();
   const { account, chainId, wallet, walletClient, privyId } = usePrivyWalletClient();
-  const [wizard, setWizard] = React.useState<AgentWizardResponse | null>(null);
-  const [wizardNotice, setWizardNotice] = React.useState<Notice | null>(null);
-  const [wizardOpen, setWizardOpen] = React.useState(false);
-  const [wizardBusy, setWizardBusy] = React.useState(false);
+  const [formation, setFormation] = React.useState<AgentFormationResponse | null>(null);
+  const [formationNotice, setFormationNotice] = React.useState<Notice | null>(null);
+  const [formationOpen, setFormationOpen] = React.useState(false);
+  const [formationBusy, setFormationBusy] = React.useState(false);
   const [selectedClaimedLabel, setSelectedClaimedLabel] = React.useState<string | null>(null);
   const [runtime, setRuntime] = React.useState<AgentRuntimeResponse["runtime"] | null>(null);
+  const [latestFormation, setLatestFormation] =
+    React.useState<AgentRuntimeResponse["formation"] | null>(null);
   const [latestCompanySlug, setLatestCompanySlug] = React.useState<string | null>(null);
-  const autoOpenedWizardRef = React.useRef(false);
+  const autoOpenedFormationRef = React.useRef(false);
   const sessionSignatureRef = React.useRef<string | null>(null);
   const sessionWalletAddresses = React.useMemo(() => getWalletAddressesFromPrivyUser(user), [user]);
 
-  const loadWizard = React.useCallback(async () => {
+  const loadFormation = React.useCallback(async () => {
     try {
-      const payload = await fetchJson<AgentWizardResponse>(config.endpoints.wizard);
-      setWizard(payload);
-      setWizardNotice(null);
+      const payload = await fetchJson<AgentFormationResponse>(config.endpoints.formation);
+      setFormation(payload);
+      setFormationNotice(null);
       setSelectedClaimedLabel((current) => {
         if (current && payload.available_claims.some((claim) => claim.label === current)) {
           return current;
@@ -200,21 +202,22 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
         return payload.available_claims[0]?.label ?? null;
       });
     } catch (error) {
-      setWizard(null);
-      setWizardNotice({
+      setFormation(null);
+      setFormationNotice({
         tone: "error",
-        message: getErrorMessage(error, "Agent company wizard is unavailable right now."),
+        message: getErrorMessage(error, "Agent Formation is unavailable right now."),
       });
     }
-  }, [config.endpoints.wizard]);
+  }, [config.endpoints.formation]);
 
   React.useEffect(() => {
     if (!authenticated || !privyId) {
       sessionSignatureRef.current = null;
-      autoOpenedWizardRef.current = false;
-      setWizard(null);
-      setWizardOpen(false);
+      autoOpenedFormationRef.current = false;
+      setFormation(null);
+      setFormationOpen(false);
       setLatestCompanySlug(null);
+      setLatestFormation(null);
       setRuntime(null);
       return;
     }
@@ -226,7 +229,7 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
     });
 
     if (sessionSignatureRef.current === nextSignature) {
-      void loadWizard();
+      void loadFormation();
       return;
     }
 
@@ -245,9 +248,9 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
         displayName: getPrivyDisplayName(user),
       }),
     })
-      .then(() => loadWizard())
+      .then(() => loadFormation())
       .catch((error) => {
-        setWizardNotice({
+        setFormationNotice({
           tone: "error",
           message: getErrorMessage(error, "Could not start your Regents session."),
         });
@@ -256,61 +259,75 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
     account,
     authenticated,
     config.endpoints.privySession,
-    loadWizard,
+    loadFormation,
     privyId,
     sessionWalletAddresses,
     user,
   ]);
 
   React.useEffect(() => {
-    if (!wizard?.eligible || autoOpenedWizardRef.current) return;
-    autoOpenedWizardRef.current = true;
-    setWizardOpen(true);
-  }, [wizard?.eligible]);
+    if (!formation?.eligible || autoOpenedFormationRef.current) return;
+    autoOpenedFormationRef.current = true;
+    setFormationOpen(true);
+  }, [formation?.eligible]);
 
   const connectLlmBilling = React.useCallback(async () => {
-    setWizardBusy(true);
+    setFormationBusy(true);
     try {
-      await fetchJson<{ ok: boolean }>(config.endpoints.wizardLlmBilling, {
-        method: "POST",
-        headers: {
-          accept: "application/json",
-          "content-type": "application/json",
+      const payload = await fetchJson<{ ok: boolean; checkout_url: string }>(
+        config.endpoints.formationLlmBillingCheckout,
+        {
+          method: "POST",
+          headers: {
+            accept: "application/json",
+            "content-type": "application/json",
+          },
         },
-      });
-      await loadWizard();
+      );
+      if (payload.checkout_url) {
+        window.location.assign(payload.checkout_url);
+      }
+      await loadFormation();
     } catch (error) {
-      setWizardNotice({
+      setFormationNotice({
         tone: "error",
-        message: getErrorMessage(error, "Stripe LLM billing could not be connected."),
+        message: getErrorMessage(error, "Stripe billing could not be started."),
       });
     } finally {
-      setWizardBusy(false);
+      setFormationBusy(false);
     }
-  }, [config.endpoints.wizardLlmBilling, loadWizard]);
+  }, [config.endpoints.formationLlmBillingCheckout, loadFormation]);
 
   const loadRuntime = React.useCallback(
     async (slug: string) => {
       try {
         const payload = await fetchJson<AgentRuntimeResponse>(
-          config.endpoints.wizardCompanies.replace(/\/wizard\/companies$/, `/agents/${slug}/runtime`),
+          config.endpoints.formationCompanies.replace(
+            /\/formation\/companies$/,
+            `/agents/${slug}/runtime`,
+          ),
         );
         setRuntime(payload.runtime);
+        setLatestFormation(payload.formation);
       } catch (error) {
-        setWizardNotice({
+        setFormationNotice({
           tone: "error",
           message: getErrorMessage(error, "Runtime status could not be loaded."),
         });
       }
     },
-    [config.endpoints.wizardCompanies],
+    [config.endpoints.formationCompanies],
   );
 
   const createCompany = React.useCallback(async () => {
     if (!selectedClaimedLabel) return;
-    setWizardBusy(true);
+    setFormationBusy(true);
     try {
-      const payload = await fetchJson<AgentRuntimeResponse>(config.endpoints.wizardCompanies, {
+      const payload = await fetchJson<{
+        ok: boolean;
+        agent: AgentRuntimeResponse["agent"];
+        formation: AgentRuntimeResponse["formation"];
+      }>(config.endpoints.formationCompanies, {
         method: "POST",
         headers: {
           accept: "application/json",
@@ -319,27 +336,40 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
         body: JSON.stringify({ claimedLabel: selectedClaimedLabel }),
       });
       setLatestCompanySlug(payload.agent.slug);
-      setRuntime(payload.runtime);
-      await loadWizard();
+      setLatestFormation(payload.formation);
+      setRuntime(null);
+      await loadFormation();
       void loadRuntime(payload.agent.slug);
     } catch (error) {
-      setWizardNotice({
+      setFormationNotice({
         tone: "error",
-        message: getErrorMessage(error, "Company provisioning did not finish."),
+        message: getErrorMessage(error, "Agent Formation could not start."),
       });
     } finally {
-      setWizardBusy(false);
+      setFormationBusy(false);
     }
-  }, [config.endpoints.wizardCompanies, loadRuntime, loadWizard, selectedClaimedLabel]);
+  }, [config.endpoints.formationCompanies, loadRuntime, loadFormation, selectedClaimedLabel]);
 
   const handleClaimedNameCreated = React.useCallback(
     async (claimedName: ClaimedNameRecord) => {
       setSelectedClaimedLabel(claimedName.label);
-      await loadWizard();
-      setWizardOpen(true);
+      await loadFormation();
+      setFormationOpen(true);
     },
-    [loadWizard],
+    [loadFormation],
   );
+
+  React.useEffect(() => {
+    if (!latestCompanySlug || !latestFormation) return;
+    if (!["queued", "running"].includes(latestFormation.status)) return;
+
+    const timeout = window.setTimeout(() => {
+      void loadRuntime(latestCompanySlug);
+      void loadFormation();
+    }, 2500);
+
+    return () => window.clearTimeout(timeout);
+  }, [latestCompanySlug, latestFormation, loadFormation, loadRuntime]);
 
   return (
     <div className="space-y-8">
@@ -358,7 +388,7 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
         }}
       />
 
-      {wizardNotice ? <InlineNotice notice={wizardNotice} /> : null}
+      {formationNotice ? <InlineNotice notice={formationNotice} /> : null}
 
       <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1.06fr)_minmax(0,0.94fr)]">
         <RedeemSection
@@ -385,19 +415,20 @@ export function DashboardApp({ config }: { config: DashboardConfig }) {
         />
       </div>
 
-      {wizardOpen && wizard ? (
+      {formationOpen && formation ? (
         <AgentCompanyWizard
-          wizard={wizard}
-          busy={wizardBusy}
+          wizard={formation}
+          busy={formationBusy}
           selectedClaimedLabel={selectedClaimedLabel}
           latestCompanySlug={latestCompanySlug}
+          formationState={latestFormation}
           runtime={runtime}
           onSelectClaimedLabel={setSelectedClaimedLabel}
           onConnectBilling={() => void connectLlmBilling()}
           onCreateCompany={() => void createCompany()}
-          onClose={() => setWizardOpen(false)}
+          onClose={() => setFormationOpen(false)}
           onJumpToNameClaim={() => {
-            setWizardOpen(false);
+            setFormationOpen(false);
             document.getElementById("services-name-claim")?.scrollIntoView({
               behavior: prefersReducedMotion() ? "auto" : "smooth",
               block: "start",
@@ -2468,6 +2499,7 @@ function AgentCompanyWizard({
   busy,
   selectedClaimedLabel,
   latestCompanySlug,
+  formationState,
   runtime,
   onSelectClaimedLabel,
   onConnectBilling,
@@ -2475,10 +2507,11 @@ function AgentCompanyWizard({
   onClose,
   onJumpToNameClaim,
 }: {
-  wizard: AgentWizardResponse;
+  wizard: AgentFormationResponse;
   busy: boolean;
   selectedClaimedLabel: string | null;
   latestCompanySlug: string | null;
+  formationState: AgentRuntimeResponse["formation"] | null;
   runtime: AgentRuntimeResponse["runtime"] | null;
   onSelectClaimedLabel: (value: string | null) => void;
   onConnectBilling: () => void;
@@ -2493,15 +2526,14 @@ function AgentCompanyWizard({
     wizard.collections.animata2.length +
     wizard.collections.animataPass.length;
 
-  if (latestCompanySlug && runtime) {
+  if (latestCompanySlug && runtime && formationState?.status === "succeeded") {
     return (
-      <OverlayCard title="Paperclip-Hermes company created" onClose={onClose}>
+      <OverlayCard title="Agent Formation complete" onClose={onClose}>
         <div className="space-y-4">
           <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">
             Your company is live at{" "}
             <span className="text-[color:var(--foreground)]">{latestCompanySlug}.regents.sh</span>.
-            The public page is ready, the Sprite trial is active for the first day, and
-            Hermes is set to{" "}
+            The public page is ready, the first Sprite day is active, and your model is{" "}
             <span className="text-[color:var(--foreground)]">{runtime.hermes.model}</span>.
           </p>
 
@@ -2539,15 +2571,62 @@ function AgentCompanyWizard({
     );
   }
 
+  if (latestCompanySlug && formationState && formationState.status !== "succeeded") {
+    return (
+      <OverlayCard title="Agent Formation in progress" onClose={onClose}>
+        <div className="space-y-4">
+          <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">
+            Regents is preparing <span className="text-[color:var(--foreground)]">{latestCompanySlug}.regents.sh</span>.
+            This covers the private runtime, the worker, the checkpoint, and the public page.
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <MetricTile label="Status" value={formationState.status} copy="Current formation state" />
+            <MetricTile label="Step" value={formationState.current_step} copy="Current formation step" />
+            <MetricTile
+              label="Attempts"
+              value={String(formationState.attempt_count)}
+              copy="Formation retries so far"
+            />
+            <MetricTile
+              label="Sprite credits"
+              value={formatUsdCents(wizard.credits.total_balance_usd_cents)}
+              copy="Current prepaid runtime balance"
+            />
+          </div>
+
+          {formationState.last_error_message ? (
+            <InlineNotice
+              notice={{ tone: "error", message: formationState.last_error_message }}
+            />
+          ) : (
+            <InlineNotice
+              notice={{
+                tone: "info",
+                message:
+                  "Keep this page open or come back in a moment. Regents will refresh the formation status automatically.",
+              }}
+            />
+          )}
+
+          <div className="flex justify-end gap-3">
+            <Button onClick={onClose} tone="secondary">
+              Close
+            </Button>
+          </div>
+        </div>
+      </OverlayCard>
+    );
+  }
+
   return (
-    <OverlayCard title="Create a Paperclip-Hermes company" onClose={onClose}>
+    <OverlayCard title="Start Agent Formation" onClose={onClose}>
       <div className="space-y-5">
         <p className="text-sm leading-6 text-[color:var(--muted-foreground)]">
-          Eligible wallets can launch one Regents-owned Sprite, one private Paperclip
-          company, and one Hermes worker behind a public `slug.regents.sh` page. The
-          first day of Sprite runtime is free. After that, the runtime uses Regents
-          prepaid credits. Hermes usage is billed straight to you through Stripe with
-          no Regents margin.
+          Eligible wallets can launch one Regents-owned company with a private runtime
+          and a public `slug.regents.sh` page. The first Sprite day is free. After that,
+          runtime time uses Regents prepaid credits. Model usage is billed to you through
+          Stripe with no Regents margin.
         </p>
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -2641,12 +2720,12 @@ function AgentCompanyWizard({
                   notice={{
                     tone: "info",
                     message:
-                      "Stripe LLM billing must be connected before Regents provisions the Sprite and Hermes runtime.",
+                      "Stripe billing must be active before Regents can start Agent Formation.",
                   }}
                 />
                 <div className="flex justify-end">
                   <Button disabled={busy} onClick={onConnectBilling} tone="primary">
-                    {busy ? "Connecting..." : "Connect Stripe LLM billing"}
+                    {busy ? "Opening..." : "Start Stripe billing"}
                   </Button>
                 </div>
               </div>
@@ -2656,7 +2735,7 @@ function AgentCompanyWizard({
                   notice={{
                     tone: "success",
                     message:
-                      "Stripe LLM billing is connected. Regents will provision the Sprite, Paperclip company, Hermes worker, and subdomain in one step.",
+                      "Stripe billing is active. Regents can now start Agent Formation for the selected name.",
                   }}
                 />
                 <div className="flex flex-wrap justify-end gap-3">
@@ -2668,7 +2747,7 @@ function AgentCompanyWizard({
                     onClick={onCreateCompany}
                     tone="primary"
                   >
-                    {busy ? "Provisioning..." : "Create company"}
+                    {busy ? "Starting..." : "Start formation"}
                   </Button>
                 </div>
               </div>

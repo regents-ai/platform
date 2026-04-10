@@ -1,10 +1,10 @@
-defmodule PlatformPhx.OpenSeaFakeClient do
+defmodule Web.OpenSeaFakeClient do
   @moduledoc false
-  @behaviour PlatformPhx.OpenSea.HttpClient
+  @behaviour Web.OpenSea.HttpClient
 
   @impl true
   def get(url, _options) do
-    responses = Application.get_env(:platform_phx, :opensea_fake_responses, %{})
+    responses = Application.get_env(:web, :opensea_fake_responses, %{})
 
     case Map.fetch(responses, to_string(url)) do
       {:ok, {:ok, body}} -> {:ok, %{status: 200, body: body}}

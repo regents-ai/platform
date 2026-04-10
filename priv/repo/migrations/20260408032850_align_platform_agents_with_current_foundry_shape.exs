@@ -1,4 +1,4 @@
-defmodule PlatformPhx.Repo.Migrations.AlignPlatformAgentsWithCurrentFoundryShape do
+defmodule Web.Repo.Migrations.AlignPlatformAgentsWithCurrentFoundryShape do
   use Ecto.Migration
 
   def up do

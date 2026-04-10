@@ -7,10 +7,6 @@ import type { AnimataTokenCardManifestEntry } from "./types.ts";
 
 const LIVE_CARD_STAGE_WIDTH = 384;
 const LIVE_CARD_STAGE_HEIGHT = 512;
-const LIVE_CARD_HORIZONTAL_MARGIN = 72;
-const LIVE_CARD_VERTICAL_MARGIN = 96;
-const LIVE_CARD_VIEWPORT_WIDTH = LIVE_CARD_STAGE_WIDTH + LIVE_CARD_HORIZONTAL_MARGIN * 2;
-const LIVE_CARD_VIEWPORT_HEIGHT = LIVE_CARD_STAGE_HEIGHT + LIVE_CARD_VERTICAL_MARGIN * 2;
 const LOCAL_RENDER_BASE_URL =
   process.env.ANIMATA_LOCAL_RENDER_BASE_URL ?? "http://127.0.0.1:4000";
 
@@ -36,10 +32,10 @@ export async function renderTokenCardImage(
   options: TokenCardRenderOptions,
 ) {
   const executablePath = await resolveBrowserExecutable(options.browserPath);
-  const deviceScaleFactor = options.width / LIVE_CARD_VIEWPORT_WIDTH;
+  const deviceScaleFactor = options.width / LIVE_CARD_STAGE_WIDTH;
   await fs.mkdir(path.dirname(options.outPath), { recursive: true });
 
-  if (Math.abs(options.height / LIVE_CARD_VIEWPORT_HEIGHT - deviceScaleFactor) > 0.0001) {
+  if (Math.abs(options.height / LIVE_CARD_STAGE_HEIGHT - deviceScaleFactor) > 0.0001) {
     throw new Error("Token card output dimensions must keep the 3:4 card render ratio.");
   }
 
@@ -56,8 +52,8 @@ export async function renderTokenCardImage(
   try {
     const page = await browser.newPage({
       viewport: {
-        width: LIVE_CARD_VIEWPORT_WIDTH,
-        height: LIVE_CARD_VIEWPORT_HEIGHT,
+        width: LIVE_CARD_STAGE_WIDTH,
+        height: LIVE_CARD_STAGE_HEIGHT,
       },
       deviceScaleFactor,
     });
@@ -85,6 +81,11 @@ export async function renderTokenCardImage(
           min-height: 100vh !important;
           padding: 0 !important;
         }
+
+        .rtc-stage {
+          width: 100vw !important;
+          max-width: 100vw !important;
+        }
       `,
     });
 
@@ -94,7 +95,9 @@ export async function renderTokenCardImage(
     await page.waitForFunction(waitForShaderSignal, { timeout: 30_000 });
     await page.waitForTimeout(Math.max(250, Math.round(options.heroFrameSeconds * 1000)));
 
-    await page.screenshot({
+    const card = page.locator(".rtc-card");
+
+    await card.screenshot({
       path: options.outPath,
       type: "png",
       omitBackground: true,

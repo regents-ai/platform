@@ -24,8 +24,8 @@ ssl_enabled =
   end
 
 # Configure your database
-config :platform_phx,
-       PlatformPhx.Repo,
+config :web,
+       Web.Repo,
        if(is_binary(database_url) and String.trim(database_url) != "",
          do: [
            ssl: ssl_enabled,
@@ -38,7 +38,7 @@ config :platform_phx,
            username: pg_username,
            password: pg_password,
            hostname: pg_hostname,
-           database: "platform_phx_dev",
+           database: "web_dev",
            stacktrace: true,
            show_sensitive_data_on_connection_error: true,
            pool_size: 10
@@ -51,7 +51,7 @@ config :platform_phx,
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
-config :platform_phx, PlatformPhxWeb.Endpoint,
+config :web, WebWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [ip: {127, 0, 0, 1}],
@@ -60,8 +60,8 @@ config :platform_phx, PlatformPhxWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "kJ24Vl3aXc1Vxt1EMbZh93+mw2MklxoSIrAh+cocQyvIrP5Gp6jsz12g+0cVusFi",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:platform_phx, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:platform_phx, ~w(--watch)]}
+    esbuild: {Esbuild, :install_and_run, [:web, ~w(--sourcemap=inline --watch)]},
+    tailwind: {Tailwind, :install_and_run, [:web, ~w(--watch)]}
   ]
 
 # ## SSL Support
@@ -88,7 +88,7 @@ config :platform_phx, PlatformPhxWeb.Endpoint,
 # different ports.
 
 # Reload browser tabs when matching files change.
-config :platform_phx, PlatformPhxWeb.Endpoint,
+config :web, WebWeb.Endpoint,
   live_reload: [
     web_console_logger: true,
     patterns: [
@@ -97,14 +97,14 @@ config :platform_phx, PlatformPhxWeb.Endpoint,
       # Gettext translations
       ~r"priv/gettext/.*\.po$"E,
       # Router, Controllers, LiveViews and LiveComponents
-      ~r"lib/platform_phx_web/router\.ex$"E,
-      ~r"lib/platform_phx_web/(controllers|live|components)/.*\.(ex|heex)$"E
+      ~r"lib/web_web/router\.ex$"E,
+      ~r"lib/web_web/(controllers|live|components)/.*\.(ex|heex)$"E
     ]
   ]
 
 # Enable dev routes for dashboard and mailbox
-config :platform_phx, dev_routes: true
-config :platform_phx, :token_metadata_root, Path.expand("../priv/metadata", __DIR__)
+config :web, dev_routes: true
+config :web, :token_metadata_root, Path.expand("../priv/metadata", __DIR__)
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"

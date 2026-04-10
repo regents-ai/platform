@@ -83,7 +83,7 @@ html[data-color-mode="dark"] .rtc-card {
   border-radius: 1.1rem;
   overflow: hidden;
   border: 1px solid #353c42;
-  background: linear-gradient(180deg, #181d21, #111519);
+  background: transparent;
 }
 
 .rtc-overlay {
@@ -154,12 +154,19 @@ html[data-color-mode="dark"] .rtc-plaque {
 .rtc-separator {
   position: relative;
   z-index: 1;
-  margin: 0 0.8rem;
   height: 0.62rem;
   background: linear-gradient(180deg, #181d21, #111519);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.04),
     inset 0 -1px 0 rgba(0,0,0,0.32);
+}
+
+.rtc-footer {
+  position: relative;
+  z-index: 1;
+  margin: 0 0.8rem 0.8rem;
+  border-radius: 0 0 0.95rem 0.95rem;
+  overflow: hidden;
 }
 
 .rtc-title {
@@ -330,12 +337,14 @@ export function RegentTokenCard({
           <div className="rtc-chamber">
             <div className="rtc-chamber-media">{media}</div>
           </div>
-          <div className="rtc-separator" aria-hidden="true" />
+          <div className="rtc-footer">
+            <div className="rtc-separator" aria-hidden="true" />
 
-          <div className="rtc-plaque">
-            <h1 className="rtc-title">{entry.name}</h1>
-            <div className="rtc-token-line">
-              <span className="rtc-token-id">{tokenLabel(entry.tokenId)}</span>
+            <div className="rtc-plaque">
+              <h1 className="rtc-title">{entry.name}</h1>
+              <div className="rtc-token-line">
+                <span className="rtc-token-id">{tokenLabel(entry.tokenId)}</span>
+              </div>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-defmodule PlatformPhx.Repo.Migrations.CreateOperatorReports do
+defmodule Web.Repo.Migrations.CreateOperatorReports do
   use Ecto.Migration
 
   def change do

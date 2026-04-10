@@ -7,25 +7,36 @@
 # General application configuration
 import Config
 
-config :platform_phx,
-  ecto_repos: [PlatformPhx.Repo],
+config :web,
+  ecto_repos: [Web.Repo],
   generators: [timestamp_type: :utc_datetime]
 
 # Configure the endpoint
-config :platform_phx, PlatformPhxWeb.Endpoint,
+config :web, WebWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [html: PlatformPhxWeb.ErrorHTML, json: PlatformPhxWeb.ErrorJSON],
+    formats: [html: WebWeb.ErrorHTML, json: WebWeb.ErrorJSON],
     layout: false
   ],
-  pubsub_server: PlatformPhx.PubSub,
+  pubsub_server: Web.PubSub,
   live_view: [signing_salt: "eGS39NaF"]
 
-config :platform_phx, PlatformPhxWeb.PrometheusExporter,
+config :web, WebWeb.PrometheusExporter,
   enabled: true,
   ip: {127, 0, 0, 1},
   port: 9568
+
+config :web, Oban,
+  repo: Web.Repo,
+  queues: [agent_formation: 1, billing: 5, runtime_metering: 1],
+  plugins: [
+    {Oban.Plugins.Pruner, max_age: 86_400},
+    {Oban.Plugins.Cron,
+     crontab: [
+       {"0 * * * *", Web.AgentPlatform.Workers.SpriteMeteringWorker}
+     ]}
+  ]
 
 # Configure the mailer
 #
@@ -34,12 +45,12 @@ config :platform_phx, PlatformPhxWeb.PrometheusExporter,
 #
 # For production it's recommended to configure a different adapter
 # at the `config/runtime.exs`.
-config :platform_phx, PlatformPhx.Mailer, adapter: Swoosh.Adapters.Local
+config :web, Web.Mailer, adapter: Swoosh.Adapters.Local
 
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",
-  platform_phx: [
+  web: [
     args:
       ~w(js/app.ts --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
     cd: Path.expand("../assets", __DIR__),
@@ -49,7 +60,7 @@ config :esbuild,
 # Configure tailwind (the version is required)
 config :tailwind,
   version: "4.1.12",
-  platform_phx: [
+  web: [
     args: ~w(
       --input=assets/css/app.css
       --output=priv/static/assets/css/app.css

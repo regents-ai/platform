@@ -1,11 +1,11 @@
-defmodule PlatformPhx.TokenMarketDataFakeClient do
+defmodule Web.TokenMarketDataFakeClient do
   @moduledoc false
-  @behaviour PlatformPhx.TokenMarketData.Client
+  @behaviour Web.TokenMarketData.Client
 
   @impl true
   def fetch_price_usd(_token_address) do
     case Application.get_env(
-           :platform_phx,
+           :web,
            :token_market_price_response,
            {:error, "missing price"}
          ) do
@@ -18,7 +18,7 @@ defmodule PlatformPhx.TokenMarketDataFakeClient do
   @impl true
   def fetch_token_decimals(_rpc_url, _token_address) do
     Application.get_env(
-      :platform_phx,
+      :web,
       :token_market_decimals_response,
       {:error, "missing decimals"}
     )
@@ -27,7 +27,7 @@ defmodule PlatformPhx.TokenMarketDataFakeClient do
   @impl true
   def fetch_token_balance(_rpc_url, _token_address, _owner_address) do
     Application.get_env(
-      :platform_phx,
+      :web,
       :token_market_balance_response,
       {:error, "missing balance"}
     )

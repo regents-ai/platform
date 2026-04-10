@@ -12,11 +12,12 @@ export type DashboardConfig = {
     basenamesOwned: string;
     basenamesRecent: string;
     basenamesMint: string;
-    wizard: string;
-    wizardLlmBilling: string;
-    wizardCompanies: string;
+    formation: string;
+    formationLlmBillingCheckout: string;
+    formationCompanies: string;
     credits: string;
     creditsCheckout: string;
+    stripeWebhooks: string;
     opensea: string;
     openseaRedeemStats: string;
   };
@@ -113,7 +114,8 @@ export interface LlmBillingStatus {
   status: string;
   connected: boolean;
   provider: string;
-  external_ref: string | null;
+  customer_id: string | null;
+  subscription_id: string | null;
   model_default: string;
   margin_bps: number;
 }
@@ -143,7 +145,19 @@ export interface SpriteCreditSummary {
   companies: CreditCompanySummary[];
 }
 
-export interface WizardCompanyRecord {
+export interface AgentFormationRecord {
+  id: number;
+  status: string;
+  current_step: string;
+  attempt_count: number;
+  last_error_step: string | null;
+  last_error_message: string | null;
+  started_at: string | null;
+  last_heartbeat_at: string | null;
+  completed_at: string | null;
+}
+
+export interface AgentCompanyRecord {
   id: number;
   template_key: string;
   name: string;
@@ -155,20 +169,35 @@ export interface WizardCompanyRecord {
   public_summary: string;
   sprite_name: string | null;
   sprite_url: string | null;
+  sprite_service_name: string | null;
+  sprite_checkpoint_ref: string | null;
+  sprite_created_at: string | null;
   paperclip_url: string | null;
+  paperclip_deployment_mode: string | null;
+  paperclip_http_port: number | null;
   paperclip_company_id: string | null;
   paperclip_agent_id: string | null;
+  hermes_adapter_type: string | null;
+  hermes_model: string | null;
+  hermes_persist_session: boolean;
+  hermes_toolsets: string[];
+  hermes_runtime_plugins: string[];
+  hermes_shared_skills: string[];
   runtime_status: string;
   checkpoint_status: string;
+  runtime_last_checked_at: string | null;
+  last_formation_error: string | null;
   stripe_llm_billing_status: string;
-  stripe_llm_external_ref: string | null;
+  stripe_customer_id: string | null;
+  stripe_pricing_plan_subscription_id: string | null;
   sprite_free_until: string | null;
   sprite_credit_balance_usd_cents: number;
   sprite_metering_status: string;
   subdomain: { hostname: string; active: boolean } | null;
+  formation: AgentFormationRecord | null;
 }
 
-export interface AgentWizardResponse {
+export interface AgentFormationResponse {
   ok: boolean;
   authenticated: boolean;
   wallet_address: `0x${string}` | null;
@@ -178,7 +207,8 @@ export interface AgentWizardResponse {
   available_claims: ClaimedNameRecord[];
   llm_billing: LlmBillingStatus;
   credits: SpriteCreditSummary;
-  owned_companies: WizardCompanyRecord[];
+  owned_companies: AgentCompanyRecord[];
+  active_formations: AgentFormationRecord[];
 }
 
 export interface AgentRuntimeRecord {
@@ -205,6 +235,8 @@ export interface AgentRuntimeRecord {
     model: string;
     persist_session: boolean;
     toolsets: string[];
+    runtime_plugins: string[];
+    shared_skills: string[];
   };
   checkpoint: {
     status: string;
@@ -214,13 +246,14 @@ export interface AgentRuntimeRecord {
 
 export interface AgentRuntimeResponse {
   ok: boolean;
-  agent: WizardCompanyRecord;
+  agent: AgentCompanyRecord;
   runtime: AgentRuntimeRecord;
+  formation: AgentFormationRecord | null;
 }
 
 export interface CreditCheckoutResponse {
   ok: boolean;
-  agent: WizardCompanyRecord;
+  agent: AgentCompanyRecord;
   credits: SpriteCreditSummary;
 }
 
@@ -236,5 +269,5 @@ export interface CurrentHumanProfileResponse {
     llm_billing: LlmBillingStatus;
   } | null;
   claimed_names: ClaimedNameRecord[];
-  agents: WizardCompanyRecord[];
+  agents: AgentCompanyRecord[];
 }

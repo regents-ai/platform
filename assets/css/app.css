@@ -2,7 +2,7 @@
 @import "../regent/css/regent.css";
 @source "../css";
 @source "../js";
-@source "../../lib/platform_phx_web";
+@source "../../lib/web_web";
 
 @font-face {
   font-family: "GeistPixel Circle";

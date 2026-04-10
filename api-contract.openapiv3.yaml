@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
-  title: PlatformPhx API
+  title: Web API
   version: 0.1.0
-  description: HTTP contract for the platform_phx product APIs.
+  description: HTTP contract for the web product APIs.
 servers:
   - url: /
 paths:
@@ -429,60 +429,63 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CurrentHumanProfile'
-  /api/agent-platform/wizard:
+  /api/agent-platform/formation:
     get:
-      operationId: agentPlatformWizard
+      operationId: agentPlatformFormation
       responses:
         '200':
-          description: Wizard state for the current signed-in human
+          description: Agent Formation state for the current signed-in human
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AgentWizardResponse'
+                $ref: '#/components/schemas/AgentFormationResponse'
         '502':
           $ref: '#/components/responses/StatusMessage502'
         '503':
           $ref: '#/components/responses/StatusMessage503'
-  /api/agent-platform/wizard/llm-billing:
+  /api/agent-platform/formation/llm-billing/checkout:
     post:
-      operationId: agentPlatformWizardConnectLlmBilling
+      operationId: agentPlatformFormationLlmBillingCheckout
       responses:
         '200':
-          description: Direct Stripe LLM billing marked as connected for the current human
+          description: Stripe-hosted checkout started for the current human
           content:
             application/json:
               schema:
                 type: object
-                required: [ok, llm_billing]
+                required: [ok, checkout_url, llm_billing]
                 properties:
                   ok: {type: boolean}
+                  checkout_url: {type: string}
                   llm_billing:
                     $ref: '#/components/schemas/LlmBillingStatus'
         '401':
           $ref: '#/components/responses/StatusMessage401'
-  /api/agent-platform/wizard/companies:
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
+  /api/agent-platform/formation/companies:
     post:
-      operationId: agentPlatformWizardCreateCompany
+      operationId: agentPlatformFormationCreateCompany
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateAgentCompanyRequest'
+              $ref: '#/components/schemas/CreateFormationCompanyRequest'
       responses:
-        '200':
-          description: Customer company provisioned and published from the selected claimed name
+        '202':
+          description: Agent Formation started for the selected claimed name
           content:
             application/json:
               schema:
                 type: object
-                required: [ok, agent, runtime]
+                required: [ok, agent, formation]
                 properties:
                   ok: {type: boolean}
                   agent:
                     $ref: '#/components/schemas/AgentRecord'
-                  runtime:
-                    $ref: '#/components/schemas/AgentRuntime'
+                  formation:
+                    $ref: '#/components/schemas/AgentFormation'
         '400':
           $ref: '#/components/responses/StatusMessage400'
         '401':
@@ -495,7 +498,7 @@ paths:
           $ref: '#/components/responses/StatusMessage409'
   /api/agent-platform/agents/{slug}/runtime:
     get:
-      operationId: agentPlatformRuntime
+      operationId: agentPlatformFormationRuntime
       parameters:
         - name: slug
           in: path
@@ -515,7 +518,7 @@ paths:
           $ref: '#/components/responses/StatusMessage404'
   /api/agent-platform/credits:
     get:
-      operationId: agentPlatformCredits
+      operationId: agentPlatformFormationCredits
       responses:
         '200':
           description: Current Sprite credit summary for the signed-in human
@@ -532,7 +535,7 @@ paths:
           $ref: '#/components/responses/StatusMessage401'
   /api/agent-platform/credits/checkout:
     post:
-      operationId: agentPlatformCreditsCheckout
+      operationId: agentPlatformFormationCreditsCheckout
       requestBody:
         required: true
         content:
@@ -552,6 +555,23 @@ paths:
           $ref: '#/components/responses/StatusMessage401'
         '404':
           $ref: '#/components/responses/StatusMessage404'
+  /api/agent-platform/stripe/webhooks:
+    post:
+      operationId: agentPlatformStripeWebhook
+      responses:
+        '200':
+          description: Stripe billing webhook accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: {type: boolean}
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
   /api/opensea:
     get:
       operationId: openSeaHoldings
@@ -927,7 +947,8 @@ components:
         status: {type: string}
         connected: {type: boolean}
         provider: {type: string}
-        external_ref: {type: [string, 'null']}
+        customer_id: {type: [string, 'null']}
+        subscription_id: {type: [string, 'null']}
         model_default: {type: string}
         margin_bps: {type: integer}
     CurrentHuman:
@@ -981,9 +1002,22 @@ components:
               sprite_metering_status: {type: string}
               sprite_credit_balance_usd_cents: {type: integer}
               sprite_free_until: {type: [string, 'null'], format: date-time}
-    AgentWizardResponse:
+    AgentFormation:
       type: object
-      required: [ok, authenticated, wallet_address, eligible, collections, claimed_names, available_claims, llm_billing, credits, owned_companies]
+      required: [id, status, current_step, attempt_count]
+      properties:
+        id: {type: integer}
+        status: {type: string}
+        current_step: {type: string}
+        attempt_count: {type: integer}
+        last_error_step: {type: [string, 'null']}
+        last_error_message: {type: [string, 'null']}
+        started_at: {type: [string, 'null'], format: date-time}
+        last_heartbeat_at: {type: [string, 'null'], format: date-time}
+        completed_at: {type: [string, 'null'], format: date-time}
+    AgentFormationResponse:
+      type: object
+      required: [ok, authenticated, wallet_address, eligible, collections, claimed_names, available_claims, llm_billing, credits, owned_companies, active_formations]
       properties:
         ok: {type: boolean}
         authenticated: {type: boolean}
@@ -1018,6 +1052,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AgentRecord'
+        active_formations:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentFormation'
     AgentTemplateService:
       type: object
       required: [slug, name, summary, price_label, payment_rail, public_result_default, sort_order]
@@ -1053,7 +1091,7 @@ components:
           $ref: '#/components/schemas/AgentRuntimeDefaults'
     AgentRuntimeDefaults:
       type: object
-      required: [sprite_owner, sprite_service_name, paperclip_deployment_mode, paperclip_http_port, hermes_adapter_type, hermes_model, hermes_persist_session, hermes_toolsets, paperclip_company_purpose, hermes_worker_role, recommended_network_domains, checkpoint_moments]
+      required: [sprite_owner, sprite_service_name, paperclip_deployment_mode, paperclip_http_port, hermes_adapter_type, hermes_model, hermes_persist_session, hermes_toolsets, hermes_runtime_plugins, hermes_shared_skills, paperclip_company_purpose, hermes_worker_role, recommended_network_domains, checkpoint_moments]
       properties:
         sprite_owner: {type: string}
         sprite_service_name: {type: string}
@@ -1063,6 +1101,12 @@ components:
         hermes_model: {type: string}
         hermes_persist_session: {type: boolean}
         hermes_toolsets:
+          type: array
+          items: {type: string}
+        hermes_runtime_plugins:
+          type: array
+          items: {type: string}
+        hermes_shared_skills:
           type: array
           items: {type: string}
         paperclip_company_purpose: {type: string}
@@ -1149,21 +1193,45 @@ components:
       allOf:
         - $ref: '#/components/schemas/PublicAgentRecord'
         - type: object
-          required: [sprite_name, sprite_url, paperclip_url, paperclip_company_id, paperclip_agent_id, runtime_status, checkpoint_status, stripe_llm_billing_status, sprite_free_until, sprite_credit_balance_usd_cents, sprite_metering_status]
+          required: [sprite_name, sprite_url, sprite_service_name, paperclip_url, paperclip_company_id, paperclip_agent_id, runtime_status, checkpoint_status, stripe_llm_billing_status, sprite_free_until, sprite_credit_balance_usd_cents, sprite_metering_status]
           properties:
             sprite_name: {type: [string, 'null']}
             sprite_url: {type: [string, 'null']}
+            sprite_service_name: {type: [string, 'null']}
+            sprite_checkpoint_ref: {type: [string, 'null']}
+            sprite_created_at: {type: [string, 'null'], format: date-time}
             paperclip_url: {type: [string, 'null']}
+            paperclip_deployment_mode: {type: [string, 'null']}
+            paperclip_http_port: {type: [integer, 'null']}
             paperclip_company_id: {type: [string, 'null']}
             paperclip_agent_id: {type: [string, 'null']}
+            hermes_adapter_type: {type: [string, 'null']}
+            hermes_model: {type: [string, 'null']}
+            hermes_persist_session: {type: boolean}
+            hermes_toolsets:
+              type: array
+              items: {type: string}
+            hermes_runtime_plugins:
+              type: array
+              items: {type: string}
+            hermes_shared_skills:
+              type: array
+              items: {type: string}
             runtime_status: {type: string}
             checkpoint_status: {type: string}
+            runtime_last_checked_at: {type: [string, 'null'], format: date-time}
+            last_formation_error: {type: [string, 'null']}
             stripe_llm_billing_status: {type: string}
-            stripe_llm_external_ref: {type: [string, 'null']}
+            stripe_customer_id: {type: [string, 'null']}
+            stripe_pricing_plan_subscription_id: {type: [string, 'null']}
             sprite_free_until: {type: [string, 'null'], format: date-time}
             sprite_credit_balance_usd_cents: {type: integer}
             sprite_metering_status: {type: string}
-    CreateAgentCompanyRequest:
+            formation:
+              oneOf:
+                - $ref: '#/components/schemas/AgentFormation'
+                - type: 'null'
+    CreateFormationCompanyRequest:
       type: object
       required: [claimedLabel]
       properties:
@@ -1194,7 +1262,7 @@ components:
             http_port: {type: integer}
         hermes:
           type: object
-          required: [agent_id, status, adapter_type, model, persist_session, toolsets]
+          required: [agent_id, status, adapter_type, model, persist_session, toolsets, runtime_plugins, shared_skills]
           properties:
             agent_id: {type: [string, 'null']}
             status: {type: string}
@@ -1202,6 +1270,12 @@ components:
             model: {type: string}
             persist_session: {type: boolean}
             toolsets:
+              type: array
+              items: {type: string}
+            runtime_plugins:
+              type: array
+              items: {type: string}
+            shared_skills:
               type: array
               items: {type: string}
         checkpoint:
@@ -1220,6 +1294,10 @@ components:
           $ref: '#/components/schemas/AgentRecord'
         runtime:
           $ref: '#/components/schemas/AgentRuntime'
+        formation:
+          oneOf:
+            - $ref: '#/components/schemas/AgentFormation'
+            - type: 'null'
     SpriteCreditCheckoutRequest:
       type: object
       required: [slug, amountUsdCents]

@@ -1,6 +1,6 @@
 import Config
 
-alias PlatformPhx.DatabaseUrl
+alias Web.DatabaseUrl
 
 # config/runtime.exs is executed for all environments, including
 # during releases. It is executed after compilation and before the
@@ -14,12 +14,12 @@ alias PlatformPhx.DatabaseUrl
 # If you use `mix release`, you need to explicitly enable the server
 # by passing the PHX_SERVER=true when you start it:
 #
-#     PHX_SERVER=true bin/platform_phx start
+#     PHX_SERVER=true bin/web start
 #
 # Alternatively, you can use `mix phx.gen.release` to generate a `bin/server`
 # script that automatically sets the env var above.
 if System.get_env("PHX_SERVER") do
-  config :platform_phx, PlatformPhxWeb.Endpoint, server: true
+  config :web, WebWeb.Endpoint, server: true
 end
 
 port = String.to_integer(System.get_env("PORT", "4000"))
@@ -32,17 +32,34 @@ prometheus_enabled =
 
 prometheus_port = String.to_integer(System.get_env("PROMETHEUS_METRICS_PORT", "9568"))
 
-config :platform_phx, PlatformPhxWeb.Endpoint, http: [port: port]
+agent_formation_enabled =
+  System.get_env("AGENT_FORMATION_ENABLED", "false")
+  |> String.trim()
+  |> String.downcase()
+  |> then(&(&1 in ~w(1 true yes on)))
+
+config :web, WebWeb.Endpoint, http: [port: port]
+
+if config_env() != :test do
+  oban_queues =
+    [
+      billing: 5,
+      runtime_metering: 1,
+      agent_formation: if(agent_formation_enabled, do: 1, else: false)
+    ]
+
+  config :web, Oban, queues: oban_queues
+end
 
 if config_env() != :test and
      (System.get_env("PROMETHEUS_METRICS_PORT") || System.get_env("PROMETHEUS_METRICS_ENABLED")) do
-  config :platform_phx, PlatformPhxWeb.PrometheusExporter,
+  config :web, WebWeb.PrometheusExporter,
     enabled: prometheus_enabled,
     port: prometheus_port
 end
 
 if config_env() == :prod do
-  config :platform_phx, :token_metadata_root, Application.app_dir(:platform_phx, "priv/metadata")
+  config :web, :token_metadata_root, Application.app_dir(:web, "priv/metadata")
 
   database_url =
     System.get_env("DATABASE_URL") ||
@@ -53,7 +70,7 @@ if config_env() == :prod do
 
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
-  config :platform_phx, PlatformPhx.Repo,
+  config :web, Web.Repo,
     ssl: DatabaseUrl.ssl_enabled?(database_url),
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
@@ -89,14 +106,14 @@ if config_env() == :prod do
         ]
     end
 
-  config :platform_phx, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+  config :web, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
-  config :platform_phx, PlatformPhxWeb.PrometheusExporter,
+  config :web, WebWeb.PrometheusExporter,
     enabled: prometheus_enabled,
     ip: {0, 0, 0, 0, 0, 0, 0, 0},
     port: prometheus_port
 
-  config :platform_phx, PlatformPhxWeb.Endpoint,
+  config :web, WebWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
       # Enable IPv6 and bind on all interfaces.
@@ -113,7 +130,7 @@ if config_env() == :prod do
   # To get SSL working, you will need to add the `https` key
   # to your endpoint configuration:
   #
-  #     config :platform_phx, PlatformPhxWeb.Endpoint,
+  #     config :web, WebWeb.Endpoint,
   #       https: [
   #         ...,
   #         port: 443,
@@ -135,7 +152,7 @@ if config_env() == :prod do
   # We also recommend setting `force_ssl` in your config/prod.exs,
   # ensuring no data is ever sent via http, always redirecting to https:
   #
-  #     config :platform_phx, PlatformPhxWeb.Endpoint,
+  #     config :web, WebWeb.Endpoint,
   #       force_ssl: [hsts: true]
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.
@@ -145,7 +162,7 @@ if config_env() == :prod do
   # In production you need to configure the mailer to use a different adapter.
   # Here is an example configuration for Mailgun:
   #
-  #     config :platform_phx, PlatformPhx.Mailer,
+  #     config :web, Web.Mailer,
   #       adapter: Swoosh.Adapters.Mailgun,
   #       api_key: System.get_env("MAILGUN_API_KEY"),
   #       domain: System.get_env("MAILGUN_DOMAIN")

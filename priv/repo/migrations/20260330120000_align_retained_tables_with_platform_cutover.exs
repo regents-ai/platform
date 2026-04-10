@@ -1,4 +1,4 @@
-defmodule PlatformPhx.Repo.Migrations.AlignRetainedTablesWithPlatformCutover do
+defmodule Web.Repo.Migrations.AlignRetainedTablesWithPlatformCutover do
   use Ecto.Migration
 
   def up do

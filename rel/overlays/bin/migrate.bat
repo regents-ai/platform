@@ -1,1 +1,1 @@
-call "%~dp0\platform_phx" eval PlatformPhx.Release.migrate
+call "%~dp0\web" eval Web.Release.migrate

@@ -1,0 +1,16 @@
+{
+  "name": "paperclip-regents",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "Pinned Regents Paperclip bundle for Agent Formation",
+  "scripts": {
+    "start": "node server.mjs",
+    "bootstrap": "node bootstrap_company.mjs"
+  },
+  "dependencies": {
+    "@paperclipai/adapter-utils": "latest",
+    "express": "^4.21.2",
+    "hermes-paperclip-adapter": "latest"
+  }
+}
