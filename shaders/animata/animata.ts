@@ -38,6 +38,18 @@ import type {
   AnimataTokenCardManifestEntry,
 } from "./types.ts";
 
+const TOKEN_CARD_MANIFEST_PATH = path.resolve(
+  process.cwd(),
+  "priv/token_cards/token-card-manifest.json",
+);
+
+const TOKEN_CARD_PUBLIC_ROOT = path.resolve(process.cwd(), "priv/token_cards");
+
+const TOKEN_CARD_IMAGES_ROOT = path.resolve(
+  process.cwd(),
+  "priv/token_cards/images/animata/cards",
+);
+
 async function main() {
   const [command, ...rest] = process.argv.slice(2);
 
@@ -280,9 +292,7 @@ async function runRenderRange(args: string[]) {
 
 async function runBuildCardManifest(args: string[]) {
   const plan = await loadPlan(resolveFlag(args, "--plan"));
-  const outPath =
-    resolveFlag(args, "--out") ??
-    path.resolve(process.cwd(), "priv/static/animata/token-card-manifest.json");
+  const outPath = resolveFlag(args, "--out") ?? TOKEN_CARD_MANIFEST_PATH;
 
   const manifest = buildTokenCardManifest(plan, {
     imagePathPrefix:
@@ -298,7 +308,7 @@ async function runBuildCardManifest(args: string[]) {
 
 async function runRenderCardImages(args: string[]) {
   const tokenCardManifest = await loadTokenCardManifest(resolveFlag(args, "--card-manifest"));
-  const staticRoot = resolveFlag(args, "--static-root") ?? path.resolve(process.cwd(), "priv/static");
+  const staticRoot = resolveFlag(args, "--static-root") ?? TOKEN_CARD_PUBLIC_ROOT;
   const start = parseOptionalPositiveInteger(resolveFlag(args, "--start"), "--start");
   const end = parseOptionalPositiveInteger(resolveFlag(args, "--end"), "--end");
   const requestedFamilies = parseFamilyFilter(resolveFlag(args, "--families"));
@@ -358,16 +368,14 @@ async function runRenderCardImages(args: string[]) {
 async function runBuildDrop(args: string[]) {
   const plan = await loadPlan(resolveFlag(args, "--plan"));
   const tokenCardManifest = await loadTokenCardManifest(resolveFlag(args, "--card-manifest"));
-  const staticRoot = resolveFlag(args, "--static-root") ?? path.resolve(process.cwd(), "priv/static");
+  const staticRoot = resolveFlag(args, "--static-root") ?? TOKEN_CARD_PUBLIC_ROOT;
   const outDir = resolveFlag(args, "--out-dir") ?? path.resolve(process.cwd(), "shaders/animata/out/opensea-drop");
   await buildOpenSeaDropPackage(plan, tokenCardManifest, staticRoot, outDir);
   writeJson({ ok: true, command: "build-drop", outDir, items: plan.editions.length });
 }
 
 async function runAnalyzeCardImages(args: string[]) {
-  const cardsDir =
-    resolveFlag(args, "--cards-dir") ??
-    path.resolve(process.cwd(), "priv/static/images/animata/cards");
+  const cardsDir = resolveFlag(args, "--cards-dir") ?? TOKEN_CARD_IMAGES_ROOT;
   const outPath =
     resolveFlag(args, "--out") ??
     path.resolve(process.cwd(), "shaders/animata/out/card-analysis.json");
@@ -414,9 +422,9 @@ async function runRerenderCardOutliers(args: string[]) {
 
   const syntheticArgs = [
     "--card-manifest",
-    resolveFlag(args, "--card-manifest") ?? path.resolve(process.cwd(), "priv/static/animata/token-card-manifest.json"),
+    resolveFlag(args, "--card-manifest") ?? TOKEN_CARD_MANIFEST_PATH,
     "--static-root",
-    resolveFlag(args, "--static-root") ?? path.resolve(process.cwd(), "priv/static"),
+    resolveFlag(args, "--static-root") ?? TOKEN_CARD_PUBLIC_ROOT,
     "--token-ids",
     tokenIds.join(","),
     "--workers",
@@ -561,13 +569,13 @@ function usageText() {
     "node --experimental-strip-types shaders/animata/animata.ts render-family-samples [--plan ./shaders/animata/out/plan.json] [--out-dir ./shaders/animata/out/family-samples]",
     "node --experimental-strip-types shaders/animata/animata.ts render-all-families [--plan ./shaders/animata/out/plan.json] [--out-dir ./shaders/animata/out/media] [--families radiant2,cubic] [--limit-per-family 1] [--workers 4] [--skip-existing]",
     "node --experimental-strip-types shaders/animata/animata.ts render-range --start 1 --end 1998 [--plan ./shaders/animata/out/plan.json] [--out-dir ./shaders/animata/out/media] [--workers 4] [--skip-existing]",
-    "node --experimental-strip-types shaders/animata/animata.ts build-card-manifest [--plan ./shaders/animata/out/plan.json] [--out ./priv/static/animata/token-card-manifest.json]",
-    "node --experimental-strip-types shaders/animata/animata.ts render-card-images [--card-manifest ./priv/static/animata/token-card-manifest.json] [--static-root ./priv/static] [--start 1] [--end 10] [--token-ids 8,70,1123] [--workers 4] [--skip-existing]",
-    "node --experimental-strip-types shaders/animata/animata.ts analyze-card-images [--cards-dir ./priv/static/images/animata/cards] [--out ./shaders/animata/out/card-analysis.json]",
+    "node --experimental-strip-types shaders/animata/animata.ts build-card-manifest [--plan ./shaders/animata/out/plan.json] [--out ./priv/token_cards/token-card-manifest.json]",
+    "node --experimental-strip-types shaders/animata/animata.ts render-card-images [--card-manifest ./priv/token_cards/token-card-manifest.json] [--static-root ./priv/token_cards] [--start 1] [--end 10] [--token-ids 8,70,1123] [--workers 4] [--skip-existing]",
+    "node --experimental-strip-types shaders/animata/animata.ts analyze-card-images [--cards-dir ./priv/token_cards/images/animata/cards] [--out ./shaders/animata/out/card-analysis.json]",
     "node --experimental-strip-types shaders/animata/animata.ts rerender-card-outliers [--analysis ./shaders/animata/out/card-analysis.json] [--threshold 100000] [--workers 4]",
-    "node --experimental-strip-types shaders/animata/animata.ts build-drop [--plan ./shaders/animata/out/plan.json] [--card-manifest ./priv/static/animata/token-card-manifest.json] [--static-root ./priv/static] [--out-dir ./shaders/animata/out/opensea-drop]",
-    "node --experimental-strip-types shaders/animata/animata.ts build-metadata --card-manifest ./priv/static/animata/token-card-manifest.json --site-url https://regents.sh [--plan ./shaders/animata/out/plan.json] [--out-dir ./priv/metadata]",
-    "node --experimental-strip-types shaders/animata/animata.ts refresh-opensea --card-manifest ./priv/static/animata/token-card-manifest.json --token-id 1 [--api-key-env OPENSEA_API_KEY]",
+    "node --experimental-strip-types shaders/animata/animata.ts build-drop [--plan ./shaders/animata/out/plan.json] [--card-manifest ./priv/token_cards/token-card-manifest.json] [--static-root ./priv/token_cards] [--out-dir ./shaders/animata/out/opensea-drop]",
+    "node --experimental-strip-types shaders/animata/animata.ts build-metadata --card-manifest ./priv/token_cards/token-card-manifest.json --site-url https://regents.sh [--plan ./shaders/animata/out/plan.json] [--out-dir ./priv/metadata]",
+    "node --experimental-strip-types shaders/animata/animata.ts refresh-opensea --card-manifest ./priv/token_cards/token-card-manifest.json --token-id 1 [--api-key-env OPENSEA_API_KEY]",
     "node --experimental-strip-types shaders/animata/animata.ts upload-lighthouse --kind media|metadata --input ./path/to/manifest.json [--api-key-env LIGHTHOUSE_API_KEY] [--out ./shaders/animata/out/lighthouse-upload.json]",
   ].join("\n");
 }
@@ -721,8 +729,7 @@ async function loadRenderManifest(explicitPath: string | null): Promise<AnimataR
 }
 
 async function loadTokenCardManifest(explicitPath: string | null): Promise<AnimataTokenCardManifest> {
-  const manifestPath =
-    explicitPath ?? path.resolve(process.cwd(), "priv/static/animata/token-card-manifest.json");
+  const manifestPath = explicitPath ?? TOKEN_CARD_MANIFEST_PATH;
   const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as AnimataTokenCardManifest;
   if (manifest.version !== COLLECTION_VERSION) {
     throw new Error(`Unexpected token card manifest version ${manifest.version}.`);

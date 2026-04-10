@@ -209,6 +209,15 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
            ]
   end
 
+  test "token card image is served from the hosted card path", %{conn: conn} do
+    conn =
+      conn
+      |> get("/images/animata/cards/1.png")
+
+    assert response(conn, 200)
+    assert get_resp_header(conn, "content-type") == ["image/png"]
+  end
+
   test "token card route returns not found for unknown token", %{conn: conn} do
     conn
     |> get("/cards/regents-club/99999")

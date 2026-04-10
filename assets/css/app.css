@@ -1087,36 +1087,43 @@ html[data-color-mode="dark"] .pp-sidebar-shell {
 
 .pp-token-metrics-line {
   margin: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: max-content max-content;
   align-items: center;
   justify-content: center;
-  gap: 0.9rem;
+  column-gap: 1rem;
   text-align: center;
 }
 
 .pp-token-metrics-label {
+  display: inline-grid;
+  align-items: center;
   color: var(--muted-foreground);
   font-family: "GeistPixel Square", sans-serif;
   font-size: 0.76rem;
   letter-spacing: 0.16em;
   line-height: 1.35;
   text-transform: uppercase;
+  text-align: right;
 }
 
 .pp-token-metrics-value {
+  display: inline-grid;
+  align-items: center;
   color: color-mix(in oklch, var(--accent) 58%, var(--foreground) 42%);
   font-family: "GeistPixel Circle", sans-serif;
   font-size: clamp(1rem, 1.25vw, 1.16rem);
   line-height: 1.18;
-  text-align: center;
+  text-align: left;
 }
 
 .pp-token-metrics-band-primary .pp-token-metrics-line {
-  align-items: baseline;
+  column-gap: 1.25rem;
 }
 
 .pp-token-metrics-band-primary .pp-token-metrics-label {
   font-size: 0.88rem;
+  line-height: 1.42;
 }
 
 .pp-token-metrics-band-primary .pp-token-metrics-value {

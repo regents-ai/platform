@@ -58,6 +58,6 @@ defmodule PlatformPhx.TokenCardManifest do
   end
 
   defp manifest_path do
-    Application.app_dir(:platform_phx, "priv/static/animata/token-card-manifest.json")
+    Application.app_dir(:platform_phx, "priv/token_cards/token-card-manifest.json")
   end
 end

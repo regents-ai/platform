@@ -83,15 +83,15 @@ Build the hosted token card manifest that the web route and metadata step both u
 ```bash
 node --experimental-strip-types shaders/animata/animata.ts build-card-manifest \
   --plan ./shaders/animata/out/plan.json \
-  --out ./priv/static/animata/token-card-manifest.json
+  --out ./priv/token_cards/token-card-manifest.json
 ```
 
 Render portrait token card PNGs from that manifest:
 
 ```bash
 node --experimental-strip-types shaders/animata/animata.ts render-card-images \
-  --card-manifest ./priv/static/animata/token-card-manifest.json \
-  --static-root ./priv/static \
+  --card-manifest ./priv/token_cards/token-card-manifest.json \
+  --static-root ./priv/token_cards \
   --start 1 --end 25 \
   --workers 4 \
   --skip-existing
@@ -104,8 +104,8 @@ Build the OpenSea drop package from the rendered card images:
 ```bash
 node --experimental-strip-types shaders/animata/animata.ts build-drop \
   --plan ./shaders/animata/out/plan.json \
-  --card-manifest ./priv/static/animata/token-card-manifest.json \
-  --static-root ./priv/static
+  --card-manifest ./priv/token_cards/token-card-manifest.json \
+  --static-root ./priv/token_cards
 ```
 
 Build token metadata that points to the hosted card image and hosted interactive page:
@@ -113,7 +113,7 @@ Build token metadata that points to the hosted card image and hosted interactive
 ```bash
 node --experimental-strip-types shaders/animata/animata.ts build-metadata \
   --plan ./shaders/animata/out/plan.json \
-  --card-manifest ./priv/static/animata/token-card-manifest.json \
+  --card-manifest ./priv/token_cards/token-card-manifest.json \
   --site-url https://regents.sh \
   --out-dir ./priv/metadata
 ```
@@ -127,7 +127,7 @@ Ask OpenSea to refresh tokens after the hosted images and metadata are live:
 ```bash
 OPENSEA_API_KEY=... \
 node --experimental-strip-types shaders/animata/animata.ts refresh-opensea \
-  --card-manifest ./priv/static/animata/token-card-manifest.json \
+  --card-manifest ./priv/token_cards/token-card-manifest.json \
   --start 1 --end 25
 ```
 

@@ -15,6 +15,11 @@ defmodule PlatformPhxWeb.Endpoint do
     websocket: [connect_info: [session: @session_options], check_origin: :conn],
     longpoll: [connect_info: [session: @session_options], check_origin: :conn]
 
+  plug Plug.Static,
+    at: "/images/animata/cards",
+    from: {:platform_phx, "priv/token_cards/images/animata/cards"},
+    gzip: false
+
   # Serve at "/" the static files from "priv/static" directory.
   #
   # When code reloading is disabled (e.g., in production),
