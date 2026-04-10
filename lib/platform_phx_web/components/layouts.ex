@@ -1,6 +1,8 @@
 defmodule PlatformPhxWeb.Layouts do
   use PlatformPhxWeb, :html
 
+  alias PlatformPhx.RuntimeConfig
+
   embed_templates "layouts/*"
 
   attr :flash, :map, required: true, doc: "the map of flash messages"
@@ -13,11 +15,16 @@ defmodule PlatformPhxWeb.Layouts do
   attr :active_nav, :string, default: nil
   attr :content_class, :string, default: ""
   attr :theme_class, :string, default: "rg-regent-theme-platform"
+  attr :current_human, :map, default: nil
 
   slot :inner_block, required: true
 
   def app(assigns) do
-    assigns = assign(assigns, :nav_items, nav_items())
+    assigns =
+      assigns
+      |> assign(:nav_items, nav_items())
+      |> assign(:wallet_bridge_config, Jason.encode!(wallet_bridge_config()))
+      |> assign(:wallet_ready?, wallet_ready?())
 
     ~H"""
     <div
@@ -28,6 +35,15 @@ defmodule PlatformPhxWeb.Layouts do
       ]}
       phx-hook="ColorModeToggle"
     >
+      <div
+        id="layout-privy-bridge"
+        phx-hook="DashboardPrivyBridge"
+        phx-update="ignore"
+        data-dashboard-config={@wallet_bridge_config}
+        class="hidden"
+      >
+      </div>
+
       <a
         href="#main-content"
         class="sr-only rounded-xl bg-[color:var(--background)] px-3 py-2 text-sm text-[color:var(--foreground)] shadow focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50"
@@ -74,8 +90,12 @@ defmodule PlatformPhxWeb.Layouts do
                     aria-expanded="false"
                     aria-controls="sidebar-community-drawer"
                   >
-                    <span>Community</span>
-                    <span aria-hidden="true" class="pp-sidebar-community-icon" data-community-icon>
+                    <span class="pp-sidebar-community-label">Community</span>
+                    <span
+                      aria-hidden="true"
+                      class="pp-sidebar-community-icon"
+                      data-community-icon
+                    >
                       ↓
                     </span>
                   </button>
@@ -117,6 +137,13 @@ defmodule PlatformPhxWeb.Layouts do
                     <span class="pp-mobile-home-title">Regents Home</span>
                   </span>
                 </.link>
+
+                <.layout_wallet_control
+                  current_human={@current_human}
+                  wallet_ready?={@wallet_ready?}
+                  config={@wallet_bridge_config}
+                  mode={:mobile}
+                />
               </div>
 
               <nav class="pp-mobile-nav-rail" aria-label="Primary mobile navigation">
@@ -144,6 +171,13 @@ defmodule PlatformPhxWeb.Layouts do
                 </p>
                 <h1 class="pp-chrome-title">{chrome_title(@active_nav)}</h1>
               </div>
+
+              <.layout_wallet_control
+                current_human={@current_human}
+                wallet_ready?={@wallet_ready?}
+                config={@wallet_bridge_config}
+                mode={:desktop}
+              />
             </header>
 
             <main
@@ -165,16 +199,121 @@ defmodule PlatformPhxWeb.Layouts do
           </div>
         </div>
       <% else %>
-        <main
-          id="main-content"
-          class={["mx-auto min-h-screen max-w-[1600px] p-3 sm:p-4", @content_class]}
-          tabindex="-1"
-        >
-          {render_slot(@inner_block)}
-        </main>
+        <div class="mx-auto flex min-h-screen max-w-[1600px] flex-col gap-4 p-3 sm:p-4">
+          <div class="flex justify-end">
+            <.layout_wallet_control
+              current_human={@current_human}
+              wallet_ready?={@wallet_ready?}
+              config={@wallet_bridge_config}
+              mode={:floating}
+            />
+          </div>
+
+          <main
+            id="main-content"
+            class={["min-h-0 flex-1", @content_class]}
+            tabindex="-1"
+          >
+            {render_slot(@inner_block)}
+          </main>
+        </div>
       <% end %>
 
       <.flash_group flash={@flash} />
+    </div>
+    """
+  end
+
+  attr :current_human, :map, default: nil
+  attr :wallet_ready?, :boolean, required: true
+  attr :config, :string, required: true
+  attr :mode, :atom, default: :desktop
+
+  defp layout_wallet_control(assigns) do
+    ~H"""
+    <div
+      id={"layout-wallet-control-#{@mode}"}
+      phx-hook="DashboardWallet"
+      phx-update="ignore"
+      data-dashboard-config={@config}
+      data-wallet-signed-in={to_string(not is_nil(@current_human))}
+      data-wallet-address={@current_human && @current_human.wallet_address}
+      class={[
+        "pp-wallet-shell",
+        @mode == :desktop && "hidden lg:flex",
+        @mode == :mobile && "flex lg:hidden",
+        @mode == :floating && "flex"
+      ]}
+    >
+      <button
+        type="button"
+        data-wallet-sign-in
+        class="pp-wallet-pill pp-wallet-pill-primary"
+        disabled={!@wallet_ready?}
+      >
+        Sign In
+      </button>
+
+      <div data-wallet-connected class="pp-wallet-connected-shell hidden">
+        <button
+          type="button"
+          data-wallet-trigger
+          class="pp-wallet-pill pp-wallet-pill-secondary"
+          aria-expanded="false"
+          aria-controls={"layout-wallet-drawer-#{@mode}"}
+        >
+          <span class="pp-wallet-pill-dot" aria-hidden="true"></span>
+          <span>Wallet Connected</span>
+          <span class="pp-wallet-pill-caret" data-wallet-caret aria-hidden="true">↓</span>
+        </button>
+
+        <div
+          id={"layout-wallet-drawer-#{@mode}"}
+          data-wallet-drawer
+          class="pp-wallet-drawer"
+          hidden
+        >
+          <div data-wallet-drawer-inner class="pp-wallet-drawer-inner">
+            <div class="pp-wallet-drawer-row">
+              <p class="pp-wallet-drawer-label">Wallet</p>
+              <div class="pp-wallet-address-row">
+                <span data-wallet-address-text class="pp-wallet-address-text">
+                  {abbreviated_wallet(@current_human && @current_human.wallet_address)}
+                </span>
+                <button
+                  type="button"
+                  data-wallet-copy
+                  class="pp-wallet-icon-button"
+                  aria-label="Copy wallet address"
+                  title="Copy full wallet address"
+                >
+                  <span class="pp-wallet-copy-icon" aria-hidden="true">
+                    <.icon name="hero-document-duplicate" class="size-4" />
+                  </span>
+                  <span data-wallet-copy-check class="pp-wallet-copy-check" aria-hidden="true">
+                    <.icon name="hero-check" class="size-4" />
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              data-wallet-disconnect
+              class="pp-wallet-drawer-action"
+            >
+              Disconnect
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <p
+        data-dashboard-wallet-notice
+        data-notice-style="compact"
+        class="hidden text-sm text-[color:var(--muted-foreground)]"
+      >
+      </p>
     </div>
     """
   end
@@ -264,7 +403,7 @@ defmodule PlatformPhxWeb.Layouts do
       aria-label="Regents Labs on X"
       title="Regents Labs on X"
     >
-      <img src={~p"/images/xicon.png"} alt="" class="pp-home-footer-icon-image" />
+      <.x_mark class="pp-social-mark" />
     </a>
 
     <a
@@ -286,7 +425,7 @@ defmodule PlatformPhxWeb.Layouts do
       aria-label="Regents on Discord"
       title="Regents on Discord"
     >
-      <img src={~p"/images/discordicon.png"} alt="" class="pp-home-footer-icon-image" />
+      <.discord_mark class="pp-social-mark" />
     </a>
 
     <a
@@ -328,7 +467,7 @@ defmodule PlatformPhxWeb.Layouts do
         aria-label="Regents Labs on X"
         title="Regents Labs on X"
       >
-        <img src={~p"/images/xicon.png"} alt="" class="pp-home-footer-icon-image" />
+        <.x_mark class="pp-social-mark" />
       </a>
 
       <a
@@ -352,7 +491,7 @@ defmodule PlatformPhxWeb.Layouts do
         aria-label="Regents on Discord"
         title="Regents on Discord"
       >
-        <img src={~p"/images/discordicon.png"} alt="" class="pp-home-footer-icon-image" />
+        <.discord_mark class="pp-social-mark" />
       </a>
 
       <a
@@ -384,6 +523,7 @@ defmodule PlatformPhxWeb.Layouts do
 
   defp chrome_eyebrow("overview"), do: "Regents Overview"
   defp chrome_eyebrow("services"), do: "Services and Docs"
+  defp chrome_eyebrow("agent-formation"), do: "Launch a Regent company"
   defp chrome_eyebrow("bug-report"), do: "Public Operator Ledger"
   defp chrome_eyebrow("techtree"), do: "Shared Research and Eval Tree"
   defp chrome_eyebrow("autolaunch"), do: "Raise agent capital"
@@ -394,6 +534,7 @@ defmodule PlatformPhxWeb.Layouts do
 
   defp chrome_title("overview"), do: "Overview"
   defp chrome_title("services"), do: "Services"
+  defp chrome_title("agent-formation"), do: "Agent Formation"
   defp chrome_title("bug-report"), do: "Bug Report Ledger"
   defp chrome_title("techtree"), do: "Techtree"
   defp chrome_title("autolaunch"), do: "Autolaunch"
@@ -402,11 +543,42 @@ defmodule PlatformPhxWeb.Layouts do
   defp chrome_title("shader"), do: "Shader"
   defp chrome_title(_), do: "Regents Home"
 
+  defp wallet_bridge_config do
+    %{
+      privyAppId: RuntimeConfig.privy_app_id(),
+      privyClientId: RuntimeConfig.privy_client_id(),
+      privySession: "/api/auth/privy/session"
+    }
+  end
+
+  defp wallet_ready? do
+    RuntimeConfig.privy_app_id() not in [nil, ""] and
+      RuntimeConfig.privy_client_id() not in [nil, ""]
+  end
+
+  defp abbreviated_wallet(nil), do: ""
+
+  defp abbreviated_wallet(wallet_address) when is_binary(wallet_address) do
+    trimmed = String.trim(wallet_address)
+
+    if String.length(trimmed) <= 10 do
+      trimmed
+    else
+      String.slice(trimmed, 0, 6) <> "..." <> String.slice(trimmed, -4, 4)
+    end
+  end
+
   defp nav_items do
     [
       %{kind: :internal, key: "overview", href: "/overview", label: "Overview"},
       %{kind: :internal, key: "token-info", href: "/token-info", label: "Platform Token"},
-      %{kind: :internal, key: "services", href: "/services", label: "Foundry"},
+      %{kind: :internal, key: "services", href: "/services", label: "Services"},
+      %{
+        kind: :internal,
+        key: "agent-formation",
+        href: "/agent-formation",
+        label: "Agent Formation"
+      },
       %{kind: :internal, key: "techtree", href: "/techtree", label: "Techtree"},
       %{kind: :internal, key: "autolaunch", href: "/autolaunch", label: "Autolaunch"},
       %{kind: :internal, key: "regent-cli", href: "/regent-cli", label: "Regent CLI"},
@@ -414,6 +586,24 @@ defmodule PlatformPhxWeb.Layouts do
       %{kind: :external, href: "https://news.regents.sh", label: "News"},
       %{kind: :external, href: "https://github.com/orgs/regent-ai/repositories", label: "GitHub"}
     ]
+  end
+
+  attr :class, :string, default: nil
+
+  defp x_mark(assigns) do
+    ~H"""
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class={@class}>
+      <path d="M18.244 2.25h3.308l-7.227 8.26L23 21.75h-6.828l-5.347-6.79-5.94 6.79H1.577l7.73-8.835L1 2.25h7.002l4.833 6.133zM17.083 19.77h1.833L7.084 4.126H5.117z" />
+    </svg>
+    """
+  end
+
+  defp discord_mark(assigns) do
+    ~H"""
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class={@class}>
+      <path d="M20.317 4.37A19.79 19.79 0 0 0 15.43 2.855a13.79 13.79 0 0 0-.66 1.357 18.27 18.27 0 0 0-5.538 0 13.68 13.68 0 0 0-.67-1.357A19.74 19.74 0 0 0 3.678 4.37C.534 9.09-.32 13.693.099 18.23a19.9 19.9 0 0 0 6.06 3.078 14.9 14.9 0 0 0 1.298-2.11 12.92 12.92 0 0 1-2.04-.98c.172-.128.341-.262.505-.4a14.1 14.1 0 0 0 12.163 0c.165.138.334.272.505.4a12.9 12.9 0 0 1-2.042.981 14.2 14.2 0 0 0 1.299 2.109 19.86 19.86 0 0 0 6.061-3.078c.492-5.261-.84-9.821-3.59-13.86ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.334.948-2.419 2.157-2.419 1.219 0 2.175 1.095 2.157 2.419 0 1.334-.948 2.419-2.157 2.419Zm7.974 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.334.948-2.419 2.157-2.419 1.219 0 2.175 1.095 2.157 2.419 0 1.334-.938 2.419-2.157 2.419Z" />
+    </svg>
+    """
   end
 
   attr :class, :string, default: nil

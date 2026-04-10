@@ -207,6 +207,7 @@ defmodule PlatformPhxWeb.TokenInfoLive do
     <Layouts.app
       flash={@flash}
       current_scope={assigns[:current_scope]}
+      current_human={assigns[:current_human]}
       chrome={:app}
       active_nav="token-info"
       theme_class="rg-regent-theme-platform"

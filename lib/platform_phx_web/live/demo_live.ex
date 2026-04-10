@@ -21,6 +21,7 @@ defmodule PlatformPhxWeb.DemoLive do
     <Layouts.app
       flash={@flash}
       current_scope={assigns[:current_scope]}
+      current_human={assigns[:current_human]}
       chrome={:none}
       theme_class="rg-regent-theme-platform"
       content_class="p-0"
