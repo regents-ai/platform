@@ -38,7 +38,36 @@ agent_formation_enabled =
   |> String.downcase()
   |> then(&(&1 in ~w(1 true yes on)))
 
+test_xmtp_key =
+  "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+
+agent_room_private_key =
+  if config_env() == :test do
+    System.get_env("PLATFORM_AGENT_ROOM_PRIVATE_KEY", test_xmtp_key)
+  else
+    System.get_env("PLATFORM_AGENT_ROOM_PRIVATE_KEY", "")
+  end
+
 config :platform_phx, PlatformPhxWeb.Endpoint, http: [port: port]
+
+config :platform_phx, PlatformPhx.Xmtp,
+  rooms: [
+    %{
+      key: "platform_agents",
+      name: "Platform Agents",
+      description: "A room reserved for agent identities.",
+      app_data: "platform-agents",
+      agent_private_key: agent_room_private_key,
+      moderator_wallets: [],
+      capacity: 200,
+      presence_timeout_ms: :timer.minutes(2),
+      presence_check_interval_ms: :timer.seconds(30),
+      policy_options: %{
+        allowed_kinds: [:agent],
+        required_claims: %{}
+      }
+    }
+  ]
 
 if config_env() != :test do
   oban_queues =

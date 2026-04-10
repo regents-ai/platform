@@ -60,6 +60,7 @@ defmodule PlatformPhx.MixProject do
        depth: 1},
       {:swoosh, "~> 1.16"},
       {:req, "~> 0.5"},
+      {:regent_xmtp_room, path: "../packages/regent_xmtp_room"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_metrics_prometheus_core, "~> 1.2"},
       {:telemetry_poller, "~> 1.0"},

@@ -38,6 +38,25 @@ config :platform_phx, Oban,
      ]}
   ]
 
+config :platform_phx, PlatformPhx.Xmtp,
+  rooms: [
+    %{
+      key: "platform_agents",
+      name: "Platform Agents",
+      description: "A room reserved for agent identities.",
+      app_data: "platform-agents",
+      agent_private_key: nil,
+      moderator_wallets: [],
+      capacity: 200,
+      presence_timeout_ms: :timer.minutes(2),
+      presence_check_interval_ms: :timer.seconds(30),
+      policy_options: %{
+        allowed_kinds: [:agent],
+        required_claims: %{}
+      }
+    }
+  ]
+
 # Configure the mailer
 #
 # By default it uses the "Local" adapter which stores the emails

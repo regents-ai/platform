@@ -1,7 +1,13 @@
 defmodule PlatformPhxWeb.PublicRoutesTest do
-  use PlatformPhxWeb.ConnCase, async: true
+  use PlatformPhxWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
+
+  alias PlatformPhx.Accounts.HumanUser
+  alias PlatformPhx.AgentPlatform.Agent
+  alias PlatformPhx.AgentPlatform.BillingAccount
+  alias PlatformPhx.AgentPlatform.Subdomain
+  alias PlatformPhx.Repo
 
   test "home route exposes social share metadata", %{conn: conn} do
     html =
@@ -80,6 +86,19 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Token holders share upside in future revenue."
   end
 
+  test "www host renders the main home page instead of the missing subdomain state", %{
+    conn: %Plug.Conn{} = conn
+  } do
+    conn = %{conn | host: "www.regents.sh"}
+    {:ok, _home, html} = live(conn, "/")
+
+    assert html =~ "Regents Labs"
+    assert html =~ "platform-home-shell"
+    assert html =~ "entry-card-surface-dashboard-home"
+    refute html =~ "Subdomain not active"
+    refute html =~ "No published agent lives on this host yet."
+  end
+
   test "demo route renders", %{conn: conn} do
     {:ok, _demo, html} = live(conn, "/demo")
 
@@ -135,7 +154,9 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     {:ok, _services, html} = live(conn, "/services")
 
     assert html =~ "Services"
-    assert html =~ "Services"
+    assert html =~ "Manage names and redemptions"
+    assert html =~ "Claim your Regent identity"
+    assert html =~ "Redeem an Animata pass for REGENT"
     assert html =~ "https://news.regents.sh"
     assert html =~ "Community"
     assert html =~ "https://x.com/regents_sh"
@@ -151,14 +172,38 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "data-voxel-background=\"dashboard\""
     assert html =~ "platform-footer-voxel-classic"
     assert html =~ "services-wallet-console"
-    assert html =~ "dashboard-root"
-    assert html =~ "Start Agent Formation"
-    assert html =~ "Sign in to claim a Regent name, confirm billing, and launch your company."
-    assert html =~ "/api/auth/privy/session"
-    assert html =~ "/api/agent-platform/formation"
-    assert html =~ "/api/agent-platform/formation/companies"
-    assert html =~ "/api/opensea/redeem-stats"
-    assert html =~ "/api/opensea"
+    assert html =~ "phx-hook=\"DashboardPrivyBridge\""
+    assert html =~ "phx-hook=\"DashboardWallet\""
+    assert html =~ "layout-wallet-control-desktop"
+    assert html =~ "data-wallet-signed-in=\"false\""
+    assert html =~ "Sign In"
+    assert html =~ "phx-hook=\"DashboardNameClaim\""
+    assert html =~ "phx-hook=\"DashboardRedeem\""
+
+    assert html =~
+             "Use this page to review wallet holdings, claim names, and prepare the account for Agent Formation."
+
+    refute html =~ "dashboard-root"
+  end
+
+  test "agent formation route renders", %{conn: conn} do
+    {:ok, _formation, html} = live(conn, "/agent-formation")
+
+    assert html =~ "Agent Formation"
+    assert html =~ "Complete Agent Formation"
+    assert html =~ "agent-formation-wallet-console"
+    assert html =~ "Names tied to this wallet"
+    assert html =~ "Animated pass cards"
+    assert html =~ "phx-hook=\"DashboardPrivyBridge\""
+    assert html =~ "phx-hook=\"DashboardWallet\""
+    assert html =~ "layout-wallet-control-desktop"
+    assert html =~ "data-wallet-signed-in=\"false\""
+    assert html =~ "Sign In"
+
+    assert html =~
+             "Review your wallet, choose one of your claimed names, and launch your Regent company when billing is ready."
+
+    refute html =~ "dashboard-root"
   end
 
   test "subdomain root renders the published agent page", %{
@@ -168,14 +213,102 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     {:ok, _home, html} = live(conn, "/")
 
     assert html =~ "Solidity Regent"
-    assert html =~ "Regents Agent"
-    assert html =~ "Service Menu"
-    assert html =~ "Public Work Feed"
+    assert html =~ "Regent company"
+    assert html =~ "Ways to work with this company"
+    assert html =~ "Public work feed"
     assert html =~ "solidity.agent.base.eth"
     assert html =~ "solidity.regent.eth"
-    assert html =~ "Private Sprite + Paperclip company managed by Regents"
+    assert html =~ "This page is the public home for the company."
     assert html =~ "Treasury Router audit"
+    assert html =~ "Company room"
+
+    assert html =~
+             "Join the room to ask questions, follow updates, and keep the company conversation in one place."
+
     refute html =~ "https://solidity.sprites.dev"
+  end
+
+  test "signed-in owner sees company controls on the public company page", %{conn: conn} do
+    human = insert_human!("0xowner111111111111111111111111111111111111")
+    _billing = insert_billing_account!(human, 700)
+    _agent = insert_public_agent!(human, "owner-control")
+
+    conn = %{conn | host: "owner-control.regents.sh"}
+
+    {:ok, view, html} =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> live("/")
+
+    assert html =~ "Owner controls"
+    assert html =~ "Manage your company from here"
+    assert html =~ "Runtime balance"
+    assert html =~ "Owner admin"
+    assert has_element?(view, "#agent-owner-pause")
+
+    pause_html =
+      view
+      |> element("#agent-owner-pause")
+      |> render_click()
+
+    assert pause_html =~ "Company paused."
+    assert has_element?(view, "#agent-owner-resume")
+
+    resume_html =
+      view
+      |> element("#agent-owner-resume")
+      |> render_click()
+
+    assert resume_html =~ "Company running again."
+    assert has_element?(view, "#agent-owner-pause")
+  end
+
+  test "company room lets the owner join and post from the company page", %{conn: conn} do
+    human = insert_human!("0xowner222222222222222222222222222222222222")
+    _agent = insert_public_agent!(human, "owner-room")
+
+    conn = %{conn | host: "owner-room.regents.sh"}
+
+    {:ok, view, _html} =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> live("/")
+
+    initial_html = render(view)
+
+    html =
+      if has_element?(view, "#company-room [phx-click=\"xmtp_join\"]") do
+        view
+        |> element("#company-room [phx-click=\"xmtp_join\"]")
+        |> render_click()
+      else
+        initial_html
+      end
+
+    [_, request_id] =
+      Regex.run(~r/data-pending-request-id="([^"]+)"/, html) ||
+        Regex.run(~r/data-pending-request-id="([^"]+)"/, initial_html) ||
+        flunk("expected a pending join request in the company room")
+
+    html =
+      view
+      |> element("#company-room")
+      |> render_hook("xmtp_join_signature_signed", %{
+        "request_id" => request_id,
+        "signature" => "0xsigned"
+      })
+
+    assert html =~ "You are in the room."
+
+    html =
+      view
+      |> form("#company-room-form", %{
+        "xmtp_room" => %{"body" => "Owner update from the company page."}
+      })
+      |> render_submit()
+
+    assert html =~ "Owner update from the company page."
+    assert html =~ "Owner admin"
   end
 
   test "shader route renders", %{conn: conn} do
@@ -435,5 +568,72 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
       response = get(recycle(conn), path)
       assert response.status == 404
     end
+  end
+
+  defp insert_human!(wallet_address) do
+    %HumanUser{}
+    |> HumanUser.changeset(%{
+      privy_user_id: "privy-#{System.unique_integer([:positive])}",
+      wallet_address: wallet_address,
+      wallet_addresses: [wallet_address],
+      display_name: "owner@regents.sh"
+    })
+    |> Repo.insert!()
+  end
+
+  defp insert_billing_account!(human, balance_cents) do
+    %BillingAccount{}
+    |> BillingAccount.changeset(%{
+      human_user_id: human.id,
+      stripe_customer_id: "cus_#{System.unique_integer([:positive])}",
+      stripe_pricing_plan_subscription_id: "sub_#{System.unique_integer([:positive])}",
+      billing_status: "active",
+      runtime_credit_balance_usd_cents: balance_cents
+    })
+    |> Repo.insert!()
+  end
+
+  defp insert_public_agent!(human, slug) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    agent =
+      %Agent{}
+      |> Agent.changeset(%{
+        owner_human_id: human.id,
+        template_key: "start",
+        name: "Owner Control Regent",
+        slug: slug,
+        claimed_label: slug,
+        basename_fqdn: "#{slug}.agent.base.eth",
+        ens_fqdn: "#{slug}.regent.eth",
+        status: "published",
+        public_summary: "A company page for launch-flow testing.",
+        hero_statement: "The owner should be able to manage this company from its home page.",
+        runtime_status: "ready",
+        checkpoint_status: "ready",
+        stripe_llm_billing_status: "active",
+        stripe_customer_id: "cus_owner_control",
+        stripe_pricing_plan_subscription_id: "sub_owner_control",
+        sprite_free_until: DateTime.add(now, 86_400, :second),
+        sprite_metering_status: "paid",
+        wallet_address: human.wallet_address,
+        published_at: now,
+        desired_runtime_state: "active",
+        observed_runtime_state: "active"
+      })
+      |> Repo.insert!()
+
+    %Subdomain{}
+    |> Subdomain.changeset(%{
+      agent_id: agent.id,
+      slug: slug,
+      hostname: "#{slug}.regents.sh",
+      basename_fqdn: "#{slug}.agent.base.eth",
+      ens_fqdn: "#{slug}.regent.eth",
+      active: true
+    })
+    |> Repo.insert!()
+
+    agent
   end
 end
