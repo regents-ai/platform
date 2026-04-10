@@ -10,17 +10,11 @@ const TOKEN_CARD_STYLE = `
   display: grid;
   place-items: center;
   padding: clamp(1rem, 3vw, 2rem);
-  background:
-    radial-gradient(circle at top left, color-mix(in oklch, var(--brand-paper, #fbf4de) 18%, transparent), transparent 32%),
-    radial-gradient(circle at 84% 12%, color-mix(in oklch, var(--brand-gold, #d4a756) 14%, transparent), transparent 26%),
-    linear-gradient(180deg, color-mix(in oklch, var(--background, #fbf4de) 84%, var(--brand-paper, #fbf4de) 16%), var(--background, #fbf4de));
+  background: transparent;
 }
 
 html[data-color-mode="dark"] .rtc-page {
-  background:
-    radial-gradient(circle at top left, color-mix(in oklch, var(--brand-paper, #fbf4de) 10%, transparent), transparent 30%),
-    radial-gradient(circle at 84% 12%, color-mix(in oklch, var(--brand-gold, #d4a756) 10%, transparent), transparent 24%),
-    linear-gradient(180deg, color-mix(in oklch, var(--background, #034568) 92%, var(--brand-charcoal, #315569) 8%), var(--background, #034568));
+  background: transparent;
 }
 
 .rtc-stage {
@@ -251,18 +245,15 @@ function applyPose(element: HTMLElement, pose: CardPose) {
 export function RegentTokenCard({
   entry,
   media,
-  interactive = true,
   className,
   renderVariant = "live",
 }: {
   entry: TokenCardManifestEntry;
   media: React.ReactNode;
-  interactive?: boolean;
   className?: string;
   renderVariant?: "live" | "static-image";
 }) {
   const cardRef = React.useRef<HTMLDivElement | null>(null);
-  const poseRef = React.useRef<CardPose>({ ...RESTING_POSE });
   const reducedMotion = React.useRef(initialReducedMotion()).current;
 
   React.useEffect(() => {
@@ -284,54 +275,13 @@ export function RegentTokenCard({
     });
   }, [reducedMotion]);
 
-  function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (!interactive || reducedMotion) return;
-    const element = cardRef.current;
-    if (!element) return;
-
-    const rect = element.getBoundingClientRect();
-    const offsetX = (event.clientX - rect.left) / rect.width - 0.5;
-    const offsetY = (event.clientY - rect.top) / rect.height - 0.5;
-    const nextPose: CardPose = {
-      overlayShiftX: offsetX * 12,
-      overlayShiftY: offsetY * 10,
-      glareX: 50 + offsetX * 36,
-      glareY: 10 + offsetY * 22,
-      overlayOpacity: 0.88,
-    };
-
-    poseRef.current = nextPose;
-    applyPose(element, nextPose);
-  }
-
-  function onPointerLeave() {
-    const element = cardRef.current;
-    if (!interactive || reducedMotion || !element) return;
-
-    animate(poseRef.current, {
-      overlayShiftX: RESTING_POSE.overlayShiftX,
-      overlayShiftY: RESTING_POSE.overlayShiftY,
-      glareX: RESTING_POSE.glareX,
-      glareY: RESTING_POSE.glareY,
-      overlayOpacity: RESTING_POSE.overlayOpacity,
-      duration: 300,
-      ease: "outExpo",
-      onUpdate: () => applyPose(element, poseRef.current),
-    });
-  }
-
   return (
     <div
       className={classNames("rtc-card-shell", className)}
       data-rtc-variant={renderVariant}
     >
       <style>{TOKEN_CARD_STYLE}</style>
-      <div
-        ref={cardRef}
-        className="rtc-card"
-        onPointerMove={onPointerMove}
-        onPointerLeave={onPointerLeave}
-      >
+      <div ref={cardRef} className="rtc-card">
         <div className="rtc-frame">
           <div className="rtc-overlay" aria-hidden="true" />
           <div className="rtc-chamber">

@@ -18,7 +18,6 @@ export function TokenCardPage({
         <section className="rtc-stage" aria-label="Regents Club token card">
           <RegentTokenCard
             entry={entry}
-            interactive={false}
             media={
               <div className="flex h-full items-center justify-center bg-black text-center text-xs uppercase tracking-[0.24em] text-white/70">
                 Unknown shader
