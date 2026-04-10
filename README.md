@@ -105,3 +105,42 @@ Before you wrap up work, run:
 ```bash
 mix precommit
 ```
+
+## Live Metrics In Prometheus
+
+To graph the live Fly app locally, run two things from this repo.
+
+First, open a tunnel from your laptop to the live app metrics port:
+
+```bash
+./bin/live-metrics-proxy
+```
+
+Leave that terminal open.
+
+This uses local port `19568` so it does not collide with your own app metrics on `9568`.
+
+Second, start Prometheus:
+
+```bash
+docker compose -f docker-compose.prometheus.yml up -d
+```
+
+Make sure Docker Desktop is running first.
+
+Then open [http://localhost:9090](http://localhost:9090).
+
+Useful first queries:
+
+```text
+platform_phx_vm_memory_total_bytes
+rate(platform_phx_phoenix_requests_total[5m])
+histogram_quantile(0.95, sum by (le, route) (rate(platform_phx_phoenix_request_duration_seconds_bucket[5m])))
+histogram_quantile(0.95, sum by (le) (rate(platform_phx_repo_query_duration_seconds_bucket[5m])))
+```
+
+When you are done:
+
+```bash
+docker compose -f docker-compose.prometheus.yml down
+```

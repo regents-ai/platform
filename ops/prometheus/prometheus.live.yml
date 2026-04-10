@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: "platform-phx-live"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:19568"]
+        labels:
+          app: "platform-phx"
+          environment: "live"

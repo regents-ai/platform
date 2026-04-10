@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+exec flyctl proxy 19568:9568 -a platform-phx --bind-addr 127.0.0.1
