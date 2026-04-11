@@ -24,8 +24,8 @@ html[data-color-mode="dark"] .rtc-page {
 }
 
 .rtc-stage--embedded {
-  width: min(100%, 20rem);
-  max-width: 20rem;
+  width: min(100%, 24rem);
+  max-width: 24rem;
 }
 
 .rtc-card {
