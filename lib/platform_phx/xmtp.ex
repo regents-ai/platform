@@ -7,13 +7,13 @@ defmodule PlatformPhx.Xmtp do
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.Repo
-  alias RegentXmtpRoom.Principal
+  alias Xmtp.Principal
 
   @manager __MODULE__.Manager
   @shared_agent_room_key "platform_agents"
 
   def child_spec(opts \\ []) do
-    RegentXmtpRoom.child_spec(
+    Xmtp.child_spec(
       Keyword.merge(opts,
         name: @manager,
         repo: PlatformPhx.Repo,
@@ -31,18 +31,18 @@ defmodule PlatformPhx.Xmtp do
     @shared_agent_room_key
   end
 
-  def topic(room_key \\ default_room_key()), do: RegentXmtpRoom.topic(@manager, room_key)
+  def topic(room_key \\ default_room_key()), do: Xmtp.topic(@manager, room_key)
 
   def subscribe(room_key \\ default_room_key()) do
-    RegentXmtpRoom.subscribe(@manager, room_key)
+    Xmtp.subscribe(@manager, room_key)
   end
 
   def room_panel(principal, room_key \\ default_room_key(), claims \\ %{}) do
-    RegentXmtpRoom.public_room_panel(@manager, room_key, normalize_principal(principal), claims)
+    Xmtp.public_room_panel(@manager, room_key, normalize_principal(principal), claims)
   end
 
   def request_join(principal, room_key \\ default_room_key(), claims \\ %{}) do
-    RegentXmtpRoom.request_join(@manager, room_key, normalize_principal(principal), claims)
+    Xmtp.request_join(@manager, room_key, normalize_principal(principal), claims)
   end
 
   def complete_join_signature(
@@ -52,7 +52,7 @@ defmodule PlatformPhx.Xmtp do
         room_key \\ default_room_key(),
         claims \\ %{}
       ) do
-    RegentXmtpRoom.complete_join_signature(
+    Xmtp.complete_join_signature(
       @manager,
       room_key,
       normalize_principal(principal),
@@ -63,15 +63,15 @@ defmodule PlatformPhx.Xmtp do
   end
 
   def send_message(principal, body, room_key \\ default_room_key()) do
-    RegentXmtpRoom.send_public_message(@manager, room_key, normalize_principal(principal), body)
+    Xmtp.send_public_message(@manager, room_key, normalize_principal(principal), body)
   end
 
   def heartbeat(principal, room_key \\ default_room_key()) do
-    RegentXmtpRoom.heartbeat(@manager, room_key, normalize_principal(principal))
+    Xmtp.heartbeat(@manager, room_key, normalize_principal(principal))
   end
 
   def invite_user(actor, target, room_key \\ default_room_key(), claims \\ %{}) do
-    RegentXmtpRoom.invite_user(
+    Xmtp.invite_user(
       @manager,
       room_key,
       normalize_actor(actor),
@@ -81,11 +81,11 @@ defmodule PlatformPhx.Xmtp do
   end
 
   def kick_user(actor, target, room_key \\ default_room_key()) do
-    RegentXmtpRoom.kick_user(@manager, room_key, normalize_actor(actor), normalize_target(target))
+    Xmtp.kick_user(@manager, room_key, normalize_actor(actor), normalize_target(target))
   end
 
   def moderator_delete_message(actor, message_id, room_key \\ default_room_key()) do
-    RegentXmtpRoom.moderator_delete_message(
+    Xmtp.moderator_delete_message(
       @manager,
       room_key,
       normalize_actor(actor),
@@ -95,7 +95,7 @@ defmodule PlatformPhx.Xmtp do
 
   def bootstrap_room!(opts \\ []) do
     room_key = Keyword.get(opts, :room_key, default_room_key())
-    RegentXmtpRoom.bootstrap_room!(@manager, room_key, opts)
+    Xmtp.bootstrap_room!(@manager, room_key, opts)
   end
 
   def company_room_key(%Agent{slug: slug}), do: company_room_key(slug)
@@ -125,7 +125,7 @@ defmodule PlatformPhx.Xmtp do
   end
 
   def reset_for_test!(room_key \\ default_room_key()) do
-    RegentXmtpRoom.reset_for_test!(@manager, room_key)
+    Xmtp.reset_for_test!(@manager, room_key)
   end
 
   def principal_for_agent_wallet(wallet_address, label \\ nil) do

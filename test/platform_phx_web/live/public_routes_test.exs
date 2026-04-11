@@ -267,7 +267,12 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
 
   test "company room lets the owner join and post from the company page", %{conn: conn} do
     human = insert_human!("0xowner222222222222222222222222222222222222")
-    _agent = insert_public_agent!(human, "owner-room")
+    agent = insert_public_agent!(human, "owner-room")
+    room_key = PlatformPhx.Xmtp.company_room_key(agent)
+
+    on_exit(fn ->
+      PlatformPhx.Xmtp.reset_for_test!(room_key)
+    end)
 
     conn = %{conn | host: "owner-room.regents.sh"}
 

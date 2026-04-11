@@ -5,15 +5,20 @@ defmodule PlatformPhx.XmtpTest do
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.Repo
   alias PlatformPhx.Xmtp
-  alias RegentXmtpRoom.Room
+  alias Elixir.Xmtp.Room, as: XmtpRoom
 
   test "company rooms keep the Regent room agent as owner while the company owner is moderator" do
     human = insert_human!("0xabc0000000000000000000000000000000000001")
     agent = insert_agent!(human, "owner-split")
+    room_key = Xmtp.company_room_key(agent)
+
+    on_exit(fn ->
+      Xmtp.reset_for_test!(room_key)
+    end)
 
     assert {:ok, room_info} = Xmtp.bootstrap_company_room!(agent, reuse: true)
 
-    room = Repo.get_by!(Room, room_key: Xmtp.company_room_key(agent))
+    room = Repo.get_by!(XmtpRoom, room_key: room_key)
     assert room.agent_inbox_id == room_info.agent_inbox_id
 
     assert {:ok, owner_panel} = Xmtp.company_room_panel(human, agent)

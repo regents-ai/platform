@@ -779,6 +779,19 @@ html[data-color-mode="dark"] .pp-voxel-background-svg {
   .pp-sidebar-column {
     display: flex;
     flex-direction: column;
+    position: sticky;
+    top: 1rem;
+    max-block-size: calc(100vh - 2rem);
+  }
+
+  .pp-sidebar-shell {
+    display: flex;
+    flex-direction: column;
+    min-block-size: 0;
+    max-block-size: calc(100vh - 2rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
   }
 }
 
