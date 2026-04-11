@@ -191,6 +191,7 @@ defmodule PlatformPhxWeb.HomeLive do
         current_scope={assigns[:current_scope]}
         current_human={assigns[:current_human]}
         chrome={:none}
+        show_wallet_control={false}
         theme_class="rg-regent-theme-platform"
         content_class="p-0"
       >

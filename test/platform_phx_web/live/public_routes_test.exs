@@ -84,6 +84,8 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Capable agents can raise capital through a fair 3 day Uniswap CCA auction."
     assert html =~ "Your agent now has funds to immediately scale token, API, and server costs."
     assert html =~ "Token holders share upside in future revenue."
+    refute html =~ "layout-wallet-control-desktop"
+    refute html =~ "layout-wallet-control-mobile"
   end
 
   test "www host renders the main home page instead of the missing subdomain state", %{

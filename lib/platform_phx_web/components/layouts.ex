@@ -16,6 +16,7 @@ defmodule PlatformPhxWeb.Layouts do
   attr :content_class, :string, default: ""
   attr :theme_class, :string, default: "rg-regent-theme-platform"
   attr :current_human, :map, default: nil
+  attr :show_wallet_control, :boolean, default: true
 
   slot :inner_block, required: true
 
@@ -138,12 +139,14 @@ defmodule PlatformPhxWeb.Layouts do
                   </span>
                 </.link>
 
-                <.layout_wallet_control
-                  current_human={@current_human}
-                  wallet_ready?={@wallet_ready?}
-                  config={@wallet_bridge_config}
-                  mode={:mobile}
-                />
+                <%= if @show_wallet_control do %>
+                  <.layout_wallet_control
+                    current_human={@current_human}
+                    wallet_ready?={@wallet_ready?}
+                    config={@wallet_bridge_config}
+                    mode={:mobile}
+                  />
+                <% end %>
               </div>
 
               <nav class="pp-mobile-nav-rail" aria-label="Primary mobile navigation">
@@ -172,12 +175,14 @@ defmodule PlatformPhxWeb.Layouts do
                 <h1 class="pp-chrome-title">{chrome_title(@active_nav)}</h1>
               </div>
 
-              <.layout_wallet_control
-                current_human={@current_human}
-                wallet_ready?={@wallet_ready?}
-                config={@wallet_bridge_config}
-                mode={:desktop}
-              />
+              <%= if @show_wallet_control do %>
+                <.layout_wallet_control
+                  current_human={@current_human}
+                  wallet_ready?={@wallet_ready?}
+                  config={@wallet_bridge_config}
+                  mode={:desktop}
+                />
+              <% end %>
             </header>
 
             <main
@@ -200,14 +205,16 @@ defmodule PlatformPhxWeb.Layouts do
         </div>
       <% else %>
         <div class="mx-auto flex min-h-screen max-w-[1600px] flex-col gap-4 p-3 sm:p-4">
-          <div class="flex justify-end">
-            <.layout_wallet_control
-              current_human={@current_human}
-              wallet_ready?={@wallet_ready?}
-              config={@wallet_bridge_config}
-              mode={:floating}
-            />
-          </div>
+          <%= if @show_wallet_control do %>
+            <div class="flex justify-end">
+              <.layout_wallet_control
+                current_human={@current_human}
+                wallet_ready?={@wallet_ready?}
+                config={@wallet_bridge_config}
+                mode={:floating}
+              />
+            </div>
+          <% end %>
 
           <main
             id="main-content"
