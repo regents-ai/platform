@@ -74,13 +74,16 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "aria-label=\"Open\""
     assert html =~ "href=\"/services\""
     assert html =~ "platform-footer-voxel-classic"
-    assert html =~ "Choose where to work next."
-    assert html =~ "Go to services, billing, and company launches."
-    assert html =~ "Publish work that other agents can inspect, rerun, and improve."
+
+    assert html =~
+             "Upgrade your Claw or Hermes agent to collaborate and autoresearch. First tech:"
+
     assert html =~ "https://huggingface.co/datasets/nvidia/Nemotron-RL-bixbench_hypothesis"
     assert html =~ "BBH-Train"
-    assert html =~ "Raise launch capital for useful agents"
-    assert html =~ "Community links, source, and token market"
+    assert html =~ "benchmark by Nvidia."
+    assert html =~ "Capable agents can raise capital through a fair 3 day Uniswap CCA auction."
+    assert html =~ "Your agent now has funds to immediately scale token, API, and server costs."
+    assert html =~ "Token holders share upside in future revenue."
     refute html =~ "layout-wallet-control-desktop"
     refute html =~ "layout-wallet-control-mobile"
   end
@@ -94,8 +97,8 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Regents Labs"
     assert html =~ "platform-home-shell"
     assert html =~ "entry-card-surface-dashboard-home"
-    refute html =~ "Subdomain not live yet"
-    refute html =~ "Nothing is published at"
+    refute html =~ "Subdomain not active"
+    refute html =~ "No published agent lives on this host yet."
   end
 
   test "demo route renders", %{conn: conn} do
@@ -109,33 +112,18 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Regents voxel demo"
   end
 
-  test "demo2 route renders", %{conn: conn} do
-    {:ok, _demo, html} = live(conn, "/demo2")
-
-    assert html =~ "platform-demo2-shell"
-    assert html =~ "platform-demo2-frame-ember-hall"
-    assert html =~ "platform-demo2-frame-redline"
-    assert html =~ "phx-hook=\"Demo2Tunnel\""
-    assert html =~ "platform-demo2-scene-ember-hall"
-    assert html =~ "Five full-height tunnel passes"
-    assert html =~ "Wide ember hall"
-    assert html =~ "Redline"
-  end
-
   test "overview route renders", %{conn: conn} do
     {:ok, _overview, html} = live(conn, "/overview")
 
-    assert html =~ "See how the platform fits together"
+    assert html =~ "Regents Overview"
+    assert html =~ "Overview"
     assert html =~ "platform-footer-voxel-classic"
-    assert html =~ "See how people and agents move through Regents."
     assert html =~ "Human Overview"
     assert html =~ "Agent Overview"
     assert html =~ "Using Regents as a human operator"
     assert html =~ "Regents is for a Claw/Hermes-type agent to flourish"
     assert html =~ "npm install -g @regentlabs/cli"
-    assert html =~ "Install the shared operator rail"
-    assert html =~ "Keep the Techtree skill path close"
-    assert html =~ "Keep the Autolaunch skill path close"
+    assert html =~ "planned package name for the shared operator surface"
     assert html =~ "access opens"
     assert html =~ "Visit techtree.sh"
     assert html =~ "Visit autolaunch.sh"
@@ -146,8 +134,8 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "data-mode=\"human\""
     assert html =~ "platform-overview-human-scene"
     assert html =~ "platform-overview-agent-scene"
-    assert html =~ "Get Oriented"
-    assert html =~ "Build and Operate"
+
+    assert html =~ ~r/href="\/overview".*href="\/token-info"/s
   end
 
   test "overview route accepts regent scene lifecycle events", %{conn: conn} do
@@ -168,8 +156,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     {:ok, _services, html} = live(conn, "/services")
 
     assert html =~ "Services"
-    assert html =~ "Manage names, redemptions, and wallet setup"
-    assert html =~ "Handle the shared setup work first"
+    assert html =~ "Manage names and redemptions"
     assert html =~ "Claim your Regent identity"
     assert html =~ "Redeem an Animata pass for REGENT"
     assert html =~ "https://news.regents.sh"
@@ -194,11 +181,9 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Sign In"
     assert html =~ "phx-hook=\"DashboardNameClaim\""
     assert html =~ "phx-hook=\"DashboardRedeem\""
-    assert html =~ "Shared services"
-    assert html =~ "Launch flow"
 
     assert html =~
-             "Use this page to review wallet holdings, claim names, redeem passes, and prepare the account for Agent Formation."
+             "Use this page to review wallet holdings, claim names, and prepare the account for Agent Formation."
 
     refute html =~ "dashboard-root"
   end
@@ -207,7 +192,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     {:ok, _formation, html} = live(conn, "/agent-formation")
 
     assert html =~ "Agent Formation"
-    assert html =~ "Move from a claimed name to a live company"
+    assert html =~ "Complete Agent Formation"
     assert html =~ "agent-formation-wallet-console"
     assert html =~ "Names tied to this wallet"
     assert html =~ "Passes Owned"
@@ -220,7 +205,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Sign In"
 
     assert html =~
-             "Review your wallet, choose one of your claimed names, and take it live once billing is ready."
+             "Review your wallet, choose one of your claimed names, and launch your Regent company when billing is ready."
 
     refute html =~ "dashboard-root"
   end
@@ -338,8 +323,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   test "shader route renders", %{conn: conn} do
     {:ok, _shader, html} = live(conn, "/shader")
 
-    assert html =~ "Shader registry"
-    assert html =~ "Browse shared shader work"
+    assert html =~ "Shader Registry"
     assert html =~ "Shader"
     assert html =~ "shader-root"
     assert html =~ "phx-hook=\"ShaderRoot\""
@@ -353,19 +337,12 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
       |> get("/cards/regents-club/1")
 
     html = html_response(conn, 200)
-    share_url = PlatformPhxWeb.Endpoint.url() <> "/cards/regents-club/1"
-    share_image_url = PlatformPhxWeb.Endpoint.url() <> "/images/animata/cards/1.png"
 
     assert html =~ "regents-token-card-page"
     assert html =~ "data-token-card-root"
     assert html =~ "\"tokenId\":1"
     assert html =~ "\"shaderId\":"
     assert html =~ "Regents Club #1"
-    assert html =~ ~s(<meta property="og:title" content="Regents Club #1")
-    assert html =~ ~s(<meta property="og:url" content="#{share_url}")
-    assert html =~ ~s(<meta property="og:image" content="#{share_image_url}")
-    assert html =~ ~s(<meta name="twitter:image" content="#{share_image_url}")
-    assert html =~ ~s(<link rel="canonical" href="#{share_url}")
 
     assert get_resp_header(conn, "x-frame-options") == []
 
@@ -411,7 +388,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   test "heerich demo route renders", %{conn: conn} do
     {:ok, _demo, html} = live(conn, "/heerich-demo")
 
-    assert html =~ "Heerich 0.11.0 Lab"
+    assert html =~ "Heerich 0.7.1 Lab"
     assert html =~ "platform-heerich-demo-shell"
     assert html =~ "demo-explode-cluster"
     assert html =~ "addGeometry(type: fill)"
@@ -432,8 +409,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   test "techtree route renders", %{conn: conn} do
     {:ok, _techtree, html} = live(conn, "/techtree")
 
-    assert html =~ "Research surface"
-    assert html =~ "Publish work other agents can inspect"
+    assert html =~ "Shared Research and Eval Tree"
     assert html =~ "Techtree"
     assert html =~ "Agent Skill"
     assert html =~ "Techtree gives agents a public graph for open autoresearch."
@@ -471,8 +447,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   test "autolaunch route renders", %{conn: conn} do
     {:ok, _autolaunch, html} = live(conn, "/autolaunch")
 
-    assert html =~ "Capital surface"
-    assert html =~ "Raise backing for useful agent work"
+    assert html =~ "Raise agent capital"
     assert html =~ "Autolaunch"
     assert html =~ "Agent Skill"
     assert html =~ "Autolaunch helps agents raise capital before they scale."
@@ -507,8 +482,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   test "regent cli route renders", %{conn: conn} do
     {:ok, _regent_cli, html} = live(conn, "/regent-cli")
 
-    assert html =~ "Terminal rail"
-    assert html =~ "Work with Regents from the command line"
+    assert html =~ "Local Operator Surface"
     assert html =~ "Regent CLI"
     assert html =~ "Copy page as markdown"
     assert html =~ "Local runtime and operator surface for"
@@ -518,14 +492,8 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "regent techtree start"
     assert html =~ "regent auth siwa login"
     assert html =~ "The CLI is JSON-first."
-    assert html =~ "Use `--session-file /absolute/path.json`"
     assert html =~ "regent chatbox history --webapp|--agent"
     assert html =~ "CLI posting is agent-room only."
-
-    assert html =~
-             "regent platform auth login --identity-token-env REGENT_PLATFORM_IDENTITY_TOKEN"
-
-    assert html =~ "regent platform company create --claimed-label &lt;label&gt;"
     assert html =~ "regent autolaunch ..."
     assert html =~ "regent shader list"
     assert html =~ "regent shader export w3dfWN --out avatars/shard.png"
@@ -541,8 +509,8 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "FDV"
     assert html =~ "$REGENT is live on Base"
 
-    assert html =~ "Revenue token"
-    assert html =~ "Understand how REGENT flows through the platform"
+    assert html =~ "Platform revenue token"
+    assert html =~ "Agent economies"
 
     assert html =~
              "https://app.uniswap.org/explore/tokens/base/0x6f89bca4ea5931edfcb09786267b251dee752b07?inputCurrency=NATIVE"

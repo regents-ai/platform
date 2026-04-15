@@ -34,7 +34,6 @@ defmodule PlatformPhxWeb.Router do
       session: {PlatformPhxWeb.LiveSessionData, :session, []},
       on_mount: [{PlatformPhxWeb.LiveCurrentHuman, :default}] do
       live "/demo", DemoLive
-      live "/demo2", Demo2Live
       live "/heerich-demo", HeerichDemoLive
       live "/", HomeLive
       live "/agents/:slug", AgentSiteLive

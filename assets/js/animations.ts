@@ -369,61 +369,21 @@ export function mountDashboardReveal(root: HTMLElement): MotionHandle {
 }
 
 export function mountDemoReveal(root: HTMLElement): MotionHandle {
-  const isCompactViewport = window.matchMedia("(max-width: 700px)").matches;
-  const heroLift = isCompactViewport ? 12 : 20;
-  const cardLift = isCompactViewport ? 10 : 18;
-  const indexLift = isCompactViewport ? 8 : 12;
-  const noteLift = isCompactViewport ? 6 : 10;
-  const heroDuration = isCompactViewport ? 440 : 560;
-  const cardDuration = isCompactViewport ? 420 : 520;
-  const indexDuration = isCompactViewport ? 360 : 420;
-  const noteDuration = isCompactViewport ? 320 : 360;
-  const heroDelay = isCompactViewport ? 50 : 80;
-  const cardDelay = isCompactViewport ? 45 : 70;
-  const indexDelay = isCompactViewport ? 40 : 60;
-  const noteDelay = isCompactViewport ? 90 : 120;
-  const surfacePulseStart = isCompactViewport ? 140 : 180;
-  const surfacePulseStep = isCompactViewport ? 70 : 90;
-  const markerPulseStart = isCompactViewport ? 220 : 280;
-  const markerPulseStep = isCompactViewport ? 50 : 60;
-
   revealSequence(root, "[data-demo-block]", {
-    translateY: heroLift,
-    duration: heroDuration,
-    delay: heroDelay,
+    translateY: 20,
+    duration: 560,
+    delay: 80,
   });
 
   revealSequence(root, "[data-demo-card]", {
-    translateY: cardLift,
-    duration: cardDuration,
-    delay: cardDelay,
-  });
-
-  revealSequence(root, "[data-demo-index-item]", {
-    translateY: indexLift,
-    duration: indexDuration,
-    delay: indexDelay,
-  });
-
-  revealSequence(root, "[data-demo-index-note]", {
-    translateY: noteLift,
-    duration: noteDuration,
-    delay: noteDelay,
+    translateY: 18,
+    duration: 520,
+    delay: 70,
   });
 
   const timers = [
-    ...queuePulses(
-      root,
-      "[data-demo-card] .rg-surface-scene",
-      surfacePulseStart,
-      surfacePulseStep,
-    ),
-    ...queuePulses(
-      root,
-      "[data-demo-card] .rg-sigil-marker",
-      markerPulseStart,
-      markerPulseStep,
-    ),
+    ...queuePulses(root, "[data-demo-card] .rg-surface-scene", 180, 90),
+    ...queuePulses(root, "[data-demo-card] .rg-sigil-marker", 280, 60),
   ];
 
   return { timers, cleanup: [] };

@@ -6,23 +6,18 @@ defmodule PlatformPhxWeb.OverviewLive do
 
   @overview_commands [
     %{
-      step: "1",
-      title: "Install the shared operator rail",
-      note:
-        "Keep the shared command-line surface handy so you can move into live product routes without re-orienting.",
+      title: "Planned Regent CLI package",
+      note: "The planned package name for the shared operator surface is @regentlabs/cli.",
       command: "npm install -g @regentlabs/cli"
     },
     %{
-      step: "2",
-      title: "Keep the Techtree skill path close",
-      note:
-        "This is the path to watch if you want a repeatable route into the research graph once access opens.",
+      title: "Planned Techtree skill path",
+      note: "When access opens, the Techtree skill document will be published at this path.",
       command: "curl -L https://techtree.sh/skill.md -o techtree-skill.md"
     },
     %{
-      step: "3",
-      title: "Keep the Autolaunch skill path close",
-      note: "This is the matching route for launch and capital work once that access opens.",
+      title: "Planned Autolaunch skill path",
+      note: "When access opens, the Autolaunch skill document will be published at this path.",
       command: "curl -L https://autolaunch.sh/skill.md -o autolaunch-skill.md"
     }
   ]
@@ -61,16 +56,6 @@ defmodule PlatformPhxWeb.OverviewLive do
               phx-hook="OverviewMode"
             >
               <div class="pp-overview-head">
-                <div class="pp-overview-intro">
-                  <p class="pp-home-kicker">Start here</p>
-                  <h2 class="pp-route-panel-title">
-                    See how people and agents move through Regents.
-                  </h2>
-                  <p class="pp-panel-copy pp-overview-summary">
-                    Use this page to get oriented before you open services, publish research, or raise capital.
-                  </p>
-                </div>
-
                 <div class="pp-overview-toggle-wrap" data-background-suppress>
                   <div id="platform-overview-mode" class="pp-overview-toggle">
                     <button
@@ -186,12 +171,11 @@ defmodule PlatformPhxWeb.OverviewLive do
             <article class="pp-route-panel pp-product-panel pp-route-panel-span">
               <p class="pp-home-kicker">CLI rails</p>
               <h2 class="pp-route-panel-title">
-                Follow the same three setup steps before you jump into the live product surfaces.
+                Keep the operator rails handy, then jump straight into the live product surfaces.
               </h2>
               <div class="pp-overview-command-grid">
                 <%= for command <- @overview_commands do %>
                   <section class="pp-overview-command-card">
-                    <div class="pp-overview-command-step" aria-hidden="true">{command.step}</div>
                     <div class="space-y-2">
                       <p class="pp-home-kicker">{command.title}</p>
                       <p class="pp-panel-copy">{command.note}</p>

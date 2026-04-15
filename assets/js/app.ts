@@ -32,13 +32,7 @@ import { AnimatedHomeLogoSceneHook } from "./home_logo_scene";
 import { LogoStudiesHook } from "./logos";
 import { mountOverviewMode } from "./overview";
 import { mountColorModeToggle } from "./color_mode";
-import { mountDemo2Tunnel } from "./demo2";
 import { VoxelBackgroundHook } from "./voxel_background";
-import {
-  findNearestScrollContainer,
-  groupCardRectsIntoRows,
-  selectCenteredRowWindow,
-} from "./formation_pass_gallery.ts";
 
 type HookContext = {
   el: Element;
@@ -184,19 +178,6 @@ const HeerichProceduralDemoHook = {
   },
   updated(this: HookContext) {
     mountProceduralHeerichDemo(this.el as HTMLElement);
-  },
-};
-const Demo2TunnelHook = {
-  mounted(this: HookContext & { __demo2Cleanup?: () => void }) {
-    this.__demo2Cleanup?.();
-    this.__demo2Cleanup = mountDemo2Tunnel(this.el as HTMLElement);
-  },
-  updated(this: HookContext & { __demo2Cleanup?: () => void }) {
-    this.__demo2Cleanup?.();
-    this.__demo2Cleanup = mountDemo2Tunnel(this.el as HTMLElement);
-  },
-  destroyed(this: HookContext & { __demo2Cleanup?: () => void }) {
-    this.__demo2Cleanup?.();
   },
 };
 const ClipboardCopyHook = {
@@ -406,42 +387,27 @@ function mountFormationPassGallery(root: HTMLElement): () => void {
   const cardRoots = Array.from(root.querySelectorAll<HTMLElement>("[data-token-card-root]"));
   if (cardRoots.length === 0) return () => undefined;
 
-  const budget = Math.max(1, Number.parseInt(root.dataset.tokenCardBudget ?? "12", 10) || 12);
-  const scrollContainer = findNearestScrollContainer(root);
-  const scrollTarget = scrollContainer === window ? window : scrollContainer;
+  const budget = Math.max(1, Number.parseInt(root.dataset.tokenCardBudget ?? "10", 10) || 10);
+  const chunkSize = Math.max(1, Number.parseInt(root.dataset.tokenCardChunk ?? "2", 10) || 2);
   let frameId = 0;
-  const resizeObserver =
-    typeof ResizeObserver === "undefined"
-      ? null
-      : new ResizeObserver(() => {
-          requestSync();
-        });
-
-  const readViewportCenter = (): number => {
-    if (scrollContainer === window) {
-      return window.innerHeight / 2;
-    }
-
-    const rect = (scrollContainer as HTMLElement).getBoundingClientRect();
-    return rect.top + rect.height / 2;
-  };
 
   const syncActiveWindow = () => {
     frameId = 0;
-    const rows = groupCardRectsIntoRows(
-      cardRoots.map((cardRoot) => {
-        const rect = cardRoot.getBoundingClientRect();
 
-        return {
-          top: rect.top,
-          bottom: rect.bottom,
-        };
-      }),
-    );
-    const activeIndices = selectCenteredRowWindow(rows, readViewportCenter(), budget);
+    const viewportTop = 0;
+    const firstVisibleIndex = cardRoots.findIndex((cardRoot) => {
+      const rect = cardRoot.getBoundingClientRect();
+      return rect.bottom > viewportTop + 48;
+    });
+
+    const normalizedFirstVisible = firstVisibleIndex === -1 ? 0 : firstVisibleIndex;
+    const maxStart = Math.max(0, cardRoots.length - budget);
+    const windowStart = Math.min(maxStart, Math.floor(normalizedFirstVisible / chunkSize) * chunkSize);
+    const windowEnd = windowStart + budget;
 
     cardRoots.forEach((cardRoot, index) => {
-      const nextValue = activeIndices.has(index) ? "true" : "false";
+      const active = index >= windowStart && index < windowEnd;
+      const nextValue = active ? "true" : "false";
 
       if (cardRoot.dataset.tokenCardActive === nextValue) return;
 
@@ -455,18 +421,13 @@ function mountFormationPassGallery(root: HTMLElement): () => void {
     frameId = window.requestAnimationFrame(syncActiveWindow);
   };
 
-  cardRoots.forEach((cardRoot) => {
-    cardRoot.dataset.tokenCardActive = "false";
+  cardRoots.forEach((cardRoot, index) => {
+    cardRoot.dataset.tokenCardActive = index < budget ? "true" : "false";
     mountTokenCardRoot(cardRoot);
   });
 
-  resizeObserver?.observe(root);
-  if (scrollContainer !== window) {
-    resizeObserver?.observe(scrollContainer as HTMLElement);
-  }
-
   requestSync();
-  scrollTarget.addEventListener("scroll", requestSync, { passive: true });
+  window.addEventListener("scroll", requestSync, { passive: true });
   window.addEventListener("resize", requestSync);
 
   return () => {
@@ -474,8 +435,7 @@ function mountFormationPassGallery(root: HTMLElement): () => void {
       window.cancelAnimationFrame(frameId);
     }
 
-    resizeObserver?.disconnect();
-    scrollTarget.removeEventListener("scroll", requestSync);
+    window.removeEventListener("scroll", requestSync);
     window.removeEventListener("resize", requestSync);
     cardRoots.forEach((cardRoot) => unmountTokenCardRoot(cardRoot));
   };
@@ -746,7 +706,6 @@ const hooks: HooksOptions = {
   SidebarCommunity: SidebarCommunityHook,
   DashboardReveal: DashboardRevealHook,
   DemoReveal: DemoRevealHook,
-  Demo2Tunnel: Demo2TunnelHook,
   HeerichProceduralDemo: HeerichProceduralDemoHook,
   FooterVoxel: FooterVoxelHook,
   LogoStudies: LogoStudiesHook,
