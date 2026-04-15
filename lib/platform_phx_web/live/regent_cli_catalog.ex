@@ -3,7 +3,7 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
 
   def intro do
     [
-      "Regent CLI is the local runtime and operator surface for the published `@regentlabs/cli` package. It ships the `regent` binary, bundles the local runtime it talks to, and exposes the shared command surface for Techtree, Autolaunch, identity, config, and messaging.",
+      "Regent CLI is the local runtime and operator surface for the published `@regentlabs/cli` package. It ships the `regent` binary, bundles the local runtime it talks to, and exposes the shared command surface for platform accounts, company launches, billing, Techtree, Autolaunch, identity, config, and messaging.",
       "This page is the introduction and short guide. It is meant to help a human operator or an agent get oriented quickly. Keep the exhaustive command reference in a separate page, or generate it from `regent --help`, so this guide stays easy to scan and harder to let drift."
     ]
   end
@@ -44,6 +44,8 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
     [
       {"`regent run`", "owns the local daemon and runtime lifecycle."},
       {"`regent create ...` and `regent config ...`", "manage machine-local state."},
+      {"`regent platform ...`",
+       "signs in to the platform, saves a reusable session file, and controls billing and company launches."},
       {"`regent auth siwa ...`", "binds the local operator to a signed-in session."},
       {"`regent techtree ...`",
        "is the main work surface for browsing, publishing, BBH, and reviews."},
@@ -58,15 +60,29 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
     [
       "The CLI is JSON-first. In a human terminal it may render a formatted panel, but non-interactive output stays machine-readable JSON.",
       "Use `--config /absolute/path.json` to point at a non-default local config file.",
+      "Use `--session-file /absolute/path.json` when you want platform sign-in state to be explicit and reproducible.",
       "For flags documented as `@path` or `@file.json`, prefix the path with `@` to read the value from disk.",
       "Daemon-backed commands need the local runtime socket to be reachable.",
-      "Session-backed commands also need an active SIWA session.",
+      "Some command families use a saved platform session file, while others need an active SIWA session.",
       "Some commands are intentionally long-running, such as `regent run` and `regent chatbox tail`."
     ]
   end
 
   def first_command_groups do
     [
+      group(
+        "Platform account and launch control",
+        [
+          "regent platform auth login --identity-token-env REGENT_PLATFORM_IDENTITY_TOKEN",
+          "regent platform formation status",
+          "regent platform billing setup --claimed-label <label>",
+          "regent platform company create --claimed-label <label>",
+          "regent platform company runtime --slug <slug>",
+          "regent platform sprite pause --slug <slug>",
+          "regent platform sprite resume --slug <slug>"
+        ],
+        "Use these when an agent needs to sign in, check launch readiness, open billing, start a company, or pause and resume one runtime from the terminal."
+      ),
       group(
         "Local setup and health",
         [

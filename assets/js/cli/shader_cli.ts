@@ -34,11 +34,15 @@ export type RegentCommand = ShaderListCommand | ShaderExportCommand | HelpComman
 
 const VALID_USAGES: readonly ShaderUsage[] = ["avatar", "background", "creator-inert"];
 
-export function usageText() {
+export function shaderUsageLines() {
   return [
     "regent shader list [--usage avatar|background|creator-inert]",
     "regent shader export <shader-id> [--define KEY=VALUE ...] [--width 1024] [--height 1024] [--settle-ms 900] [--out ./avatar.png] [--spec-out ./avatar.json] [--browser /path/to/chrome]",
-  ].join("\n");
+  ];
+}
+
+export function usageText() {
+  return shaderUsageLines().join("\n");
 }
 
 export function shaderListPayload(command: ShaderListCommand) {
@@ -68,28 +72,21 @@ export function listShaders(usage: ShaderUsage | null) {
   return SHADER_CATALOG.filter((shader) => shader.usage.includes(usage));
 }
 
-export function parseRegentCommand(argv: readonly string[], cwd: string): RegentCommand {
-  const args = [...argv];
-
-  if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
-    return { kind: "help" };
-  }
-
-  const [surface, command, ...rest] = args;
-
-  if (surface !== "shader") {
-    throw new Error(`Unknown command surface "${surface}".\n${usageText()}`);
-  }
-
+export function parseShaderCommand(
+  command: string | undefined,
+  rest: readonly string[],
+  cwd: string,
+  fullUsageText: string,
+): ShaderListCommand | ShaderExportCommand {
   if (command === "list") {
-    return parseShaderList(rest);
+    return parseShaderList([...rest]);
   }
 
   if (command === "export") {
-    return parseShaderExport(rest, cwd);
+    return parseShaderExport([...rest], cwd);
   }
 
-  throw new Error(`Unknown shader command "${command ?? ""}".\n${usageText()}`);
+  throw new Error(`Unknown shader command "${command ?? ""}".\n${fullUsageText}`);
 }
 
 function parseShaderList(args: string[]): ShaderListCommand {

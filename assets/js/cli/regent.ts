@@ -1,13 +1,7 @@
 #!/usr/bin/env node
 import process from "node:process";
 
-import {
-  exportSummaryPayload,
-  parseRegentCommand,
-  shaderListPayload,
-  usageText,
-} from "./shader_cli.ts";
-import { exportShaderImage } from "./shader_export.ts";
+import { executeRegentCommand, parseRegentCommand, usageText } from "./regent_cli.ts";
 
 async function main() {
   const command = parseRegentCommand(process.argv.slice(2), process.cwd());
@@ -17,13 +11,7 @@ async function main() {
     return;
   }
 
-  if (command.kind === "shader-list") {
-    writeJson(shaderListPayload(command));
-    return;
-  }
-
-  const result = await exportShaderImage(command);
-  writeJson(exportSummaryPayload(result));
+  writeJson(await executeRegentCommand(command));
 }
 
 function writeJson(value: unknown) {

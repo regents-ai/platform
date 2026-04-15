@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Regent CLI Contract
   version: 0.1.0
-  description: Canonical local/runtime-backed CLI surface for shader export. Agent Formation is web-only on regents.sh.
+  description: Canonical Regent CLI surface for local shader work and platform account, billing, company, and runtime operations.
 commands:
   - name: regent shader list
     summary: List the available shader avatars and their editable parameters.
@@ -167,3 +167,769 @@ commands:
                 type: object
                 additionalProperties:
                   type: string
+  - name: regent platform auth login
+    summary: Start a signed-in platform session from a Privy identity token and save it for later platform commands.
+    auth:
+      mode: privy-identity-token
+    transport:
+      kind: http-cookie-session
+      operationIds: [privySessionCsrf, privySessionCreate]
+    args: []
+    flags:
+      - name: --identity-token
+        type: string
+        required: false
+        description: Privy identity token for the platform account.
+      - name: --identity-token-env
+        type: string
+        required: false
+        description: Environment variable name that contains the Privy identity token.
+      - name: --display-name
+        type: string
+        required: false
+        description: Optional display name to save for the signed-in person.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        type: object
+        required: [ok, command, origin, sessionFile, profile]
+        properties:
+          ok: {type: boolean}
+          command: {type: string}
+          origin: {type: string}
+          sessionFile: {type: string}
+          profile:
+            $ref: '#/components/schemas/CurrentHumanProfile'
+  - name: regent platform auth status
+    summary: Read the current signed-in platform profile from the saved platform session.
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [privySessionProfile]
+    args: []
+    flags:
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        type: object
+        required: [ok, command, origin, sessionFile, profile]
+        properties:
+          ok: {type: boolean}
+          command: {type: string}
+          origin: {type: string}
+          sessionFile: {type: string}
+          profile:
+            $ref: '#/components/schemas/CurrentHumanProfile'
+  - name: regent platform auth logout
+    summary: Clear the saved platform session and sign out from the platform account.
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [privySessionDelete]
+    args: []
+    flags:
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        type: object
+        required: [ok, command, origin, sessionFile]
+        properties:
+          ok: {type: boolean}
+          command: {type: string}
+          origin: {type: string}
+          sessionFile: {type: string}
+  - name: regent platform formation status
+    summary: Read the current platform launch state, available claims, billing state, and owned companies.
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [agentPlatformFormation]
+    args: []
+    flags:
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        type: object
+        required: [ok, command, origin, formation]
+        properties:
+          ok: {type: boolean}
+          command: {type: string}
+          origin: {type: string}
+          formation:
+            $ref: '#/components/schemas/AgentFormationResponse'
+  - name: regent platform billing account
+    summary: Read the current platform billing account from the saved session.
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [agentPlatformBillingAccount]
+    args: []
+    flags:
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        type: object
+        required: [ok, command, origin, billing]
+        properties:
+          ok: {type: boolean}
+          command: {type: string}
+          origin: {type: string}
+          billing:
+            type: object
+            required: [ok, billing_account]
+            properties:
+              ok: {type: boolean}
+              billing_account:
+                $ref: '#/components/schemas/BillingAccount'
+  - name: regent platform billing usage
+    summary: Read shared runtime credit and company usage from the saved session.
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [agentPlatformBillingUsage]
+    args: []
+    flags:
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        type: object
+        required: [ok, command, origin, usage]
+        properties:
+          ok: {type: boolean}
+          command: {type: string}
+          origin: {type: string}
+          usage:
+            type: object
+            required: [ok, usage]
+            properties:
+              ok: {type: boolean}
+              usage:
+                $ref: '#/components/schemas/BillingUsageSummary'
+  - name: regent platform billing setup
+    summary: Start hosted billing setup for the saved platform account.
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [agentPlatformBillingSetupCheckout]
+    args: []
+    flags:
+      - name: --claimed-label
+        type: string
+        required: false
+        description: Optional claimed name to carry into the hosted billing return link.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        type: object
+        required: [ok, command, origin, checkout]
+        properties:
+          ok: {type: boolean}
+          command: {type: string}
+          origin: {type: string}
+          checkout:
+            type: object
+            required: [ok, checkout_url, billing_account]
+            properties:
+              ok: {type: boolean}
+              checkout_url: {type: string}
+              billing_account:
+                $ref: '#/components/schemas/BillingAccount'
+  - name: regent platform billing topup
+    summary: Start hosted runtime credit checkout for the saved platform account.
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [agentPlatformBillingTopupCheckout]
+    args: []
+    flags:
+      - name: --amount-usd-cents
+        type: integer
+        required: true
+        description: Runtime credit amount in US cents.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        type: object
+        required: [ok, command, origin, checkout]
+        properties:
+          ok: {type: boolean}
+          command: {type: string}
+          origin: {type: string}
+          checkout:
+            type: object
+            required: [ok, checkout_url, billing_account]
+            properties:
+              ok: {type: boolean}
+              checkout_url: {type: string}
+              billing_account:
+                $ref: '#/components/schemas/BillingAccount'
+  - name: regent platform company create
+    summary: Start a new company launch for one claimed name from the saved platform account.
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [agentPlatformFormationCreateCompany]
+    args: []
+    flags:
+      - name: --claimed-label
+        type: string
+        required: true
+        description: Claimed name label to launch as a company.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        type: object
+        required: [ok, command, origin, company]
+        properties:
+          ok: {type: boolean}
+          command: {type: string}
+          origin: {type: string}
+          company:
+            type: object
+            required: [ok, agent, formation]
+            properties:
+              ok: {type: boolean}
+              agent:
+                $ref: '#/components/schemas/AgentRecord'
+              formation:
+                $ref: '#/components/schemas/AgentFormation'
+  - name: regent platform company runtime
+    summary: Read runtime state for one owned company from the saved platform session.
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [agentPlatformFormationRuntime]
+    args: []
+    flags:
+      - name: --slug
+        type: string
+        required: true
+        description: Company slug to inspect.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        type: object
+        required: [ok, command, origin, runtime]
+        properties:
+          ok: {type: boolean}
+          command: {type: string}
+          origin: {type: string}
+          runtime:
+            $ref: '#/components/schemas/AgentRuntimeResponse'
+  - name: regent platform sprite pause
+    summary: Pause one owned company runtime from the saved platform session.
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [agentPlatformPauseSprite]
+    args: []
+    flags:
+      - name: --slug
+        type: string
+        required: true
+        description: Company slug to pause.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        type: object
+        required: [ok, command, origin, sprite]
+        properties:
+          ok: {type: boolean}
+          command: {type: string}
+          origin: {type: string}
+          sprite:
+            type: object
+            required: [ok, sprite]
+            properties:
+              ok: {type: boolean}
+              sprite:
+                $ref: '#/components/schemas/SpriteRuntimeControl'
+  - name: regent platform sprite resume
+    summary: Resume one owned company runtime from the saved platform session.
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [agentPlatformResumeSprite]
+    args: []
+    flags:
+      - name: --slug
+        type: string
+        required: true
+        description: Company slug to resume.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        type: object
+        required: [ok, command, origin, sprite]
+        properties:
+          ok: {type: boolean}
+          command: {type: string}
+          origin: {type: string}
+          sprite:
+            type: object
+            required: [ok, sprite]
+            properties:
+              ok: {type: boolean}
+              sprite:
+                $ref: '#/components/schemas/SpriteRuntimeControl'
+              billing_account:
+                $ref: '#/components/schemas/BillingAccount'
+
+components:
+  schemas:
+    PrivySessionCsrf:
+      type: object
+      required: [ok, csrf_token]
+      properties:
+        ok: {type: boolean}
+        csrf_token: {type: string}
+    PrivySessionRequest:
+      type: object
+      properties:
+        displayName: {type: [string, 'null']}
+    ClaimedName:
+      type: object
+      required: [label, fqdn, claimed_at, in_use]
+      properties:
+        label: {type: string}
+        fqdn: {type: string}
+        ens_fqdn: {type: [string, 'null']}
+        claimed_at: {type: string, format: date-time}
+        in_use: {type: boolean}
+    WelcomeCredit:
+      type: object
+      required: [status, amount_usd_cents, credit_scope, granted_at, expires_at, stripe_sync_status]
+      properties:
+        status: {type: string}
+        amount_usd_cents: {type: integer}
+        credit_scope: {type: string}
+        granted_at: {type: string, format: date-time}
+        expires_at: {type: string, format: date-time}
+        stripe_sync_status: {type: string}
+        stripe_synced_at: {type: [string, 'null'], format: date-time}
+    BillingAccount:
+      type: object
+      required: [status, connected, provider, model_default, margin_bps, runtime_credit_balance_usd_cents, paid_companies, paused_companies, trialing_companies, welcome_credit]
+      properties:
+        status: {type: string}
+        connected: {type: boolean}
+        provider: {type: string}
+        customer_id: {type: [string, 'null']}
+        subscription_id: {type: [string, 'null']}
+        model_default: {type: string}
+        margin_bps: {type: integer}
+        runtime_credit_balance_usd_cents: {type: integer}
+        paid_companies: {type: integer}
+        paused_companies: {type: integer}
+        trialing_companies: {type: integer}
+        welcome_credit:
+          oneOf:
+            - $ref: '#/components/schemas/WelcomeCredit'
+            - type: 'null'
+    CurrentHuman:
+      type: object
+      required: [id, privy_user_id, wallet_addresses, billing_account]
+      properties:
+        id: {type: integer}
+        privy_user_id: {type: string}
+        wallet_address: {type: [string, 'null']}
+        wallet_addresses:
+          type: array
+          items: {type: string}
+        display_name: {type: [string, 'null']}
+        billing_account:
+          $ref: '#/components/schemas/BillingAccount'
+    AgentSubdomain:
+      type: object
+      required: [hostname, active]
+      properties:
+        hostname: {type: string}
+        active: {type: boolean}
+    AgentService:
+      type: object
+      required: [slug, name, summary, price_label, payment_rail, delivery_mode, public_result_default, sort_order]
+      properties:
+        slug: {type: string}
+        name: {type: string}
+        summary: {type: string}
+        price_label: {type: string}
+        payment_rail: {type: string}
+        delivery_mode: {type: string}
+        public_result_default: {type: boolean}
+        sort_order: {type: integer}
+    AgentConnection:
+      type: object
+      required: [kind, status]
+      properties:
+        kind: {type: string}
+        status: {type: string}
+        display_name: {type: [string, 'null']}
+        external_ref: {type: [string, 'null']}
+        details:
+          type: object
+          additionalProperties: true
+        connected_at: {type: [string, 'null'], format: date-time}
+    AgentArtifact:
+      type: object
+      required: [title, summary, visibility, published_at]
+      properties:
+        title: {type: string}
+        summary: {type: string}
+        url: {type: [string, 'null']}
+        visibility: {type: string}
+        published_at: {type: string, format: date-time}
+    AgentFormation:
+      type: object
+      required: [id, status, current_step, attempt_count]
+      properties:
+        id: {type: integer}
+        claimed_label: {type: [string, 'null']}
+        status: {type: string}
+        current_step: {type: string}
+        attempt_count: {type: integer}
+        last_error_step: {type: [string, 'null']}
+        last_error_message: {type: [string, 'null']}
+        started_at: {type: [string, 'null'], format: date-time}
+        last_heartbeat_at: {type: [string, 'null'], format: date-time}
+        completed_at: {type: [string, 'null'], format: date-time}
+    PublicAgentRecord:
+      type: object
+      required: [id, template_key, name, slug, claimed_label, basename_fqdn, ens_fqdn, status, public_summary, services, connections, feed]
+      properties:
+        id: {type: integer}
+        owner_human_id: {type: [integer, 'null']}
+        template_key: {type: string}
+        name: {type: string}
+        slug: {type: string}
+        claimed_label: {type: string}
+        basename_fqdn: {type: string}
+        ens_fqdn: {type: string}
+        status: {type: string}
+        public_summary: {type: string}
+        hero_statement: {type: [string, 'null']}
+        wallet_address: {type: [string, 'null']}
+        published_at: {type: [string, 'null'], format: date-time}
+        subdomain:
+          oneOf:
+            - $ref: '#/components/schemas/AgentSubdomain'
+            - type: 'null'
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentService'
+        connections:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentConnection'
+        feed:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentArtifact'
+    AgentRecord:
+      allOf:
+        - $ref: '#/components/schemas/PublicAgentRecord'
+        - type: object
+          required: [sprite_name, sprite_service_name, paperclip_company_id, paperclip_agent_id, runtime_status, checkpoint_status, desired_runtime_state, observed_runtime_state, sprite_free_until, sprite_metering_status]
+          properties:
+            sprite_name: {type: [string, 'null']}
+            sprite_service_name: {type: [string, 'null']}
+            sprite_checkpoint_ref: {type: [string, 'null']}
+            sprite_created_at: {type: [string, 'null'], format: date-time}
+            paperclip_deployment_mode: {type: [string, 'null']}
+            paperclip_http_port: {type: [integer, 'null']}
+            paperclip_company_id: {type: [string, 'null']}
+            paperclip_agent_id: {type: [string, 'null']}
+            hermes_adapter_type: {type: [string, 'null']}
+            hermes_model: {type: [string, 'null']}
+            hermes_persist_session: {type: boolean}
+            hermes_toolsets:
+              type: array
+              items: {type: string}
+            hermes_runtime_plugins:
+              type: array
+              items: {type: string}
+            hermes_shared_skills:
+              type: array
+              items: {type: string}
+            runtime_status: {type: string}
+            checkpoint_status: {type: string}
+            runtime_last_checked_at: {type: [string, 'null'], format: date-time}
+            last_formation_error: {type: [string, 'null']}
+            desired_runtime_state: {type: string}
+            observed_runtime_state: {type: string}
+            sprite_free_until: {type: [string, 'null'], format: date-time}
+            sprite_metering_status: {type: string}
+            formation:
+              oneOf:
+                - $ref: '#/components/schemas/AgentFormation'
+                - type: 'null'
+    CurrentHumanProfile:
+      type: object
+      required: [ok, authenticated, claimed_names, agents]
+      properties:
+        ok: {type: boolean}
+        authenticated: {type: boolean}
+        human:
+          oneOf:
+            - $ref: '#/components/schemas/CurrentHuman'
+            - type: 'null'
+        claimed_names:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClaimedName'
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentRecord'
+    BillingUsageSummary:
+      type: object
+      required: [runtime_credit_balance_usd_cents, trialing_companies, paid_companies, paused_companies, welcome_credit, companies]
+      properties:
+        runtime_credit_balance_usd_cents: {type: integer}
+        trialing_companies: {type: integer}
+        paid_companies: {type: integer}
+        paused_companies: {type: integer}
+        welcome_credit:
+          oneOf:
+            - $ref: '#/components/schemas/WelcomeCredit'
+            - type: 'null'
+        companies:
+          type: array
+          items:
+            type: object
+            required: [slug, name, runtime_status, desired_runtime_state, observed_runtime_state, sprite_metering_status, sprite_free_until]
+            properties:
+              slug: {type: string}
+              name: {type: string}
+              runtime_status: {type: string}
+              desired_runtime_state: {type: string}
+              observed_runtime_state: {type: string}
+              sprite_metering_status: {type: string}
+              sprite_free_until: {type: [string, 'null'], format: date-time}
+    AgentFormationResponse:
+      type: object
+      required: [ok, authenticated, wallet_address, eligible, collections, claimed_names, available_claims, billing_account, owned_companies, active_formations]
+      properties:
+        ok: {type: boolean}
+        authenticated: {type: boolean}
+        wallet_address: {type: [string, 'null']}
+        eligible: {type: boolean}
+        collections:
+          type: object
+          required: [animata1, animata2, animataPass]
+          properties:
+            animata1:
+              type: array
+              items: {type: integer}
+            animata2:
+              type: array
+              items: {type: integer}
+            animataPass:
+              type: array
+              items: {type: integer}
+        claimed_names:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClaimedName'
+        available_claims:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClaimedName'
+        billing_account:
+          $ref: '#/components/schemas/BillingAccount'
+        owned_companies:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentRecord'
+        active_formations:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentFormation'
+    SpriteRuntimeControl:
+      type: object
+      required: [slug, desired_runtime_state, observed_runtime_state, runtime_status]
+      properties:
+        slug: {type: string}
+        desired_runtime_state: {type: string}
+        observed_runtime_state: {type: string}
+        runtime_status: {type: string}
+    AgentRuntime:
+      type: object
+      required: [sprite, paperclip, hermes, checkpoint]
+      properties:
+        sprite:
+          type: object
+          required: [name, status, owner, free_until, metering_status, desired_runtime_state, observed_runtime_state]
+          properties:
+            name: {type: [string, 'null']}
+            status: {type: string}
+            owner: {type: string}
+            free_until: {type: [string, 'null'], format: date-time}
+            metering_status: {type: string}
+            desired_runtime_state: {type: string}
+            observed_runtime_state: {type: string}
+        paperclip:
+          type: object
+          required: [company_id, status, deployment_mode, http_port]
+          properties:
+            company_id: {type: [string, 'null']}
+            status: {type: string}
+            deployment_mode: {type: string}
+            http_port: {type: integer}
+        hermes:
+          type: object
+          required: [agent_id, status, adapter_type, model, persist_session, toolsets, runtime_plugins, shared_skills]
+          properties:
+            agent_id: {type: [string, 'null']}
+            status: {type: string}
+            adapter_type: {type: string}
+            model: {type: string}
+            persist_session: {type: boolean}
+            toolsets:
+              type: array
+              items: {type: string}
+            runtime_plugins:
+              type: array
+              items: {type: string}
+            shared_skills:
+              type: array
+              items: {type: string}
+        checkpoint:
+          type: object
+          required: [status]
+          properties:
+            status: {type: string}
+    AgentRuntimeResponse:
+      type: object
+      required: [ok, agent, runtime, billing_account]
+      properties:
+        ok: {type: boolean}
+        agent:
+          $ref: '#/components/schemas/AgentRecord'
+        runtime:
+          $ref: '#/components/schemas/AgentRuntime'
+        billing_account:
+          $ref: '#/components/schemas/BillingAccount'
+        formation:
+          oneOf:
+            - $ref: '#/components/schemas/AgentFormation'
+            - type: 'null'
