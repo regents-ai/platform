@@ -11,9 +11,10 @@ defmodule PlatformPhxWeb.BugReportLive do
     {:ok,
      socket
      |> assign(:page_title, "Bug Report Ledger")
-     |> assign(:reports, pagination.entries)
+     |> assign(:report_count, length(pagination.entries))
      |> assign(:next_page, 2)
-     |> assign(:has_next, pagination.has_next)}
+     |> assign(:has_next, pagination.has_next)
+     |> stream(:reports, pagination.entries)}
   end
 
   @impl true
@@ -31,9 +32,10 @@ defmodule PlatformPhxWeb.BugReportLive do
 
     {:noreply,
      socket
-     |> assign(:reports, socket.assigns.reports ++ pagination.entries)
+     |> assign(:report_count, socket.assigns.report_count + length(pagination.entries))
      |> assign(:next_page, socket.assigns.next_page + 1)
-     |> assign(:has_next, pagination.has_next)}
+     |> assign(:has_next, pagination.has_next)
+     |> stream(:reports, pagination.entries)}
   end
 
   @impl true
@@ -69,7 +71,7 @@ defmodule PlatformPhxWeb.BugReportLive do
               </div>
             </header>
 
-            <%= if @reports == [] do %>
+            <%= if @report_count == 0 do %>
               <article class="pp-bug-ledger-empty">
                 <p class="pp-home-kicker">Live Board</p>
                 <h3 class="pp-route-panel-title">No bug reports have been filed yet.</h3>
@@ -78,8 +80,13 @@ defmodule PlatformPhxWeb.BugReportLive do
                 </p>
               </article>
             <% else %>
-              <section class="pp-bug-ledger-table" aria-label="Recent bug reports">
-                <div class="pp-bug-ledger-head" role="presentation">
+              <section
+                id="platform-bug-ledger-table"
+                class="pp-bug-ledger-table"
+                aria-label="Recent bug reports"
+                phx-update="stream"
+              >
+                <div id="platform-bug-ledger-head" class="pp-bug-ledger-head" role="presentation">
                   <span>Reporter</span>
                   <span>Summary</span>
                   <span>Status</span>
@@ -87,8 +94,8 @@ defmodule PlatformPhxWeb.BugReportLive do
                   <span>Details</span>
                 </div>
 
-                <%= for report <- @reports do %>
-                  <article class="pp-bug-ledger-row" id={"bug-report-#{report.report_id}"}>
+                <%= for {dom_id, report} <- @streams.reports do %>
+                  <article class="pp-bug-ledger-row" id={dom_id}>
                     <div class="pp-bug-ledger-cell pp-bug-ledger-reporter" data-label="Reporter">
                       <p class="pp-bug-ledger-primary">{reporter_title(report)}</p>
                       <p class="pp-bug-ledger-secondary">{report.reporter_wallet_address}</p>

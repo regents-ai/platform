@@ -33,12 +33,13 @@ defmodule PlatformPhxWeb.BugReportLiveTest do
       set: [created_at: ~U[2026-04-01 11:00:00Z]]
     )
 
-    {:ok, _view, html} = live(conn, "/bug-report")
+    {:ok, view, html} = live(conn, "/bug-report")
 
     assert html =~ "newer summary"
     assert html =~ "older summary"
     assert html =~ "Show details"
     assert html =~ "newer details"
+    assert has_element?(view, "#platform-bug-ledger-table[phx-update=\"stream\"]")
 
     assert position(html, "newer summary") < position(html, "older summary")
   end
@@ -58,6 +59,7 @@ defmodule PlatformPhxWeb.BugReportLiveTest do
     assert html =~ "Loading older reports"
     assert html =~ "report-051"
     refute html =~ "report-001"
+    assert has_element?(view, "#platform-bug-ledger-table[phx-update=\"stream\"]")
 
     html_two =
       view
