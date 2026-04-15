@@ -75,6 +75,7 @@ export interface AnimataTokenCardManifestEntry {
   defineValues: Record<string, string>;
   versionLabel: string;
   imagePath: string;
+  pagePath: string;
   animationPath: string;
 }
 

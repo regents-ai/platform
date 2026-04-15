@@ -14,6 +14,7 @@ test("token card manifest keeps the collection shape stable", () => {
   assert.equal(first?.tokenId, 1);
   assert.equal(first?.name, "Regents Club #1");
   assert.match(first?.imagePath ?? "", /^\/images\/animata\/cards\/1\.png$/);
-  assert.match(first?.animationPath ?? "", /^\/cards\/regents-club\/1$/);
+  assert.match(first?.pagePath ?? "", /^\/cards\/regents-club\/1$/);
+  assert.match(first?.animationPath ?? "", /^\/images\/animata\/cards\/1\.mp4$/);
   assert.match(first?.versionLabel ?? "", /^0001\.v1$/);
 });

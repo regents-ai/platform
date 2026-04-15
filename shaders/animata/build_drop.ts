@@ -73,18 +73,27 @@ export function buildTokenCardManifest(
   plan: AnimataPlanDocument,
   options?: {
     imagePathPrefix?: string;
+    pagePathPrefix?: string;
     animationPathPrefix?: string;
     versionLabel?: string;
   },
 ) {
   const imagePathPrefix = options?.imagePathPrefix ?? "/images/animata/cards";
-  const animationPathPrefix = options?.animationPathPrefix ?? "/cards/regents-club";
+  const pagePathPrefix = options?.pagePathPrefix ?? "/cards/regents-club";
+  const animationPathPrefix = options?.animationPathPrefix ?? "/images/animata/cards";
   const versionLabel = options?.versionLabel ?? "v1";
 
   return {
     collection: plan.collection,
     version: plan.version,
-    items: plan.editions.map((edition) => buildTokenCardEntry(edition, imagePathPrefix, animationPathPrefix, versionLabel)),
+    items: plan.editions.map((edition) =>
+      buildTokenCardEntry(
+        edition,
+        imagePathPrefix,
+        pagePathPrefix,
+        animationPathPrefix,
+        versionLabel,
+      )),
   } satisfies AnimataTokenCardManifest;
 }
 
@@ -115,7 +124,7 @@ export async function buildHostedMetadataBundle(
           description: edition.description,
           external_url: edition.externalUrl,
           image: absoluteUrl(siteUrl, tokenCard.imagePath),
-          animation_url: absoluteUrl(siteUrl, tokenCard.animationPath),
+          animation_url: absoluteUrl(siteUrl, tokenCard.pagePath),
           attributes: edition.attributes,
         },
         null,
@@ -143,6 +152,7 @@ export async function buildHostedMetadataBundle(
 function buildTokenCardEntry(
   edition: AnimataPlanDocument["editions"][number],
   imagePathPrefix: string,
+  pagePathPrefix: string,
   animationPathPrefix: string,
   versionLabel: string,
 ): AnimataTokenCardManifestEntry {
@@ -154,7 +164,8 @@ function buildTokenCardEntry(
     defineValues: edition.defineValues,
     versionLabel: `${String(edition.tokenId).padStart(4, "0")}.${versionLabel}`,
     imagePath: `${trimTrailingSlash(imagePathPrefix)}/${edition.posterFileName}`,
-    animationPath: `${trimTrailingSlash(animationPathPrefix)}/${edition.tokenId}`,
+    pagePath: `${trimTrailingSlash(pagePathPrefix)}/${edition.tokenId}`,
+    animationPath: `${trimTrailingSlash(animationPathPrefix)}/${edition.videoFileName}`,
   };
 }
 
