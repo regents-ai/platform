@@ -319,7 +319,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
                formation_id: formation.id,
                step: "reserve_claim",
                status: "succeeded",
-               message: "Reserved the claimed name for Agent Formation."
+               message: "Your company name is saved."
              })
              |> Repo.insert() do
         %{

@@ -1,8 +1,9 @@
 defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
   @moduledoc false
+  @max_attempts 5
   use Oban.Worker,
     queue: :agent_formation,
-    max_attempts: 5,
+    max_attempts: @max_attempts,
     unique: [period: :infinity, keys: [:agent_id], fields: [:args]]
 
   import Ecto.Query, warn: false
@@ -11,6 +12,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
   alias PlatformPhx.AgentPlatform.FormationEvent
   alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.AgentPlatform.SpriteRunner
+  alias PlatformPhx.AgentPlatform.SpriteRuntimeClient
   alias PlatformPhx.Repo
 
   @runner_steps [
@@ -23,7 +25,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
   ]
 
   @impl true
-  def perform(%Oban.Job{args: %{"agent_id" => agent_id}}) do
+  def perform(%Oban.Job{args: %{"agent_id" => agent_id}} = job) do
     agent =
       Agent
       |> where([agent], agent.id == ^agent_id)
@@ -37,12 +39,15 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
          {:ok, formation} <- mark_running(formation),
          {:ok, result} <- maybe_run_sprite(agent, formation),
          {:ok, agent, formation} <- apply_runner_result(agent, formation, result),
-         {:ok, agent, formation} <- activate_subdomain(agent, formation),
-         {:ok, _agent, _formation} <- finalize(agent, formation) do
+         {:ok, agent, formation} <- verify_runtime(agent, formation),
+         {:ok, _agent, _formation} <- publish_company(agent, formation) do
       :ok
     else
       nil ->
         {:discard, "agent not found"}
+
+      {:error, {:runtime_not_ready, state}} ->
+        handle_runtime_not_ready(job, agent, formation, state)
 
       {:error, _reason} = error ->
         fail(agent, formation, error)
@@ -69,7 +74,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
 
   defp maybe_run_sprite(%Agent{} = agent, %FormationRun{current_step: step} = formation)
        when step in @runner_steps do
-    insert_event(formation, step, "started", "Agent Formation is preparing the runtime.")
+    insert_event(formation, step, "started", "We're setting up your company now.")
     SpriteRunner.run(agent, formation)
   end
 
@@ -77,16 +82,21 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
     {:ok, formation.metadata || %{}}
   end
 
-  defp apply_runner_result(%Agent{} = agent, %FormationRun{} = formation, result) do
+  defp apply_runner_result(
+         %Agent{} = agent,
+         %FormationRun{current_step: step} = formation,
+         result
+       )
+       when step in @runner_steps do
     Enum.each(@runner_steps, fn step ->
-      insert_event(formation, step, "succeeded", "Completed #{String.replace(step, "_", " ")}.")
+      insert_event(formation, step, "succeeded", success_message_for_step(step))
     end)
 
     formation =
       formation
       |> FormationRun.changeset(%{
         status: "running",
-        current_step: "activate_subdomain",
+        current_step: "verify_runtime",
         sprite_command_log_path: result["log_path"] || formation.sprite_command_log_path,
         metadata: Map.merge(formation.metadata || %{}, result),
         last_heartbeat_at: now()
@@ -104,9 +114,8 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
         sprite_created_at: now(),
         runtime_status: "forming",
         desired_runtime_state: "active",
-        observed_runtime_state: "active",
+        observed_runtime_state: "unknown",
         checkpoint_status: "ready",
-        runtime_last_checked_at: now(),
         last_formation_error: nil
       })
       |> Repo.update!()
@@ -114,59 +123,109 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
     {:ok, Repo.preload(agent, [:subdomain, :formation_run]), formation}
   end
 
-  defp activate_subdomain(%Agent{} = agent, %FormationRun{} = formation) do
+  defp apply_runner_result(%Agent{} = agent, %FormationRun{} = formation, _result) do
+    {:ok, Repo.preload(agent, [:subdomain, :formation_run]), formation}
+  end
+
+  defp verify_runtime(%Agent{} = agent, %FormationRun{} = formation) do
+    insert_event(
+      formation,
+      "verify_runtime",
+      "started",
+      "We're checking that your company is responding."
+    )
+
+    with {:ok, runtime_state} <-
+           SpriteRuntimeClient.service_state(agent.sprite_name, agent.sprite_service_name),
+         :ok <- require_active_runtime(runtime_state.state) do
+      formation =
+        formation
+        |> FormationRun.changeset(%{
+          current_step: "activate_subdomain",
+          last_heartbeat_at: now()
+        })
+        |> Repo.update!()
+
+      agent =
+        agent
+        |> Agent.changeset(%{
+          runtime_status: "ready",
+          observed_runtime_state: "active",
+          runtime_last_checked_at: now(),
+          last_formation_error: nil
+        })
+        |> Repo.update!()
+
+      insert_event(
+        formation,
+        "verify_runtime",
+        "succeeded",
+        "Your company is responding and ready for launch."
+      )
+
+      {:ok, Repo.preload(agent, [:subdomain, :formation_run]), formation}
+    else
+      {:error, {:runtime_not_ready, state}} ->
+        {:error, {:runtime_not_ready, state}}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp publish_company(%Agent{} = agent, %FormationRun{} = formation) do
     insert_event(
       formation,
       "activate_subdomain",
       "started",
-      "Turning on the public company page."
+      "We're opening your public site."
     )
 
-    agent.subdomain
-    |> Ecto.Changeset.change(active: true)
-    |> Repo.update!()
+    insert_event(formation, "finalize", "started", "We're wrapping up your launch.")
 
-    formation =
-      formation
-      |> FormationRun.changeset(%{
-        current_step: "finalize",
-        last_heartbeat_at: now()
-      })
+    published_at = agent.published_at || now()
+    completed_at = now()
+
+    Repo.transaction(fn ->
+      agent.subdomain
+      |> Ecto.Changeset.change(active: true)
       |> Repo.update!()
 
-    insert_event(formation, "activate_subdomain", "succeeded", "The public subdomain is live.")
+      agent =
+        agent
+        |> Agent.changeset(%{
+          status: "published",
+          runtime_status: "ready",
+          desired_runtime_state: "active",
+          observed_runtime_state: "active",
+          checkpoint_status: "ready",
+          published_at: published_at,
+          runtime_last_checked_at: completed_at
+        })
+        |> Repo.update!()
 
-    {:ok, Repo.preload(agent, [:subdomain, :formation_run]), formation}
-  end
+      formation =
+        formation
+        |> FormationRun.changeset(%{
+          status: "succeeded",
+          current_step: "finalize",
+          completed_at: completed_at,
+          last_heartbeat_at: completed_at
+        })
+        |> Repo.update!()
 
-  defp finalize(%Agent{} = agent, %FormationRun{} = formation) do
-    insert_event(formation, "finalize", "started", "Finishing Agent Formation.")
+      insert_event(formation, "activate_subdomain", "succeeded", "Your public site is live.")
+      insert_event(formation, "finalize", "succeeded", "Your company is ready.")
 
-    agent =
-      agent
-      |> Agent.changeset(%{
-        status: "published",
-        runtime_status: "ready",
-        desired_runtime_state: "active",
-        observed_runtime_state: "active",
-        checkpoint_status: "ready",
-        published_at: agent.published_at || now(),
-        runtime_last_checked_at: now()
-      })
-      |> Repo.update!()
+      {Repo.preload(agent, [:subdomain, :formation_run]), formation}
+    end)
+    |> case do
+      {:ok, {published_agent, completed_formation}} ->
+        {:ok, published_agent, completed_formation}
 
-    formation =
-      formation
-      |> FormationRun.changeset(%{
-        status: "succeeded",
-        current_step: "finalize",
-        completed_at: now(),
-        last_heartbeat_at: now()
-      })
-      |> Repo.update!()
-
-    insert_event(formation, "finalize", "succeeded", "Agent Formation finished successfully.")
-    {:ok, agent, formation}
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp fail(%Agent{} = agent, %FormationRun{} = formation, {:error, {_, _, message}}) do
@@ -223,6 +282,37 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
       message: message
     })
     |> Repo.insert!()
+  end
+
+  defp success_message_for_step("create_sprite"), do: "The first launch step is complete."
+  defp success_message_for_step("bootstrap_sprite"), do: "Your company setup is in place."
+  defp success_message_for_step("bootstrap_paperclip"), do: "Your company tools are connected."
+  defp success_message_for_step("create_company"), do: "Your company home is built."
+  defp success_message_for_step("create_hermes"), do: "Your company assistant is ready."
+  defp success_message_for_step("create_checkpoint"), do: "Your first restore point is saved."
+  defp success_message_for_step(_step), do: "This launch step is complete."
+
+  defp require_active_runtime("active"), do: :ok
+  defp require_active_runtime(state), do: {:error, {:runtime_not_ready, state}}
+
+  defp runtime_not_ready_message("paused"),
+    do: "Your company setup finished, but the service is still paused."
+
+  defp runtime_not_ready_message(_state),
+    do: "Your company setup finished, but the service did not report ready yet."
+
+  defp handle_runtime_not_ready(
+         %Oban.Job{attempt: attempt, max_attempts: max_attempts},
+         _agent,
+         _formation,
+         state
+       )
+       when attempt < max_attempts do
+    {:error, {:external, :sprite, runtime_not_ready_message(state)}}
+  end
+
+  defp handle_runtime_not_ready(%Oban.Job{}, agent, formation, state) do
+    fail(agent, formation, {:error, {:external, :sprite, runtime_not_ready_message(state)}})
   end
 
   defp now do

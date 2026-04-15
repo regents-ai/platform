@@ -58,6 +58,7 @@ defmodule PlatformPhx.AgentPlatform.FormationRun do
       "create_company",
       "create_hermes",
       "create_checkpoint",
+      "verify_runtime",
       "activate_subdomain",
       "finalize"
     ])

@@ -38,7 +38,7 @@ defmodule PlatformPhx.AgentPlatform.SpriteRuntimeClient do
           {:error, {:external, :sprite, "Sprites service lookup failed"}}
 
         {:error, error} ->
-          {:error, {:external, :sprite, Exception.message(error)}}
+          {:error, {:external, :sprite, format_error(error)}}
 
         error ->
           error
@@ -66,7 +66,7 @@ defmodule PlatformPhx.AgentPlatform.SpriteRuntimeClient do
         :ok
       else
         false -> {:error, {:external, :sprite, "Sprites #{action} failed"}}
-        {:error, error} -> {:error, {:external, :sprite, Exception.message(error)}}
+        {:error, error} -> {:error, {:external, :sprite, format_error(error)}}
         error -> error
       end
     end
@@ -88,5 +88,9 @@ defmodule PlatformPhx.AgentPlatform.SpriteRuntimeClient do
         value -> {:ok, value}
       end
     end
+
+    defp format_error(%{__exception__: true} = error), do: Exception.message(error)
+    defp format_error({_kind, message}) when is_binary(message), do: message
+    defp format_error(error), do: inspect(error)
   end
 end

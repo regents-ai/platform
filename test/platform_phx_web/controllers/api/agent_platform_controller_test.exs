@@ -1,9 +1,12 @@
 defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
   use PlatformPhxWeb.ConnCase, async: false
   use Oban.Testing, repo: PlatformPhx.Repo
+  import Ecto.Query
 
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform.BillingAccount
+  alias PlatformPhx.AgentPlatform.BillingLedgerEntry
+  alias PlatformPhx.AgentPlatform.FormationEvent
   alias PlatformPhx.AgentPlatform.WelcomeCreditGrant
   alias PlatformPhx.AgentPlatform.Workers.RunFormationWorker
   alias PlatformPhx.Basenames.Mint
@@ -21,6 +24,11 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     previous_credit_grant_result =
       Application.get_env(:platform_phx, :stripe_fake_credit_grant_result)
+
+    previous_runtime_transition_states =
+      Application.get_env(:platform_phx, :sprite_runtime_transition_states)
+
+    previous_runtime_topups = Application.get_env(:platform_phx, :runtime_topups, [])
 
     previous_api_key = System.get_env("OPENSEA_API_KEY")
     previous_stripe_secret_key = System.get_env("STRIPE_SECRET_KEY")
@@ -81,6 +89,14 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
         :stripe_fake_credit_grant_result,
         previous_credit_grant_result
       )
+
+      restore_app_env(
+        :platform_phx,
+        :sprite_runtime_transition_states,
+        previous_runtime_transition_states
+      )
+
+      Application.put_env(:platform_phx, :runtime_topups, previous_runtime_topups)
 
       restore_system_env("OPENSEA_API_KEY", previous_api_key)
       restore_system_env("STRIPE_SECRET_KEY", previous_stripe_secret_key)
@@ -145,7 +161,10 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
     })
 
-    conn = init_test_session(conn, %{current_human_id: human.id})
+    conn =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
 
     billing_response =
       conn
@@ -255,6 +274,190 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert resume_response["sprite"]["desired_runtime_state"] == "active"
   end
 
+  test "billing setup rejects a missing csrf token", %{conn: conn} do
+    human = insert_human!()
+
+    assert_raise Plug.CSRFProtection.InvalidCSRFTokenError, fn ->
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> post("/api/agent-platform/billing/setup/checkout", %{})
+    end
+  end
+
+  test "webhook rejects a stale Stripe signature", %{conn: _conn} do
+    raw_body = stripe_topup_event_body(123, 500, 321)
+    stale_timestamp = System.system_time(:second) - 601
+
+    webhook_conn =
+      Phoenix.ConnTest.build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header(
+        "stripe-signature",
+        stripe_signature(raw_body, "whsec_test", stale_timestamp)
+      )
+      |> post("/api/agent-platform/stripe/webhooks", raw_body)
+
+    assert json_response(webhook_conn, 401)["statusMessage"] =~ "outside the allowed window"
+  end
+
+  test "formation leaves the company offline when the sprite service is not ready", %{conn: conn} do
+    human = insert_human!()
+    insert_claimed_name!(human, "offline")
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "3"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    Application.put_env(
+      :platform_phx,
+      :sprite_runtime_client,
+      PlatformPhx.SpriteRuntimeClientPausedFake
+    )
+
+    conn =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
+
+    conn
+    |> post("/api/agent-platform/billing/setup/checkout", %{claimedLabel: "offline"})
+    |> json_response(200)
+
+    raw_body = stripe_setup_event_body(human.id)
+
+    webhook_conn =
+      Phoenix.ConnTest.build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("stripe-signature", stripe_signature(raw_body, "whsec_test"))
+      |> post("/api/agent-platform/stripe/webhooks", raw_body)
+
+    assert json_response(webhook_conn, 200)["ok"] == true
+
+    job = find_sync_billing_job!("evt_test_checkout")
+    assert :ok == perform_job(worker_module(job.worker), job.args)
+
+    conn
+    |> post("/api/agent-platform/formation/companies", %{claimedLabel: "offline"})
+    |> json_response(202)
+
+    agent = Repo.get_by!(PlatformPhx.AgentPlatform.Agent, slug: "offline")
+
+    assert :ok ==
+             RunFormationWorker.perform(%Oban.Job{
+               args: %{"agent_id" => agent.id},
+               attempt: 5,
+               max_attempts: 5
+             })
+
+    runtime_response =
+      conn
+      |> get("/api/agent-platform/agents/offline/runtime")
+      |> json_response(200)
+
+    assert runtime_response["agent"]["status"] == "failed"
+    assert runtime_response["agent"]["subdomain"]["active"] == false
+    assert runtime_response["formation"]["status"] == "failed"
+    assert runtime_response["formation"]["current_step"] == "verify_runtime"
+  end
+
+  test "formation retries runtime readiness before failing and keeps prior launch steps clean", %{
+    conn: conn
+  } do
+    human = insert_human!()
+    insert_claimed_name!(human, "warming")
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "3"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    Application.put_env(
+      :platform_phx,
+      :sprite_runtime_client,
+      PlatformPhx.SpriteRuntimeClientTransitionFake
+    )
+
+    Application.put_env(:platform_phx, :sprite_runtime_transition_states, ["paused", "active"])
+
+    conn =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
+
+    conn
+    |> post("/api/agent-platform/billing/setup/checkout", %{claimedLabel: "warming"})
+    |> json_response(200)
+
+    raw_body = stripe_setup_event_body(human.id)
+
+    webhook_conn =
+      Phoenix.ConnTest.build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("stripe-signature", stripe_signature(raw_body, "whsec_test"))
+      |> post("/api/agent-platform/stripe/webhooks", raw_body)
+
+    assert json_response(webhook_conn, 200)["ok"] == true
+
+    job = find_sync_billing_job!("evt_test_checkout")
+    assert :ok == perform_job(worker_module(job.worker), job.args)
+
+    response =
+      conn
+      |> post("/api/agent-platform/formation/companies", %{claimedLabel: "warming"})
+      |> json_response(202)
+
+    agent_id = response["agent"]["id"]
+
+    assert match?(
+             {:error, {:external, :sprite, _}},
+             RunFormationWorker.perform(%Oban.Job{
+               args: %{"agent_id" => agent_id},
+               attempt: 1,
+               max_attempts: 5
+             })
+           )
+
+    runtime_response =
+      conn
+      |> get("/api/agent-platform/agents/warming/runtime")
+      |> json_response(200)
+
+    assert runtime_response["agent"]["status"] == "forming"
+    assert runtime_response["agent"]["subdomain"]["active"] == false
+    assert runtime_response["formation"]["status"] == "running"
+    assert runtime_response["formation"]["current_step"] == "verify_runtime"
+
+    assert :ok ==
+             RunFormationWorker.perform(%Oban.Job{
+               args: %{"agent_id" => agent_id},
+               attempt: 2,
+               max_attempts: 5
+             })
+
+    retried_runtime_response =
+      conn
+      |> get("/api/agent-platform/agents/warming/runtime")
+      |> json_response(200)
+
+    assert retried_runtime_response["agent"]["status"] == "published"
+    assert retried_runtime_response["agent"]["subdomain"]["active"] == true
+    assert retried_runtime_response["formation"]["status"] == "succeeded"
+
+    assert Repo.aggregate(
+             from(event in FormationEvent,
+               where: event.formation_id == ^runtime_response["formation"]["id"],
+               where: event.step == "create_sprite" and event.status == "succeeded"
+             ),
+             :count,
+             :id
+           ) == 1
+  end
+
   test "webhook replay does not duplicate a top-up credit", %{conn: _conn} do
     human = insert_human!()
     billing_account = insert_billing_account!(human)
@@ -277,9 +480,58 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert account.runtime_credit_balance_usd_cents == 500
   end
 
+  test "top-up replay retries when the follow-up credit-grant job cannot be queued", %{
+    conn: _conn
+  } do
+    human = insert_human!()
+    billing_account = insert_billing_account!(human)
+
+    args = %{
+      "event_id" => "evt_test_topup",
+      "event_type" => "checkout.session.completed",
+      "customer_id" => billing_account.stripe_customer_id,
+      "subscription_id" => nil,
+      "subscription_status" => "complete",
+      "mode" => "payment",
+      "metadata" => %{
+        "checkout_kind" => "runtime_topup",
+        "human_user_id" => Integer.to_string(human.id),
+        "billing_account_id" => Integer.to_string(billing_account.id),
+        "amount_usd_cents" => "500"
+      }
+    }
+
+    %BillingLedgerEntry{}
+    |> BillingLedgerEntry.changeset(%{
+      billing_account_id: billing_account.id,
+      entry_type: "topup",
+      amount_usd_cents: 500,
+      description: "Runtime credit added through Stripe Checkout.",
+      source_ref: "stripe-event:evt_test_topup",
+      effective_at: DateTime.utc_now() |> DateTime.truncate(:second),
+      stripe_sync_status: "failed",
+      stripe_sync_attempt_count: 1
+    })
+    |> Repo.insert!()
+
+    Application.put_env(
+      :platform_phx,
+      :runtime_topups,
+      oban_module: PlatformPhx.ObanInsertErrorFake
+    )
+
+    assert {:error, :queue_unavailable} ==
+             perform_job(PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker, args)
+  end
+
   test "billing setup replay does not duplicate the welcome credit", %{conn: conn} do
     human = insert_human!()
-    conn = init_test_session(conn, %{current_human_id: human.id})
+
+    conn =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
+
     raw_body = stripe_setup_event_body(human.id)
 
     for _ <- 1..2 do
@@ -402,8 +654,8 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
   defp maybe_put_billing_account_id(metadata, id),
     do: Map.put(metadata, "billing_account_id", Integer.to_string(id))
 
-  defp stripe_signature(raw_body, secret) do
-    timestamp = Integer.to_string(System.system_time(:second))
+  defp stripe_signature(raw_body, secret, timestamp \\ System.system_time(:second)) do
+    timestamp = Integer.to_string(timestamp)
 
     signed =
       :crypto.mac(:hmac, :sha256, secret, "#{timestamp}.#{raw_body}")
@@ -429,4 +681,12 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
   defp restore_system_env(key, nil), do: System.delete_env(key)
   defp restore_system_env(key, value), do: System.put_env(key, value)
+
+  defp put_csrf_token(conn) do
+    token = Plug.CSRFProtection.get_csrf_token()
+
+    conn
+    |> put_session("_csrf_token", Plug.CSRFProtection.dump_state())
+    |> put_req_header("x-csrf-token", token)
+  end
 end
