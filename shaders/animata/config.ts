@@ -22,8 +22,7 @@ export const TOKEN_CARD_WIDTH = 1536;
 export const TOKEN_CARD_HEIGHT = 2048;
 export const TOKEN_CARD_VERSION_LABEL = "v1";
 export const TOKEN_CARD_IMAGE_PATH_PREFIX = "/images/animata/cards";
-export const TOKEN_CARD_PAGE_PATH_PREFIX = "/cards/regents-club";
-export const TOKEN_CARD_ANIMATION_PATH_PREFIX = "/images/animata/cards";
+export const TOKEN_CARD_ANIMATION_PATH_PREFIX = "/cards/regents-club";
 
 export const AVATAR_ALLOCATIONS: readonly AnimataFamilyAllocation[] = [
   { shaderId: "radiant2", count: 173, usage: "avatar" },

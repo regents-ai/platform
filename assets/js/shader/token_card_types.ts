@@ -8,6 +8,5 @@ export interface TokenCardManifestEntry {
   defineValues: ShaderDefineValues;
   versionLabel: string;
   imagePath: string;
-  pagePath: string;
   animationPath: string;
 }

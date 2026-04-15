@@ -15,7 +15,6 @@ import {
   TOKEN_CARD_ANIMATION_PATH_PREFIX,
   TOKEN_CARD_HEIGHT,
   TOKEN_CARD_IMAGE_PATH_PREFIX,
-  TOKEN_CARD_PAGE_PATH_PREFIX,
   TOKEN_CARD_VERSION_LABEL,
   TOKEN_CARD_WIDTH,
 } from "./config.ts";
@@ -72,9 +71,6 @@ async function main() {
       return;
     case "build-card-manifest":
       await runBuildCardManifest(rest);
-      return;
-    case "publish-loop-videos":
-      await runPublishLoopVideos(rest);
       return;
     case "render-card-images":
       await runRenderCardImages(rest);
@@ -301,8 +297,6 @@ async function runBuildCardManifest(args: string[]) {
   const manifest = buildTokenCardManifest(plan, {
     imagePathPrefix:
       resolveFlag(args, "--image-path-prefix") ?? TOKEN_CARD_IMAGE_PATH_PREFIX,
-    pagePathPrefix:
-      resolveFlag(args, "--page-path-prefix") ?? TOKEN_CARD_PAGE_PATH_PREFIX,
     animationPathPrefix:
       resolveFlag(args, "--animation-path-prefix") ?? TOKEN_CARD_ANIMATION_PATH_PREFIX,
     versionLabel: resolveFlag(args, "--version-label") ?? TOKEN_CARD_VERSION_LABEL,
@@ -310,59 +304,6 @@ async function runBuildCardManifest(args: string[]) {
 
   await writeJsonFile(outPath, manifest);
   writeJson({ ok: true, command: "build-card-manifest", outPath, items: manifest.items.length });
-}
-
-async function runPublishLoopVideos(args: string[]) {
-  const tokenCardManifest = await loadTokenCardManifest(resolveFlag(args, "--card-manifest"));
-  const renderManifest = await loadRenderManifest(resolveFlag(args, "--render-manifest"));
-  const staticRoot = resolveFlag(args, "--static-root") ?? path.resolve(process.cwd(), "priv/static");
-  const start = parseOptionalPositiveInteger(resolveFlag(args, "--start"), "--start");
-  const end = parseOptionalPositiveInteger(resolveFlag(args, "--end"), "--end");
-  const requestedTokenIds = parseTokenIdFilter(resolveFlag(args, "--token-ids"));
-  const skipExisting = hasFlag(args, "--skip-existing");
-
-  if (start !== null && end !== null && end < start) {
-    throw new Error("--end must be greater than or equal to --start.");
-  }
-
-  const renderRecordByTokenId = new Map(renderManifest.items.map((item) => [item.tokenId, item]));
-  const selectedEntries = tokenCardManifest.items.filter((entry) => {
-    if (requestedTokenIds && !requestedTokenIds.has(entry.tokenId)) return false;
-    if (start !== null && entry.tokenId < start) return false;
-    if (end !== null && entry.tokenId > end) return false;
-    return true;
-  });
-
-  let published = 0;
-  let skipped = 0;
-
-  for (const [index, entry] of selectedEntries.entries()) {
-    writeCardProgress(index + 1, selectedEntries.length, entry);
-    const renderRecord = renderRecordByTokenId.get(entry.tokenId);
-
-    if (!renderRecord) {
-      throw new Error(`Missing render record for token ${entry.tokenId}.`);
-    }
-
-    const outPath = path.join(staticRoot, entry.animationPath.replace(/^\/+/, ""));
-    await fs.mkdir(path.dirname(outPath), { recursive: true });
-
-    if (skipExisting && await fileExists(outPath)) {
-      skipped += 1;
-      continue;
-    }
-
-    await fs.copyFile(renderRecord.videoPath, outPath);
-    published += 1;
-  }
-
-  writeJson({
-    ok: true,
-    command: "publish-loop-videos",
-    staticRoot,
-    published,
-    skipped,
-  });
 }
 
 async function runRenderCardImages(args: string[]) {
@@ -629,7 +570,6 @@ function usageText() {
     "node --experimental-strip-types shaders/animata/animata.ts render-all-families [--plan ./shaders/animata/out/plan.json] [--out-dir ./shaders/animata/out/media] [--families radiant2,cubic] [--limit-per-family 1] [--workers 4] [--skip-existing]",
     "node --experimental-strip-types shaders/animata/animata.ts render-range --start 1 --end 1998 [--plan ./shaders/animata/out/plan.json] [--out-dir ./shaders/animata/out/media] [--workers 4] [--skip-existing]",
     "node --experimental-strip-types shaders/animata/animata.ts build-card-manifest [--plan ./shaders/animata/out/plan.json] [--out ./priv/token_cards/token-card-manifest.json]",
-    "node --experimental-strip-types shaders/animata/animata.ts publish-loop-videos --render-manifest ./shaders/animata/out/render-manifest.json [--card-manifest ./priv/token_cards/token-card-manifest.json] [--static-root ./priv/static] [--token-ids 1,2,3] [--skip-existing]",
     "node --experimental-strip-types shaders/animata/animata.ts render-card-images [--card-manifest ./priv/token_cards/token-card-manifest.json] [--static-root ./priv/token_cards] [--start 1] [--end 10] [--token-ids 8,70,1123] [--workers 4] [--skip-existing]",
     "node --experimental-strip-types shaders/animata/animata.ts analyze-card-images [--cards-dir ./priv/token_cards/images/animata/cards] [--out ./shaders/animata/out/card-analysis.json]",
     "node --experimental-strip-types shaders/animata/animata.ts rerender-card-outliers [--analysis ./shaders/animata/out/card-analysis.json] [--threshold 100000] [--workers 4]",

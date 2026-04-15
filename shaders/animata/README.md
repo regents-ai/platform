@@ -5,7 +5,7 @@ This folder contains the project-specific pipeline for rebuilding the `regents-c
 What it does:
 - plans all 1,998 editions with deterministic shader families and unique parameter sets
 - renders looping MP4 files plus PNG poster frames
-- builds a fixed token card manifest for the hosted Regents card pages and motion-file paths
+- builds a fixed token card manifest for the hosted OpenSea detail pages
 - renders portrait token card PNGs for OpenSea grid cards
 - builds the OpenSea bulk upload package (`Media/` plus `metadata-file.csv`)
 - builds per-token metadata JSON files that point to the hosted card route
@@ -24,7 +24,6 @@ Defaults locked for this collection:
 - token card output is `1536x2048` and serves:
   - `image` from `/images/animata/cards/<token>.png`
   - `animation_url` from `/cards/regents-club/<token>`
-  - downloadable motion files from `/images/animata/cards/<token>.mp4`
 
 ## Commands
 
@@ -87,16 +86,6 @@ node --experimental-strip-types shaders/animata/animata.ts build-card-manifest \
   --out ./priv/token_cards/token-card-manifest.json
 ```
 
-Publish the rendered MP4 files into the static card path that the hosted page uses:
-
-```bash
-node --experimental-strip-types shaders/animata/animata.ts publish-loop-videos \
-  --render-manifest ./shaders/animata/out/render-manifest.json \
-  --card-manifest ./priv/token_cards/token-card-manifest.json \
-  --static-root ./priv/static \
-  --skip-existing
-```
-
 Render portrait token card PNGs from that manifest:
 
 ```bash
@@ -157,7 +146,6 @@ node --experimental-strip-types shaders/animata/animata.ts upload-lighthouse \
 - The media and metadata upload steps expect `@lighthouse-web3/sdk` to be installed in the Node environment where you run them.
 - The renderer expects Chrome or Chromium to be available. It will first look at `REGENT_CHROME_EXECUTABLE`, then common macOS and Linux install paths.
 - The hosted OpenSea flow now uses the portrait token card PNG for `image` and the hosted Regents route for `animation_url`.
-- The hosted Regents card page uses the published MP4 file directly for saving and sharing the animated version.
-- The raw looping MP4 render is still available for archival or non-OpenSea use until it has been copied into `priv/static/images/animata/cards`.
+- The raw looping MP4 render is still available for archival or non-OpenSea use, but it is no longer the primary OpenSea detail surface.
 - `--workers` lets one command run a small internal worker pool instead of forcing you to split the work by hand.
 - `--skip-existing` reuses already-finished PNG and MP4 outputs when those files are already present in the target output path.
