@@ -23,6 +23,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     previous_responses = Application.get_env(:platform_phx, :opensea_fake_responses)
     previous_stripe_client = Application.get_env(:platform_phx, :stripe_billing_client)
     previous_sprite_runner = Application.get_env(:platform_phx, :agent_platform_sprite_runner)
+    previous_sprite_runtime_client = Application.get_env(:platform_phx, :sprite_runtime_client)
     previous_api_key = System.get_env("OPENSEA_API_KEY")
     previous_stripe_secret_key = System.get_env("STRIPE_SECRET_KEY")
     previous_pricing_plan_id = System.get_env("STRIPE_BILLING_PRICING_PLAN_ID")
@@ -37,6 +38,12 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       PlatformPhx.SpriteRunnerFake
     )
 
+    Application.put_env(
+      :platform_phx,
+      :sprite_runtime_client,
+      PlatformPhx.SpriteRuntimeClientFake
+    )
+
     System.put_env("OPENSEA_API_KEY", "test-key")
     System.put_env("STRIPE_SECRET_KEY", "sk_test_agent_formation")
     System.put_env("STRIPE_BILLING_PRICING_PLAN_ID", "pp_test_agent_formation")
@@ -47,6 +54,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       restore_app_env(:platform_phx, :opensea_fake_responses, previous_responses)
       restore_app_env(:platform_phx, :stripe_billing_client, previous_stripe_client)
       restore_app_env(:platform_phx, :agent_platform_sprite_runner, previous_sprite_runner)
+      restore_app_env(:platform_phx, :sprite_runtime_client, previous_sprite_runtime_client)
       restore_system_env("OPENSEA_API_KEY", previous_api_key)
       restore_system_env("STRIPE_SECRET_KEY", previous_stripe_secret_key)
       restore_system_env("STRIPE_BILLING_PRICING_PLAN_ID", previous_pricing_plan_id)
@@ -240,6 +248,11 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     view
     |> element("button", "Launch my company")
     |> render_click()
+
+    assert_patch(
+      view,
+      "/agent-formation?claimedLabel=#{launch_label}&launch=#{launch_label}&stage=setup"
+    )
 
     agent = AgentPlatform.get_owned_agent(human, launch_label)
     assert agent
