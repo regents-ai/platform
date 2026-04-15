@@ -43,18 +43,21 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
     end
   end
 
-  def create_credit_grant(%BillingAccount{} = account, amount_usd_cents, source_ref) do
+  def create_credit_grant(%BillingAccount{} = account, amount_usd_cents, source_ref, opts \\ []) do
     with {:ok, secret_key} <- fetch_secret_key() do
       client().create_credit_grant(%{
         secret_key: secret_key,
         customer_id: account.stripe_customer_id,
         amount_usd_cents: amount_usd_cents,
-        source_ref: source_ref
+        source_ref: source_ref,
+        idempotency_key: Keyword.get(opts, :idempotency_key)
       })
     end
   end
 
-  def report_runtime_usage(%SpriteUsageRecord{} = usage_record, customer_id)
+  def report_runtime_usage(usage_record, customer_id, opts \\ [])
+
+  def report_runtime_usage(%SpriteUsageRecord{} = usage_record, customer_id, opts)
       when is_binary(customer_id) do
     with {:ok, secret_key} <- fetch_secret_key(),
          {:ok, meter_event_name} <- fetch_runtime_meter_event_name() do
@@ -62,12 +65,14 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
         secret_key: secret_key,
         meter_event_name: meter_event_name,
         customer_id: customer_id,
-        usage_record: usage_record
+        usage_record: usage_record,
+        identifier: Keyword.get(opts, :identifier),
+        idempotency_key: Keyword.get(opts, :idempotency_key)
       })
     end
   end
 
-  def report_runtime_usage(_usage_record, _customer_id),
+  def report_runtime_usage(_usage_record, _customer_id, _opts),
     do: {:error, {:unavailable, "Stripe customer is missing"}}
 
   def parse_webhook_event(raw_body, headers) do
@@ -144,10 +149,14 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
           :crypto.mac(:hmac, :sha256, secret, "#{timestamp}.#{raw_body}")
           |> Base.encode16(case: :lower)
 
-        if Plug.Crypto.secure_compare(expected, signed_hash) do
-          :ok
+        with :ok <- validate_signature_timestamp(timestamp) do
+          if Plug.Crypto.secure_compare(expected, signed_hash) do
+            :ok
+          else
+            {:error, {:unauthorized, "Stripe signature could not be verified"}}
+          end
         else
-          {:error, {:unauthorized, "Stripe signature could not be verified"}}
+          {:error, _reason} = error -> error
         end
 
       :error ->
@@ -185,10 +194,22 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
       end)
 
     with timestamp when is_binary(timestamp) <- Map.get(parts, "t"),
+         {parsed_timestamp, ""} <- Integer.parse(timestamp),
          signed_hash when is_binary(signed_hash) <- Map.get(parts, "v1") do
-      {:ok, timestamp, signed_hash}
+      {:ok, parsed_timestamp, signed_hash}
     else
       _ -> :error
+    end
+  end
+
+  defp validate_signature_timestamp(timestamp) when is_integer(timestamp) do
+    now = System.system_time(:second)
+    tolerance = RuntimeConfig.stripe_webhook_tolerance_seconds()
+
+    if abs(now - timestamp) <= tolerance do
+      :ok
+    else
+      {:error, {:unauthorized, "Stripe signature timestamp is outside the allowed window"}}
     end
   end
 
@@ -289,9 +310,12 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
         {"metadata[source_ref]", params.source_ref}
       ]
 
+      headers = request_headers(params)
+
       case Req.post("https://api.stripe.com/v1/billing/credit_grants",
              form: form,
-             auth: {:bearer, params.secret_key}
+             auth: {:bearer, params.secret_key},
+             headers: headers
            ) do
         {:ok, %{status: status, body: %{"id" => id}}} when status in 200..299 ->
           {:ok, %{credit_grant_id: id}}
@@ -317,9 +341,19 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
         {"payload[agent_id]", Integer.to_string(usage_record.agent_id)}
       ]
 
+      form =
+        if is_binary(params.identifier) and params.identifier != "" do
+          [{"identifier", params.identifier} | form]
+        else
+          form
+        end
+
+      headers = request_headers(params)
+
       case Req.post("https://api.stripe.com/v1/billing/meter_events",
              form: form,
-             auth: {:bearer, params.secret_key}
+             auth: {:bearer, params.secret_key},
+             headers: headers
            ) do
         {:ok, %{status: status, body: %{"identifier" => identifier}}} when status in 200..299 ->
           {:ok, %{meter_event_id: identifier}}
@@ -332,6 +366,18 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
         {:error, error} ->
           {:error, {:external, :stripe, Exception.message(error)}}
       end
+    end
+
+    defp request_headers(params) do
+      []
+      |> maybe_put_header("idempotency-key", params[:idempotency_key])
+    end
+
+    defp maybe_put_header(headers, _key, nil), do: headers
+    defp maybe_put_header(headers, _key, ""), do: headers
+
+    defp maybe_put_header(headers, key, value) when is_binary(value) do
+      [{key, value} | headers]
     end
   end
 end

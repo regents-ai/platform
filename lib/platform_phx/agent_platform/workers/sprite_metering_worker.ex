@@ -9,8 +9,9 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
   alias PlatformPhx.AgentPlatform.SpriteRuntimeClient
   alias PlatformPhx.AgentPlatform.SpriteUsageRecord
-  alias PlatformPhx.AgentPlatform.StripeBilling
+  alias PlatformPhx.AgentPlatform.Workers.SyncSpriteUsageRecordWorker
   alias PlatformPhx.Repo
+  alias Oban
 
   @hourly_cost_usd_cents 25
   @runtime_meter_key "sprite_runtime_seconds"
@@ -97,7 +98,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
     else
       amount_usd_cents = runtime_charge_cents(usage_seconds)
 
-      {:ok, {usage_record, updated_account, depleted?}} =
+      {:ok, {_usage_record, _updated_account, depleted?}} =
         Repo.transaction(fn ->
           usage_record =
             %SpriteUsageRecord{}
@@ -109,7 +110,8 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
               amount_usd_cents: amount_usd_cents,
               window_started_at: window_started_at,
               window_ended_at: now,
-              status: "pending"
+              status: "pending",
+              stripe_sync_attempt_count: 0
             })
             |> Repo.insert!()
 
@@ -143,29 +145,12 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
             })
           )
 
+          %{"sprite_usage_record_id" => usage_record.id}
+          |> SyncSpriteUsageRecordWorker.new()
+          |> Oban.insert!()
+
           {usage_record, updated_account, next_balance <= 0 and not trial_active?(agent, now)}
         end)
-
-      case StripeBilling.report_runtime_usage(usage_record, updated_account.stripe_customer_id) do
-        {:ok, result} ->
-          usage_record
-          |> SpriteUsageRecord.changeset(%{
-            status: "reported",
-            stripe_meter_event_id: result.meter_event_id,
-            last_error_message: nil
-          })
-          |> Repo.update!()
-
-        {:error, {_, _, message}} ->
-          usage_record
-          |> SpriteUsageRecord.changeset(%{status: "failed", last_error_message: message})
-          |> Repo.update!()
-
-        {:error, {_, message}} ->
-          usage_record
-          |> SpriteUsageRecord.changeset(%{status: "failed", last_error_message: message})
-          |> Repo.update!()
-      end
 
       if depleted? do
         pause_for_balance(agent)

@@ -32,6 +32,12 @@ defmodule PlatformPhx.StripeLlmFakeClient do
   end
 
   def report_runtime_usage(_params) do
-    {:ok, %{meter_event_id: "mtr_test_usage"}}
+    case Application.get_env(:platform_phx, :stripe_fake_runtime_usage_result, :ok) do
+      :ok ->
+        {:ok, %{meter_event_id: "mtr_test_usage"}}
+
+      {:error, message} when is_binary(message) ->
+        {:error, {:external, :stripe, message}}
+    end
   end
 end

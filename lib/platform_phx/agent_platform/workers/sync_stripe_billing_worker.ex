@@ -9,10 +9,12 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
-  alias PlatformPhx.AgentPlatform.StripeBilling
+  alias PlatformPhx.AgentPlatform.RuntimeTopups
   alias PlatformPhx.AgentPlatform.WelcomeCreditGrant
   alias PlatformPhx.AgentPlatform.WelcomeCredits
+  alias PlatformPhx.AgentPlatform.Workers.SyncTopupCreditGrantWorker
   alias PlatformPhx.Repo
+  alias Oban
 
   @impl true
   def perform(%Oban.Job{args: args}) do
@@ -76,18 +78,24 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
           )
 
         if existing do
-          account
+          case RuntimeTopups.maybe_enqueue_pending_sync(Repo.preload(existing, :billing_account)) do
+            {:ok, _result} -> account
+            {:error, reason} -> Repo.rollback(reason)
+          end
         else
-          %BillingLedgerEntry{}
-          |> BillingLedgerEntry.changeset(%{
-            billing_account_id: account.id,
-            entry_type: "topup",
-            amount_usd_cents: amount,
-            description: "Runtime credit added through Stripe Checkout.",
-            source_ref: source_ref,
-            effective_at: DateTime.utc_now() |> DateTime.truncate(:second)
-          })
-          |> Repo.insert!()
+          ledger_entry =
+            %BillingLedgerEntry{}
+            |> BillingLedgerEntry.changeset(%{
+              billing_account_id: account.id,
+              entry_type: "topup",
+              amount_usd_cents: amount,
+              description: "Runtime credit added through Stripe Checkout.",
+              source_ref: source_ref,
+              effective_at: DateTime.utc_now() |> DateTime.truncate(:second),
+              stripe_sync_status: "pending",
+              stripe_sync_attempt_count: 0
+            })
+            |> Repo.insert!()
 
           updated =
             account
@@ -110,16 +118,16 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
             ]
           )
 
+          %{"billing_ledger_entry_id" => ledger_entry.id}
+          |> SyncTopupCreditGrantWorker.new()
+          |> Oban.insert!()
+
           updated
         end
       end)
       |> case do
-        {:ok, updated_account} ->
-          _ = StripeBilling.create_credit_grant(updated_account, amount, source_ref)
-          :ok
-
-        {:error, _reason} = error ->
-          error
+        {:ok, _updated_account} -> :ok
+        {:error, _reason} = error -> error
       end
     else
       false -> {:discard, "top-up amount missing"}

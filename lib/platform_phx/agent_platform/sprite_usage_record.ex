@@ -15,6 +15,8 @@ defmodule PlatformPhx.AgentPlatform.SpriteUsageRecord do
     field :window_ended_at, :utc_datetime
     field :status, :string, default: "pending"
     field :stripe_meter_event_id, :string
+    field :stripe_sync_attempt_count, :integer, default: 0
+    field :stripe_reported_at, :utc_datetime
     field :last_error_message, :string
 
     belongs_to :billing_account, PlatformPhx.AgentPlatform.BillingAccount
@@ -35,6 +37,8 @@ defmodule PlatformPhx.AgentPlatform.SpriteUsageRecord do
       :window_ended_at,
       :status,
       :stripe_meter_event_id,
+      :stripe_sync_attempt_count,
+      :stripe_reported_at,
       :last_error_message
     ])
     |> validate_required([
@@ -47,6 +51,7 @@ defmodule PlatformPhx.AgentPlatform.SpriteUsageRecord do
       :window_ended_at,
       :status
     ])
+    |> validate_number(:stripe_sync_attempt_count, greater_than_or_equal_to: 0)
     |> validate_inclusion(:status, ["pending", "reported", "failed"])
     |> unique_constraint([:agent_id, :window_started_at, :window_ended_at])
   end
