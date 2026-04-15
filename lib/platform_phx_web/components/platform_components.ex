@@ -20,6 +20,7 @@ defmodule PlatformPhxWeb.PlatformComponents do
       data-platform-card
       class={[
         "pp-entry-card",
+        Map.get(@card, :featured?) && "pp-entry-card-featured",
         @card.theme_class
       ]}
     >
@@ -70,11 +71,11 @@ defmodule PlatformPhxWeb.PlatformComponents do
               >
                 <img src={Map.get(@card, :logo_path)} alt="" />
               </span>
-              <span
-                :if={@variant != "home"}
-                class="pp-entry-link-label"
-              >
-                {@card.cta_label}
+              <span class="pp-entry-link-copy">
+                <span class="pp-entry-link-label">{@card.cta_label}</span>
+                <span :if={Map.get(@card, :cta_detail)} class="pp-entry-link-note">
+                  {Map.get(@card, :cta_detail)}
+                </span>
               </span>
               <span
                 class="pp-entry-link-arrow"

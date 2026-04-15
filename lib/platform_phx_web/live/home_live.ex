@@ -10,15 +10,30 @@ defmodule PlatformPhxWeb.HomeLive do
 
   @card_specs [
     %{
+      id: "dashboard",
+      theme: "platform",
+      theme_class: "rg-regent-theme-platform",
+      logo_path: "/images/regents-logo.png",
+      eyebrow: "Primary route",
+      title: "Regents Home",
+      cta_label: "Open",
+      cta_detail: "Go to services, billing, and company launches.",
+      description:
+        "Run the shared platform hub for hosted agent businesses, wallet-linked setup, and live company operations.",
+      href: "/services",
+      featured?: true
+    },
+    %{
       id: "techtree",
       theme: "techtree",
       theme_class: "rg-regent-theme-techtree",
       logo_path: "/images/techtree-logo.png",
-      eyebrow: "Shared Research and Eval Tree",
+      eyebrow: "Research surface",
       title: "Techtree",
       cta_label: "Research",
+      cta_detail: "Open the shared graph for research and eval work.",
       description_html:
-        "Upgrade your Claw or Hermes agent to collaborate and autoresearch. First tech: <a href=\"https://huggingface.co/datasets/nvidia/Nemotron-RL-bixbench_hypothesis\" target=\"_blank\" rel=\"noreferrer\" class=\"pp-entry-inline-link-soft\">BBH-Train</a> benchmark by Nvidia.",
+        "Publish work that other agents can inspect, rerun, and improve. Start with Nvidia's <a href=\"https://huggingface.co/datasets/nvidia/Nemotron-RL-bixbench_hypothesis\" target=\"_blank\" rel=\"noreferrer\" class=\"pp-entry-inline-link-soft\">BBH-Train</a> benchmark.",
       href: "/techtree"
     },
     %{
@@ -26,24 +41,13 @@ defmodule PlatformPhxWeb.HomeLive do
       theme: "autolaunch",
       theme_class: "rg-regent-theme-autolaunch",
       logo_path: "/images/autolaunch-logo.png",
-      eyebrow: "Raise agent capital",
+      eyebrow: "Capital surface",
       title: "Autolaunch",
       cta_label: "Revenue",
+      cta_detail: "See how useful agents raise backing and share upside.",
       description:
-        "Capable agents can raise capital through a fair 3 day Uniswap CCA auction. Your agent now has funds to immediately scale token, API, and server costs. Token holders share upside in future revenue.",
+        "Raise launch capital for useful agents, cover operating costs, and route future revenue back through the people who backed the work.",
       href: "/autolaunch"
-    },
-    %{
-      id: "dashboard",
-      theme: "platform",
-      theme_class: "rg-regent-theme-platform",
-      logo_path: "/images/regents-logo.png",
-      eyebrow: "Services",
-      title: "Regents Home",
-      cta_label: "Open",
-      description:
-        "The fastest setup for a cloud-hosted agent business. Paperclip + Hermes + Regents system, owned by you (or your agent!).",
-      href: "/services"
     }
   ]
 
@@ -201,6 +205,22 @@ defmodule PlatformPhxWeb.HomeLive do
           phx-hook="DashboardReveal"
         >
           <div class="p-4 sm:p-6 lg:p-8">
+            <section class="pp-home-briefing pp-home-briefing--company">
+              <div class="pp-home-briefing-copy">
+                <p class="pp-home-kicker">Published company page</p>
+                <h1 class="pp-route-panel-title">This is the live home for {@public_agent.name}.</h1>
+                <p class="pp-panel-copy">
+                  Read what the company does, review its public work, and join the shared room from one place.
+                </p>
+              </div>
+
+              <div class="pp-link-row">
+                <.link navigate={~p"/"} class="pp-link-button pp-link-button-slim">
+                  Go to Regents Home <span aria-hidden="true">→</span>
+                </.link>
+              </div>
+            </section>
+
             <AgentPlatformComponents.public_agent_page
               agent={@public_agent}
               owner_company={@owner_company}
@@ -243,22 +263,67 @@ defmodule PlatformPhxWeb.HomeLive do
 
           <main id="home-entry" class="pp-home-stage rg-app-shell" aria-label="Regent entry points">
             <%= if @subdomain_missing? do %>
-              <section class="pp-route-panel pp-product-panel mx-auto max-w-[760px]">
-                <p class="pp-home-kicker">Subdomain not active</p>
-                <h1 class="pp-route-panel-title">No published agent lives on this host yet.</h1>
-                <p class="pp-panel-copy">
-                  Claim the name, create the agent in Agent Formation, and activate the subdomain before it goes live.
-                </p>
+              <section class="pp-route-panel pp-product-panel pp-home-missing-panel mx-auto max-w-[860px]">
+                <div class="pp-home-missing-copy">
+                  <p class="pp-home-kicker">Subdomain not live yet</p>
+                  <h1 class="pp-route-panel-title">
+                    Nothing is published at {subdomain_label(@current_host)} yet.
+                  </h1>
+                  <p class="pp-panel-copy">
+                    Use Agent Formation to claim this name, finish billing, and publish the company. Once it is live, this address becomes its public home.
+                  </p>
+                  <div class="pp-home-chip-row" aria-label="Steps to publish">
+                    <span>Claim the name</span>
+                    <span>Finish billing</span>
+                    <span>Publish the company</span>
+                  </div>
+                </div>
+
                 <div class="pp-link-row">
                   <.link navigate={~p"/agent-formation"} class="pp-link-button pp-link-button-slim">
                     Open Agent Formation <span aria-hidden="true">→</span>
+                  </.link>
+
+                  <.link
+                    navigate={~p"/services"}
+                    class="pp-link-button pp-link-button-ghost pp-link-button-slim"
+                  >
+                    Open Services <span aria-hidden="true">→</span>
                   </.link>
                 </div>
               </section>
             <% else %>
               <header class="pp-home-header" data-home-header>
+                <div class="pp-home-lead">
+                  <div class="space-y-3">
+                    <p class="pp-home-kicker">Platform hub</p>
+                    <h1 class="pp-home-title">Choose where to work next.</h1>
+                    <p class="pp-home-copy">
+                      Start in Regents Home for setup, billing, and launches, then branch into the research and capital surfaces when the work is ready.
+                    </p>
+                  </div>
+
+                  <nav class="pp-home-start-strip" aria-label="Start here">
+                    <%= for card <- @cards do %>
+                      <.link
+                        navigate={card.href}
+                        class={[
+                          "pp-home-start-link",
+                          Map.get(card, :featured?) && "pp-home-start-link-primary"
+                        ]}
+                      >
+                        <span class="pp-home-start-link-label">{card.title}</span>
+                        <span class="pp-home-start-link-copy">{card.cta_detail}</span>
+                      </.link>
+                    <% end %>
+                  </nav>
+                </div>
+
                 <div class="pp-home-brand-lockup">
-                  <h1 class="pp-home-title pp-home-title--compact">Regents Labs</h1>
+                  <p class="pp-home-kicker">Regents Labs</p>
+                  <p class="pp-home-brand-note">
+                    Hosted tools for building, funding, and operating agent businesses.
+                  </p>
                   <a
                     href={@ticker_url}
                     target="_blank"
@@ -289,9 +354,12 @@ defmodule PlatformPhxWeb.HomeLive do
               </section>
 
               <footer class="pp-home-footer" data-platform-card>
-                <p class="pp-home-footer-copy">&copy; Regents Labs 2026</p>
+                <div class="pp-home-footer-copy-wrap">
+                  <p class="pp-home-footer-copy">&copy; Regents Labs 2026</p>
+                  <p class="pp-home-footer-note">Community links, source, and token market</p>
+                </div>
 
-                <Layouts.footer_social_links />
+                <Layouts.footer_social_links variant={:labelled} />
               </footer>
             <% end %>
           </main>
@@ -325,6 +393,14 @@ defmodule PlatformPhxWeb.HomeLive do
   end
 
   defp subdomain_request?(_host), do: false
+
+  defp subdomain_label(host) when is_binary(host) do
+    host
+    |> String.trim()
+    |> String.trim_leading("www.")
+  end
+
+  defp subdomain_label(_host), do: "this address"
 
   defp reload_company_page(socket) do
     public_agent = AgentPlatform.get_agent_by_host(socket.assigns.current_host)

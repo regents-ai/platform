@@ -169,6 +169,36 @@ defmodule PlatformPhxWeb.DashboardLive do
                 </p>
               </div>
 
+              <nav class="pp-dashboard-task-switch" aria-label="Platform tasks">
+                <.link
+                  navigate={~p"/services"}
+                  class={[
+                    "pp-dashboard-task-link",
+                    @active_nav == "services" && "pp-dashboard-task-link-current"
+                  ]}
+                >
+                  <span class="pp-dashboard-task-eyebrow">Shared services</span>
+                  <span class="pp-dashboard-task-title">Services</span>
+                  <span class="pp-dashboard-task-copy">
+                    Claim names, redeem passes, and prepare the wallet.
+                  </span>
+                </.link>
+
+                <.link
+                  navigate={~p"/agent-formation"}
+                  class={[
+                    "pp-dashboard-task-link",
+                    @active_nav == "agent-formation" && "pp-dashboard-task-link-current"
+                  ]}
+                >
+                  <span class="pp-dashboard-task-eyebrow">Launch flow</span>
+                  <span class="pp-dashboard-task-title">Agent Formation</span>
+                  <span class="pp-dashboard-task-copy">
+                    Move a claimed name through billing and into a live company.
+                  </span>
+                </.link>
+              </nav>
+
               <%= if @active_nav == "services" do %>
                 <.services_view
                   services={@services}
@@ -858,8 +888,7 @@ defmodule PlatformPhxWeb.DashboardLive do
             <div
               id="agent-formation-pass-gallery"
               phx-hook="FormationPassGallery"
-              data-token-card-budget="10"
-              data-token-card-chunk="2"
+              data-token-card-budget="12"
               class="mt-5 grid justify-items-center gap-x-5 gap-y-6 sm:grid-cols-2 xl:grid-cols-3"
             >
               <%= if @formation.collections.animata_pass == [] do %>
@@ -930,17 +959,20 @@ defmodule PlatformPhxWeb.DashboardLive do
                 <%= for formation <- @formation.active_formations do %>
                   <div class="rounded-2xl border border-[color:var(--border)] px-4 py-4">
                     <div class="flex flex-wrap items-center justify-between gap-3">
-                      <div>
+                      <div class="space-y-2">
                         <p class="font-display text-lg text-[color:var(--foreground)]">
-                          {formation.claimed_label || formation.current_step}
+                          {formation_heading(formation)}
                         </p>
                         <p class="mt-1 text-sm text-[color:var(--muted-foreground)]">
-                          Step: {formation.current_step}
+                          Now: {launch_step_label(formation)}
+                        </p>
+                        <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
+                          {launch_step_copy(formation)}
                         </p>
                       </div>
                       <div class="flex flex-wrap items-center gap-2">
                         <span class={status_badge_class(formation.status)}>
-                          {formation.status}
+                          {formation_status_label(formation.status)}
                         </span>
                         <button
                           type="button"
@@ -1000,14 +1032,14 @@ defmodule PlatformPhxWeb.DashboardLive do
                                       {formation_step_title(event.step)}
                                     </p>
                                     <p
-                                      :if={event.message}
+                                      :if={formation_event_copy(event)}
                                       class="text-sm leading-6 text-[color:var(--muted-foreground)]"
                                     >
-                                      {event.message}
+                                      {formation_event_copy(event)}
                                     </p>
                                   </div>
                                   <span class={formation_event_status_class(event.status)}>
-                                    {event.status}
+                                    {formation_event_status_label(event.status)}
                                   </span>
                                 </div>
                                 <p
@@ -1056,7 +1088,7 @@ defmodule PlatformPhxWeb.DashboardLive do
                         </p>
                       </div>
                       <span class={status_badge_class(company.runtime_status)}>
-                        {company.runtime_status}
+                        {company_status_label(company.runtime_status)}
                       </span>
                     </div>
                   </div>
@@ -1418,9 +1450,9 @@ defmodule PlatformPhxWeb.DashboardLive do
       active_nav: "agent-formation",
       console_id: "agent-formation-wallet-console",
       console_eyebrow: "Agent Formation",
-      console_title: "Complete Agent Formation",
+      console_title: "Move from a claimed name to a live company",
       console_copy:
-        "Review your wallet, choose one of your claimed names, and launch your Regent company when billing is ready."
+        "Review your wallet, choose one of your claimed names, and take it live once billing is ready."
     }
   end
 
@@ -1430,9 +1462,9 @@ defmodule PlatformPhxWeb.DashboardLive do
       active_nav: "services",
       console_id: "services-wallet-console",
       console_eyebrow: "Services",
-      console_title: "Manage names and redemptions",
+      console_title: "Handle the shared setup work first",
       console_copy:
-        "Use this page to review wallet holdings, claim names, and prepare the account for Agent Formation."
+        "Use this page to review wallet holdings, claim names, redeem passes, and prepare the account for Agent Formation."
     }
   end
 
@@ -1608,17 +1640,24 @@ defmodule PlatformPhxWeb.DashboardLive do
     Enum.any?(formation.active_formations, &(&1.status in ["queued", "running"]))
   end
 
+  defp formation_heading(%{claimed_label: claimed_label}) when is_binary(claimed_label) do
+    trimmed = String.trim(claimed_label)
+    if trimmed == "", do: "Current launch", else: trimmed
+  end
+
+  defp formation_heading(formation), do: launch_step_label(formation)
+
   defp formation_history_panel_id(%{id: id}) when not is_nil(id), do: "formation-history-#{id}"
   defp formation_history_panel_id(_formation), do: "formation-history"
 
-  defp formation_step_title("reserve_claim"), do: "Reserved the name"
-  defp formation_step_title("create_sprite"), do: "Started the sprite"
-  defp formation_step_title("bootstrap_sprite"), do: "Prepared the sprite"
-  defp formation_step_title("bootstrap_paperclip"), do: "Connected Paperclip"
+  defp formation_step_title("reserve_claim"), do: "Saved your company name"
+  defp formation_step_title("create_sprite"), do: "Started your company"
+  defp formation_step_title("bootstrap_sprite"), do: "Prepared your company"
+  defp formation_step_title("bootstrap_paperclip"), do: "Connected your company tools"
   defp formation_step_title("create_company"), do: "Built the company home"
-  defp formation_step_title("create_hermes"), do: "Prepared Hermes"
-  defp formation_step_title("create_checkpoint"), do: "Saved a checkpoint"
-  defp formation_step_title("activate_subdomain"), do: "Turned on the public site"
+  defp formation_step_title("create_hermes"), do: "Prepared your company assistant"
+  defp formation_step_title("create_checkpoint"), do: "Saved your first restore point"
+  defp formation_step_title("activate_subdomain"), do: "Opened your public site"
   defp formation_step_title("finalize"), do: "Finished launch"
 
   defp formation_step_title(step) when is_binary(step) do
@@ -1634,6 +1673,10 @@ defmodule PlatformPhxWeb.DashboardLive do
     "rounded-full border border-[color:color-mix(in_oklch,var(--positive)_55%,var(--border)_45%)] px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-[color:var(--foreground)]"
   end
 
+  defp formation_event_status_class("started") do
+    "rounded-full border border-[color:var(--border)] px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-[color:var(--foreground)]"
+  end
+
   defp formation_event_status_class("failed") do
     "rounded-full border border-[color:#a6574f] px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-[color:#a6574f]"
   end
@@ -1641,6 +1684,60 @@ defmodule PlatformPhxWeb.DashboardLive do
   defp formation_event_status_class(_status) do
     "rounded-full border border-[color:var(--border)] px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]"
   end
+
+  defp formation_event_status_label("started"), do: "In progress"
+  defp formation_event_status_label("succeeded"), do: "Done"
+  defp formation_event_status_label("failed"), do: "Needs attention"
+
+  defp formation_event_status_label(status) when is_binary(status) do
+    status
+    |> String.replace("_", " ")
+    |> String.split()
+    |> Enum.map_join(" ", &String.capitalize/1)
+  end
+
+  defp formation_event_status_label(_status), do: "Update"
+
+  defp formation_event_copy(%{status: "failed", message: message}) when is_binary(message),
+    do: message
+
+  defp formation_event_copy(%{step: "reserve_claim", status: "succeeded"}),
+    do: "Your company name is saved."
+
+  defp formation_event_copy(%{step: "create_sprite", status: "started"}),
+    do: "We're starting your company now."
+
+  defp formation_event_copy(%{step: "create_sprite", status: "succeeded"}),
+    do: "The first launch step is complete."
+
+  defp formation_event_copy(%{step: "bootstrap_sprite", status: "succeeded"}),
+    do: "Your company setup is in place."
+
+  defp formation_event_copy(%{step: "bootstrap_paperclip", status: "succeeded"}),
+    do: "Your company tools are connected."
+
+  defp formation_event_copy(%{step: "create_company", status: "succeeded"}),
+    do: "Your company home is built."
+
+  defp formation_event_copy(%{step: "create_hermes", status: "succeeded"}),
+    do: "Your company assistant is ready."
+
+  defp formation_event_copy(%{step: "create_checkpoint", status: "succeeded"}),
+    do: "Your first restore point is saved."
+
+  defp formation_event_copy(%{step: "activate_subdomain", status: "started"}),
+    do: "We're opening your public site."
+
+  defp formation_event_copy(%{step: "activate_subdomain", status: "succeeded"}),
+    do: "Your public site is live."
+
+  defp formation_event_copy(%{step: "finalize", status: "started"}),
+    do: "We're wrapping up your launch."
+
+  defp formation_event_copy(%{step: "finalize", status: "succeeded"}),
+    do: "Your company is ready."
+
+  defp formation_event_copy(_event), do: nil
 
   defp formation_event_time(nil), do: nil
 
@@ -1738,6 +1835,38 @@ defmodule PlatformPhxWeb.DashboardLive do
     end
   end
 
+  defp formation_status_label("queued"), do: "Waiting"
+  defp formation_status_label("running"), do: "Launching"
+  defp formation_status_label("succeeded"), do: "Ready"
+  defp formation_status_label("failed"), do: "Needs attention"
+  defp formation_status_label(nil), do: "Updating"
+
+  defp formation_status_label(status) when is_binary(status) do
+    status
+    |> String.replace("_", " ")
+    |> String.split()
+    |> Enum.map_join(" ", &String.capitalize/1)
+  end
+
+  defp formation_status_label(_status), do: "Updating"
+
+  defp company_status_label("queued"), do: "Waiting"
+  defp company_status_label("forming"), do: "Launching"
+  defp company_status_label("ready"), do: "Live"
+  defp company_status_label("published"), do: "Live"
+  defp company_status_label("paused"), do: "Paused"
+  defp company_status_label("failed"), do: "Needs attention"
+  defp company_status_label(nil), do: "Updating"
+
+  defp company_status_label(status) when is_binary(status) do
+    status
+    |> String.replace("_", " ")
+    |> String.split()
+    |> Enum.map_join(" ", &String.capitalize/1)
+  end
+
+  defp company_status_label(_status), do: "Updating"
+
   defp status_badge_class("active"),
     do:
       "rounded-full border border-[color:color-mix(in_oklch,var(--positive)_55%,var(--border)_45%)] px-3 py-1 text-xs uppercase tracking-[0.16em] text-[color:var(--foreground)]"
@@ -1749,6 +1878,10 @@ defmodule PlatformPhxWeb.DashboardLive do
   defp status_badge_class("ready"),
     do:
       "rounded-full border border-[color:color-mix(in_oklch,var(--positive)_55%,var(--border)_45%)] px-3 py-1 text-xs uppercase tracking-[0.16em] text-[color:var(--foreground)]"
+
+  defp status_badge_class("failed"),
+    do:
+      "rounded-full border border-[color:#a6574f] px-3 py-1 text-xs uppercase tracking-[0.16em] text-[color:#a6574f]"
 
   defp status_badge_class(_status),
     do:

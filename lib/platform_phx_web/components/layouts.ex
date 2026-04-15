@@ -23,7 +23,7 @@ defmodule PlatformPhxWeb.Layouts do
   def app(assigns) do
     assigns =
       assigns
-      |> assign(:nav_items, nav_items())
+      |> assign(:nav_sections, nav_sections())
       |> assign(:wallet_bridge_config, Jason.encode!(wallet_bridge_config()))
       |> assign(:wallet_ready?, wallet_ready?())
 
@@ -60,7 +60,7 @@ defmodule PlatformPhxWeb.Layouts do
               class="pp-sidebar-shell relative isolate z-10 rounded-[1.75rem] border border-[color:var(--border)] bg-[color:var(--sidebar)] p-5 shadow-[0_24px_70px_-48px_color-mix(in_oklch,var(--brand-ink)_55%,transparent)]"
             >
               <div class="pp-sidebar-brand-row">
-                <.link navigate={~p"/"} class="flex items-center gap-3 text-[color:var(--foreground)]">
+                <.link navigate={~p"/"} class="pp-sidebar-home-link">
                   <div class="flex h-12 w-12 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-[color:var(--card)]">
                     <img
                       src={~p"/images/regents-logo.png"}
@@ -68,20 +68,44 @@ defmodule PlatformPhxWeb.Layouts do
                       class="h-9 w-9 rounded-xl object-cover"
                     />
                   </div>
-                  <div>
+                  <div class="pp-sidebar-home-copy">
+                    <p class="pp-sidebar-home-eyebrow">Home</p>
                     <p class="font-display text-[1.7rem] font-black leading-none">Regents Home</p>
+                    <p class="pp-sidebar-home-note">Return to the platform hub</p>
                   </div>
                 </.link>
               </div>
 
-              <nav class="mt-8 space-y-2" aria-label="Primary">
-                <%= for item <- @nav_items do %>
-                  <%= if item.kind == :internal do %>
-                    <.nav_link current={@active_nav == item.key} href={item.href} label={item.label} />
-                  <% else %>
-                    <.external_nav_link href={item.href} label={item.label} />
+              <div class="pp-sidebar-nav-shell">
+                <nav class="pp-sidebar-nav" aria-label="Primary">
+                  <%= for section <- @nav_sections do %>
+                    <section
+                      class="pp-sidebar-nav-section"
+                      aria-labelledby={"sidebar-nav-section-#{section.id}"}
+                    >
+                      <div class="pp-sidebar-nav-heading">
+                        <p id={"sidebar-nav-section-#{section.id}"} class="pp-sidebar-nav-label">
+                          {section.label}
+                        </p>
+                        <p class="pp-sidebar-nav-copy">{section.copy}</p>
+                      </div>
+
+                      <div class="space-y-2">
+                        <%= for item <- section.items do %>
+                          <%= if item.kind == :internal do %>
+                            <.nav_link
+                              current={@active_nav == item.key}
+                              href={item.href}
+                              label={item.label}
+                            />
+                          <% else %>
+                            <.external_nav_link href={item.href} label={item.label} />
+                          <% end %>
+                        <% end %>
+                      </div>
+                    </section>
                   <% end %>
-                <% end %>
+                </nav>
 
                 <div id="sidebar-community" class="pp-sidebar-community" phx-hook="SidebarCommunity">
                   <button
@@ -112,7 +136,7 @@ defmodule PlatformPhxWeb.Layouts do
                     </div>
                   </div>
                 </div>
-              </nav>
+              </div>
             </aside>
           </div>
 
@@ -134,8 +158,9 @@ defmodule PlatformPhxWeb.Layouts do
                     />
                   </span>
                   <span class="pp-mobile-home-copy">
-                    <span class="pp-mobile-home-eyebrow">{chrome_eyebrow(@active_nav)}</span>
+                    <span class="pp-mobile-home-eyebrow">Home</span>
                     <span class="pp-mobile-home-title">Regents Home</span>
+                    <span class="pp-mobile-home-note">Return to the platform hub</span>
                   </span>
                 </.link>
 
@@ -149,40 +174,66 @@ defmodule PlatformPhxWeb.Layouts do
                 <% end %>
               </div>
 
-              <nav class="pp-mobile-nav-rail" aria-label="Primary mobile navigation">
-                <%= for item <- @nav_items do %>
-                  <%= if item.kind == :internal do %>
-                    <.mobile_nav_link
-                      current={@active_nav == item.key}
-                      href={item.href}
-                      label={item.label}
-                    />
-                  <% else %>
-                    <.mobile_external_nav_link href={item.href} label={item.label} />
-                  <% end %>
+              <div class="pp-mobile-nav-sections">
+                <%= for section <- @nav_sections do %>
+                  <section
+                    class="pp-mobile-nav-section"
+                    aria-labelledby={"mobile-nav-section-#{section.id}"}
+                  >
+                    <div class="pp-mobile-nav-section-head">
+                      <p id={"mobile-nav-section-#{section.id}"} class="pp-mobile-nav-section-label">
+                        {section.label}
+                      </p>
+                      <p class="pp-mobile-nav-section-copy">{section.copy}</p>
+                    </div>
+
+                    <nav
+                      class="pp-mobile-nav-rail"
+                      aria-label={"#{section.label} mobile navigation"}
+                    >
+                      <%= for item <- section.items do %>
+                        <%= if item.kind == :internal do %>
+                          <.mobile_nav_link
+                            current={@active_nav == item.key}
+                            href={item.href}
+                            label={item.label}
+                          />
+                        <% else %>
+                          <.mobile_external_nav_link href={item.href} label={item.label} />
+                        <% end %>
+                      <% end %>
+                    </nav>
+                  </section>
                 <% end %>
-              </nav>
+              </div>
             </div>
 
             <header
               data-background-suppress
-              class="flex flex-wrap items-center justify-between gap-4 border-b border-[color:var(--border)] px-4 py-4 sm:px-5"
+              class="pp-chrome-header"
             >
-              <div>
+              <div class="pp-chrome-head">
                 <p class="pp-chrome-eyebrow">
                   {chrome_eyebrow(@active_nav)}
                 </p>
                 <h1 class="pp-chrome-title">{chrome_title(@active_nav)}</h1>
+                <p class="pp-chrome-note">{chrome_note(@active_nav)}</p>
               </div>
 
-              <%= if @show_wallet_control do %>
-                <.layout_wallet_control
-                  current_human={@current_human}
-                  wallet_ready?={@wallet_ready?}
-                  config={@wallet_bridge_config}
-                  mode={:desktop}
-                />
-              <% end %>
+              <div class="pp-chrome-actions">
+                <.link navigate={~p"/"} class="pp-chrome-home-link">
+                  Home <span aria-hidden="true">→</span>
+                </.link>
+
+                <%= if @show_wallet_control do %>
+                  <.layout_wallet_control
+                    current_human={@current_human}
+                    wallet_ready?={@wallet_ready?}
+                    config={@wallet_bridge_config}
+                    mode={:desktop}
+                  />
+                <% end %>
+              </div>
             </header>
 
             <main
@@ -199,7 +250,7 @@ defmodule PlatformPhxWeb.Layouts do
               class="flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--border)] px-5 py-4 text-sm text-[color:var(--muted-foreground)]"
             >
               <p>&copy; Regents Labs 2026</p>
-              <.footer_social_links />
+              <.footer_social_links variant={:labelled} />
             </footer>
           </div>
         </div>
@@ -333,16 +384,20 @@ defmodule PlatformPhxWeb.Layouts do
     ~H"""
     <.link
       navigate={@href}
+      aria-current={if @current, do: "page", else: nil}
       class={[
-        "flex items-center justify-between rounded-2xl border px-4 py-3 text-sm transition",
+        "pp-sidebar-nav-link",
         @current &&
-          "border-[color:var(--ring)] bg-[color:var(--sidebar-accent)] text-[color:var(--foreground)] shadow-[0_16px_36px_-28px_color-mix(in_oklch,var(--brand-ink)_60%,transparent)]",
+          "pp-sidebar-nav-link-current",
         !@current &&
-          "border-[color:var(--border)] bg-[color:var(--card)] text-[color:var(--muted-foreground)] hover:border-[color:var(--ring)] hover:text-[color:var(--foreground)]"
+          "pp-sidebar-nav-link-idle"
       ]}
     >
-      <span>{@label}</span>
-      <span aria-hidden="true">→</span>
+      <span class="pp-sidebar-nav-link-copy">
+        <span class="pp-sidebar-nav-link-mark" aria-hidden="true"></span>
+        <span>{@label}</span>
+      </span>
+      <span aria-hidden="true" class="pp-sidebar-nav-link-arrow">→</span>
     </.link>
     """
   end
@@ -356,10 +411,17 @@ defmodule PlatformPhxWeb.Layouts do
       href={@href}
       target="_blank"
       rel="noreferrer"
-      class="flex items-center justify-between rounded-2xl border border-[color:var(--border)] bg-[color:var(--card)] px-4 py-3 text-sm text-[color:var(--muted-foreground)] transition hover:border-[color:var(--ring)] hover:text-[color:var(--foreground)]"
+      class="pp-sidebar-nav-link pp-sidebar-nav-link-idle"
     >
-      <span>{@label}</span>
-      <span aria-hidden="true">↗</span>
+      <span class="pp-sidebar-nav-link-copy">
+        <span class="pp-sidebar-nav-link-mark pp-sidebar-nav-link-mark-external" aria-hidden="true">
+        </span>
+        <span>{@label}</span>
+      </span>
+      <span class="pp-sidebar-nav-link-exit">
+        <span>External</span>
+        <span aria-hidden="true">↗</span>
+      </span>
     </a>
     """
   end
@@ -372,6 +434,7 @@ defmodule PlatformPhxWeb.Layouts do
     ~H"""
     <.link
       navigate={@href}
+      aria-current={if @current, do: "page", else: nil}
       class={[
         "pp-mobile-nav-link",
         @current && "pp-mobile-nav-link-current"
@@ -392,10 +455,13 @@ defmodule PlatformPhxWeb.Layouts do
       href={@href}
       target="_blank"
       rel="noreferrer"
-      class="pp-mobile-nav-link"
+      class="pp-mobile-nav-link pp-mobile-nav-link-external"
     >
       <span>{@label}</span>
-      <span aria-hidden="true">↗</span>
+      <span class="pp-mobile-nav-link-exit">
+        <span>External</span>
+        <span aria-hidden="true">↗</span>
+      </span>
     </a>
     """
   end
@@ -448,13 +514,18 @@ defmodule PlatformPhxWeb.Layouts do
     """
   end
 
+  attr :variant, :atom, default: :compact
+
   def footer_social_links(assigns) do
     ~H"""
     <div class="pp-home-footer-links" aria-label="Regents Labs footer social links">
       <button
         id="platform-footer-voxel-classic"
         type="button"
-        class="pp-home-footer-link pp-footer-voxel-toggle"
+        class={[
+          "pp-home-footer-link pp-footer-voxel-toggle",
+          @variant == :labelled && "pp-home-footer-link-labelled"
+        ]}
         phx-hook="FooterVoxel"
         data-color-mode-cycle
         data-background-suppress
@@ -463,92 +534,142 @@ defmodule PlatformPhxWeb.Layouts do
         title="Toggle light and dark mode"
       >
         <span class="pp-footer-voxel-scene" data-footer-voxel-scene aria-hidden="true"></span>
+        <span :if={@variant == :labelled} class="pp-home-footer-link-text">Theme</span>
       </button>
 
       <a
         href="https://x.com/regents_sh"
         target="_blank"
         rel="noreferrer"
-        class="pp-home-footer-link"
+        class={[
+          "pp-home-footer-link",
+          @variant == :labelled && "pp-home-footer-link-labelled"
+        ]}
         data-background-suppress
         aria-label="Regents Labs on X"
         title="Regents Labs on X"
       >
         <.x_mark class="pp-social-mark" />
+        <span :if={@variant == :labelled} class="pp-home-footer-link-text">X</span>
       </a>
 
       <a
         href="https://farcaster.xyz/regent"
         target="_blank"
         rel="noreferrer"
-        class="pp-home-footer-link"
+        class={[
+          "pp-home-footer-link",
+          @variant == :labelled && "pp-home-footer-link-labelled"
+        ]}
         data-background-suppress
         aria-label="Regent on Farcaster"
         title="Regent on Farcaster"
       >
         <img src={~p"/images/farcastericon.png"} alt="" class="pp-home-footer-icon-image" />
+        <span :if={@variant == :labelled} class="pp-home-footer-link-text">Farcaster</span>
       </a>
 
       <a
         href="https://discord.gg/regents"
         target="_blank"
         rel="noreferrer"
-        class="pp-home-footer-link"
+        class={[
+          "pp-home-footer-link",
+          @variant == :labelled && "pp-home-footer-link-labelled"
+        ]}
         data-background-suppress
         aria-label="Regents on Discord"
         title="Regents on Discord"
       >
         <.discord_mark class="pp-social-mark" />
+        <span :if={@variant == :labelled} class="pp-home-footer-link-text">Discord</span>
       </a>
 
       <a
         href="https://github.com/orgs/regent-ai/repositories"
         target="_blank"
         rel="noreferrer"
-        class="pp-home-footer-link"
+        class={[
+          "pp-home-footer-link",
+          @variant == :labelled && "pp-home-footer-link-labelled"
+        ]}
         data-background-suppress
         aria-label="Regents Labs GitHub"
         title="Regents Labs GitHub"
       >
         <.github_mark class="size-5" />
+        <span :if={@variant == :labelled} class="pp-home-footer-link-text">GitHub</span>
       </a>
 
       <a
         href="https://www.geckoterminal.com/base/pools/0x4ed3b69ac263ad86482f609b2c2105f64bcfd3a7e02e8e078ec9fec1f0324bed"
         target="_blank"
         rel="noreferrer"
-        class="pp-home-footer-link"
+        class={[
+          "pp-home-footer-link",
+          @variant == :labelled && "pp-home-footer-link-labelled"
+        ]}
         data-background-suppress
         aria-label="View $REGENT on GeckoTerminal"
         title="View $REGENT on GeckoTerminal"
       >
         <img src={~p"/images/geckoterminallogo.png"} alt="" class="pp-home-footer-icon-image" />
+        <span :if={@variant == :labelled} class="pp-home-footer-link-text">GeckoTerminal</span>
       </a>
     </div>
     """
   end
 
-  defp chrome_eyebrow("overview"), do: "Regents Overview"
-  defp chrome_eyebrow("services"), do: "Services and Docs"
-  defp chrome_eyebrow("agent-formation"), do: "Launch a Regent company"
-  defp chrome_eyebrow("bug-report"), do: "Public Operator Ledger"
-  defp chrome_eyebrow("techtree"), do: "Shared Research and Eval Tree"
-  defp chrome_eyebrow("autolaunch"), do: "Raise agent capital"
-  defp chrome_eyebrow("regent-cli"), do: "Local Operator Surface"
-  defp chrome_eyebrow("token-info"), do: "Platform revenue token"
-  defp chrome_eyebrow("shader"), do: "Shader Registry"
-  defp chrome_eyebrow(_), do: "Regents Labs"
+  defp chrome_eyebrow("overview"), do: "Start here"
+  defp chrome_eyebrow("services"), do: "Shared services"
+  defp chrome_eyebrow("agent-formation"), do: "Launch a company"
+  defp chrome_eyebrow("bug-report"), do: "Public operator ledger"
+  defp chrome_eyebrow("techtree"), do: "Research surface"
+  defp chrome_eyebrow("autolaunch"), do: "Capital surface"
+  defp chrome_eyebrow("regent-cli"), do: "Terminal rail"
+  defp chrome_eyebrow("token-info"), do: "Revenue token"
+  defp chrome_eyebrow("shader"), do: "Shader registry"
+  defp chrome_eyebrow(_), do: "Platform hub"
 
-  defp chrome_title("overview"), do: "Overview"
-  defp chrome_title("services"), do: "Services"
-  defp chrome_title("agent-formation"), do: "Agent Formation"
-  defp chrome_title("bug-report"), do: "Bug Report Ledger"
-  defp chrome_title("techtree"), do: "Techtree"
-  defp chrome_title("autolaunch"), do: "Autolaunch"
-  defp chrome_title("regent-cli"), do: "Regent CLI"
-  defp chrome_title("token-info"), do: "Agent economies"
-  defp chrome_title("shader"), do: "Shader"
+  defp chrome_title("overview"), do: "See how the platform fits together"
+  defp chrome_title("services"), do: "Manage names, redemptions, and wallet setup"
+  defp chrome_title("agent-formation"), do: "Move from a claimed name to a live company"
+  defp chrome_title("bug-report"), do: "Review public bugs and fixes"
+  defp chrome_title("techtree"), do: "Publish work other agents can inspect"
+  defp chrome_title("autolaunch"), do: "Raise backing for useful agent work"
+  defp chrome_title("regent-cli"), do: "Work with Regents from the command line"
+  defp chrome_title("token-info"), do: "Understand how REGENT flows through the platform"
+  defp chrome_title("shader"), do: "Browse shared shader work"
   defp chrome_title(_), do: "Regents Home"
+
+  defp chrome_note("overview"),
+    do: "Use this page to understand the product surfaces before you jump into a task."
+
+  defp chrome_note("services"),
+    do: "This is the shared setup area for names, passes, and wallet-linked access."
+
+  defp chrome_note("agent-formation"),
+    do: "Use this flow when you are ready to take a claimed name live."
+
+  defp chrome_note("bug-report"),
+    do: "Follow open issues, fixes, and operator history in one public ledger."
+
+  defp chrome_note("techtree"),
+    do: "Open the shared research graph to publish, inspect, and improve useful work."
+
+  defp chrome_note("autolaunch"),
+    do: "Review launch paths, auctions, and funding routes for agent businesses."
+
+  defp chrome_note("regent-cli"),
+    do: "Keep the terminal workflow close when you want to operate without the browser."
+
+  defp chrome_note("token-info"),
+    do: "Review how the platform token links product income, fees, and revshare."
+
+  defp chrome_note("shader"),
+    do: "Browse the shared shader catalog and open the examples that matter."
+
+  defp chrome_note(_), do: "Open the route you need, then get back to work quickly."
 
   defp wallet_bridge_config do
     %{
@@ -575,23 +696,55 @@ defmodule PlatformPhxWeb.Layouts do
     end
   end
 
-  defp nav_items do
+  defp nav_sections do
     [
-      %{kind: :internal, key: "overview", href: "/overview", label: "Overview"},
-      %{kind: :internal, key: "token-info", href: "/token-info", label: "Platform Token"},
-      %{kind: :internal, key: "services", href: "/services", label: "Services"},
       %{
-        kind: :internal,
-        key: "agent-formation",
-        href: "/agent-formation",
-        label: "Agent Formation"
+        id: "orientation",
+        label: "Get Oriented",
+        copy: "Start with the platform map and the shared token view.",
+        items: [
+          %{kind: :internal, key: "overview", href: "/overview", label: "Overview"},
+          %{kind: :internal, key: "token-info", href: "/token-info", label: "Platform Token"}
+        ]
       },
-      %{kind: :internal, key: "techtree", href: "/techtree", label: "Techtree"},
-      %{kind: :internal, key: "autolaunch", href: "/autolaunch", label: "Autolaunch"},
-      %{kind: :internal, key: "regent-cli", href: "/regent-cli", label: "Regent CLI"},
-      %{kind: :internal, key: "bug-report", href: "/bug-report", label: "Bug Report"},
-      %{kind: :external, href: "https://news.regents.sh", label: "News"},
-      %{kind: :external, href: "https://github.com/orgs/regent-ai/repositories", label: "GitHub"}
+      %{
+        id: "operate",
+        label: "Build and Operate",
+        copy: "Use the shared rails for services, launches, and terminal work.",
+        items: [
+          %{kind: :internal, key: "services", href: "/services", label: "Services"},
+          %{
+            kind: :internal,
+            key: "agent-formation",
+            href: "/agent-formation",
+            label: "Agent Formation"
+          },
+          %{kind: :internal, key: "regent-cli", href: "/regent-cli", label: "Regent CLI"},
+          %{kind: :internal, key: "bug-report", href: "/bug-report", label: "Bug Report"}
+        ]
+      },
+      %{
+        id: "product-surfaces",
+        label: "Product Surfaces",
+        copy: "Branch into the public research and capital routes.",
+        items: [
+          %{kind: :internal, key: "techtree", href: "/techtree", label: "Techtree"},
+          %{kind: :internal, key: "autolaunch", href: "/autolaunch", label: "Autolaunch"}
+        ]
+      },
+      %{
+        id: "outside",
+        label: "Outside Regents",
+        copy: "Open public updates and source material in a new tab.",
+        items: [
+          %{kind: :external, href: "https://news.regents.sh", label: "News"},
+          %{
+            kind: :external,
+            href: "https://github.com/orgs/regent-ai/repositories",
+            label: "GitHub"
+          }
+        ]
+      }
     ]
   end
 

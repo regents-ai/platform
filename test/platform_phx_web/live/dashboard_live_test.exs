@@ -23,6 +23,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     previous_responses = Application.get_env(:platform_phx, :opensea_fake_responses)
     previous_stripe_client = Application.get_env(:platform_phx, :stripe_billing_client)
     previous_sprite_runner = Application.get_env(:platform_phx, :agent_platform_sprite_runner)
+    previous_sprite_runtime_client = Application.get_env(:platform_phx, :sprite_runtime_client)
     previous_api_key = System.get_env("OPENSEA_API_KEY")
     previous_stripe_secret_key = System.get_env("STRIPE_SECRET_KEY")
     previous_pricing_plan_id = System.get_env("STRIPE_BILLING_PRICING_PLAN_ID")
@@ -37,6 +38,12 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       PlatformPhx.SpriteRunnerFake
     )
 
+    Application.put_env(
+      :platform_phx,
+      :sprite_runtime_client,
+      PlatformPhx.SpriteRuntimeClientFake
+    )
+
     System.put_env("OPENSEA_API_KEY", "test-key")
     System.put_env("STRIPE_SECRET_KEY", "sk_test_agent_formation")
     System.put_env("STRIPE_BILLING_PRICING_PLAN_ID", "pp_test_agent_formation")
@@ -47,6 +54,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       restore_app_env(:platform_phx, :opensea_fake_responses, previous_responses)
       restore_app_env(:platform_phx, :stripe_billing_client, previous_stripe_client)
       restore_app_env(:platform_phx, :agent_platform_sprite_runner, previous_sprite_runner)
+      restore_app_env(:platform_phx, :sprite_runtime_client, previous_sprite_runtime_client)
       restore_system_env("OPENSEA_API_KEY", previous_api_key)
       restore_system_env("STRIPE_SECRET_KEY", previous_stripe_secret_key)
       restore_system_env("STRIPE_BILLING_PRICING_PLAN_ID", previous_pricing_plan_id)
@@ -80,7 +88,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     assert html =~ "https://opensea.io/collection/regents-club"
     assert html =~ "https://opensea.io/item/base/0x2208aadbdecd47d3b4430b5b75a175f6d885d487/11"
     assert html =~ "data-token-card-layout=\"embedded\""
-    assert html =~ "data-token-card-budget=\"10\""
+    assert html =~ "data-token-card-budget=\"12\""
     assert html =~ "Passes found"
     assert html =~ "Continue"
     assert html =~ "Passes Owned"
@@ -148,7 +156,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     assert_patch(view, "/agent-formation?claimedLabel=tempo&stage=setup")
 
     html = render(view)
-    assert html =~ "Complete Agent Formation"
+    assert html =~ "Move from a claimed name to a live company"
 
     assert html =~
              "Pick one unused name, make sure billing is active, and start the company launch for your wallet."
@@ -212,9 +220,14 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     assert html =~ "Active formation"
     assert html =~ "Expand"
     assert html =~ "Past actions"
-    assert html =~ "Reserved the name"
-    assert html =~ "Completed create sprite."
+    assert html =~ "orbit"
+    assert html =~ "Now: Starting your company"
+    assert html =~ "Launching"
+    assert html =~ "Saved your company name"
+    assert html =~ "The first launch step is complete."
     assert html =~ "Scroll through every launch step for this company."
+    refute html =~ "Step: create_sprite"
+    refute html =~ "Completed create sprite."
   end
 
   test "billing setup keeps the selected name and launch redirects to the company site", %{
@@ -381,7 +394,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       formation,
       "reserve_claim",
       "succeeded",
-      "Reserved the claimed name for Agent Formation.",
+      "Your company name is saved.",
       DateTime.add(now, -30, :second)
     )
 
@@ -389,7 +402,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       formation,
       "create_sprite",
       "started",
-      "Agent Formation is preparing the runtime.",
+      "We're starting your company now.",
       DateTime.add(now, -10, :second)
     )
 
@@ -397,7 +410,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       formation,
       "create_sprite",
       "succeeded",
-      "Completed create sprite.",
+      "The first launch step is complete.",
       now
     )
 

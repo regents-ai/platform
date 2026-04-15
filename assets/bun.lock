@@ -7,7 +7,7 @@
       "dependencies": {
         "@privy-io/react-auth": "^3.12.0",
         "animejs": "^4.2.2",
-        "heerich": "^0.7.1",
+        "heerich": "^0.11.0",
         "phoenix": "file:../deps/phoenix",
         "phoenix_html": "file:../deps/phoenix_html",
         "phoenix_live_view": "file:../deps/phoenix_live_view",
@@ -1317,7 +1317,7 @@
 
     "he": ["he@1.2.0", "", { "bin": { "he": "bin/he" } }, "sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw=="],
 
-    "heerich": ["heerich@0.7.1", "", {}, "sha512-II+4YV/bey2ZptjRVredibwztWBRBN9SCsGlYU11L+rtymsvfGMmNqJx/tXEAkC1gXD1rKDttH8KbBwXb/gvDA=="],
+    "heerich": ["heerich@0.11.0", "", {}, "sha512-Ryf7JonmSkt1Bvn3BYgfCqNXdzslOBXwzTp03TzUGf77J2AX36uigsJQt8Bypfb8VbqIiDOqgWyc5zKbLfILaw=="],
 
     "help-me": ["help-me@5.0.0", "", {}, "sha512-7xgomUX6ADmcYzFik0HzAxh/73YlKR9bmFzf51CZwR+b6YtzU2m0u49hQCqV6SvlqIqsaxovfwdvbnsw3b/zpg=="],
 
