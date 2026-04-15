@@ -17,6 +17,12 @@ defmodule PlatformPhxWeb.Router do
   pipeline :session_api do
     plug :accepts, ["json"]
     plug :fetch_session
+    plug PlatformPhxWeb.RequireSessionCsrf
+  end
+
+  pipeline :agent_api do
+    plug :accepts, ["json"]
+    plug PlatformPhxWeb.Plugs.RequireAgentSiwa
   end
 
   scope "/", PlatformPhxWeb do
@@ -75,12 +81,28 @@ defmodule PlatformPhxWeb.Router do
     post "/agent-platform/stripe/webhooks", Api.StripeWebhookController, :create
   end
 
+  scope "/v1/agent/siwa", PlatformPhxWeb.Api do
+    pipe_through :api
+
+    post "/nonce", AgentSiwaController, :nonce
+    post "/verify", AgentSiwaController, :verify
+    post "/http-verify", AgentSiwaController, :http_verify
+  end
+
   scope "/api/auth/privy", PlatformPhxWeb.Api do
     pipe_through :session_api
 
+    get "/csrf", PrivySessionController, :csrf
     post "/session", PrivySessionController, :create
     get "/profile", PrivySessionController, :show
     delete "/session", PrivySessionController, :delete
+  end
+
+  scope "/v1/agent", PlatformPhxWeb do
+    pipe_through :agent_api
+
+    post "/bug-report", Api.ReportController, :agent_bug
+    post "/security-report", Api.ReportController, :agent_security
   end
 
   scope "/api/agent-platform", PlatformPhxWeb.Api do

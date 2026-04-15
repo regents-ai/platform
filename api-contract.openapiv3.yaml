@@ -313,6 +313,106 @@ paths:
                 $ref: '#/components/schemas/SecurityReportResponse'
         '400':
           $ref: '#/components/responses/StatusMessage400'
+  /v1/agent/bug-report:
+    post:
+      operationId: createAgentBugReport
+      security: [{ AgentSiwaHeaders: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BugReportRequest'
+      responses:
+        '200':
+          description: Bug report stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BugReportResponse'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /v1/agent/security-report:
+    post:
+      operationId: createAgentSecurityReport
+      security: [{ AgentSiwaHeaders: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SecurityReportRequest'
+      responses:
+        '200':
+          description: Security report stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecurityReportResponse'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /v1/agent/siwa/nonce:
+    post:
+      operationId: issueAgentSiwaNonce
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiwaNonceRequest'
+      responses:
+        '200':
+          description: Signed login nonce created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiwaNonceResponse'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+  /v1/agent/siwa/verify:
+    post:
+      operationId: verifyAgentSiwaSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiwaVerifyRequest'
+      responses:
+        '200':
+          description: Signed login verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiwaVerifyResponse'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /v1/agent/siwa/http-verify:
+    post:
+      operationId: verifyAgentSiwaHttpEnvelope
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiwaHttpVerifyRequest'
+      responses:
+        '200':
+          description: Signed request verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiwaHttpVerifyResponse'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
   /api/agent-platform/templates:
     get:
       operationId: agentPlatformTemplates
@@ -392,6 +492,7 @@ paths:
   /api/auth/privy/session:
     post:
       operationId: privySessionCreate
+      security: [{ PrivyBearerToken: [] }]
       requestBody:
         required: true
         content:
@@ -407,8 +508,13 @@ paths:
                 $ref: '#/components/schemas/CurrentHumanProfile'
         '400':
           $ref: '#/components/responses/StatusMessage400'
+        '403':
+          $ref: '#/components/responses/StatusMessage403'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
     delete:
       operationId: privySessionDelete
+      security: [{ PrivySessionCookie: [] }]
       responses:
         '200':
           description: Session cleared
@@ -419,9 +525,22 @@ paths:
                 required: [ok]
                 properties:
                   ok: {type: boolean}
+        '403':
+          $ref: '#/components/responses/StatusMessage403'
+  /api/auth/privy/csrf:
+    get:
+      operationId: privySessionCsrf
+      responses:
+        '200':
+          description: Request-protection token for session-backed JSON writes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivySessionCsrf'
   /api/auth/privy/profile:
     get:
       operationId: privySessionProfile
+      security: [{ PrivySessionCookie: [] }]
       responses:
         '200':
           description: Current signed-in human and foundry state
@@ -432,6 +551,7 @@ paths:
   /api/agent-platform/formation:
     get:
       operationId: agentPlatformFormation
+      security: [{ PrivySessionCookie: [] }]
       responses:
         '200':
           description: Agent Formation state for the current signed-in human
@@ -446,6 +566,7 @@ paths:
   /api/agent-platform/billing/setup/checkout:
     post:
       operationId: agentPlatformBillingSetupCheckout
+      security: [{ PrivySessionCookie: [] }]
       requestBody:
         required: false
         content:
@@ -467,11 +588,14 @@ paths:
                     $ref: '#/components/schemas/BillingAccount'
         '401':
           $ref: '#/components/responses/StatusMessage401'
+        '403':
+          $ref: '#/components/responses/StatusMessage403'
         '503':
           $ref: '#/components/responses/StatusMessage503'
   /api/agent-platform/billing/account:
     get:
       operationId: agentPlatformBillingAccount
+      security: [{ PrivySessionCookie: [] }]
       responses:
         '200':
           description: Current billing account for the signed-in human
@@ -489,6 +613,7 @@ paths:
   /api/agent-platform/billing/usage:
     get:
       operationId: agentPlatformBillingUsage
+      security: [{ PrivySessionCookie: [] }]
       responses:
         '200':
           description: Shared runtime usage summary for the signed-in human
@@ -506,6 +631,7 @@ paths:
   /api/agent-platform/formation/companies:
     post:
       operationId: agentPlatformFormationCreateCompany
+      security: [{ PrivySessionCookie: [] }]
       requestBody:
         required: true
         content:
@@ -539,6 +665,7 @@ paths:
   /api/agent-platform/agents/{slug}/runtime:
     get:
       operationId: agentPlatformFormationRuntime
+      security: [{ PrivySessionCookie: [] }]
       parameters:
         - name: slug
           in: path
@@ -559,6 +686,7 @@ paths:
   /api/agent-platform/billing/topups/checkout:
     post:
       operationId: agentPlatformBillingTopupCheckout
+      security: [{ PrivySessionCookie: [] }]
       requestBody:
         required: true
         content:
@@ -582,6 +710,8 @@ paths:
           $ref: '#/components/responses/StatusMessage400'
         '401':
           $ref: '#/components/responses/StatusMessage401'
+        '403':
+          $ref: '#/components/responses/StatusMessage403'
   /api/agent-platform/stripe/webhooks:
     post:
       operationId: agentPlatformStripeWebhook
@@ -602,6 +732,7 @@ paths:
   /api/agent-platform/sprites/{slug}/pause:
     post:
       operationId: agentPlatformPauseSprite
+      security: [{ PrivySessionCookie: [] }]
       parameters:
         - name: slug
           in: path
@@ -622,11 +753,14 @@ paths:
                     $ref: '#/components/schemas/SpriteRuntimeControl'
         '401':
           $ref: '#/components/responses/StatusMessage401'
+        '403':
+          $ref: '#/components/responses/StatusMessage403'
         '404':
           $ref: '#/components/responses/StatusMessage404'
   /api/agent-platform/sprites/{slug}/resume:
     post:
       operationId: agentPlatformResumeSprite
+      security: [{ PrivySessionCookie: [] }]
       parameters:
         - name: slug
           in: path
@@ -651,6 +785,8 @@ paths:
           $ref: '#/components/responses/StatusMessage401'
         '402':
           $ref: '#/components/responses/StatusMessage402'
+        '403':
+          $ref: '#/components/responses/StatusMessage403'
         '404':
           $ref: '#/components/responses/StatusMessage404'
   /api/opensea:
@@ -731,6 +867,20 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/StatusMessage'
+  securitySchemes:
+    PrivyBearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    PrivySessionCookie:
+      type: apiKey
+      in: cookie
+      name: _platform_phx_key
+    AgentSiwaHeaders:
+      type: apiKey
+      in: header
+      name: x-siwa-receipt
+      description: Placeholder for the signed SIWA header bundle used by authenticated agent requests.
   schemas:
     StatusMessage:
       type: object
@@ -1004,14 +1154,98 @@ components:
         uniswapUrl: {type: [string, 'null']}
     PrivySessionRequest:
       type: object
-      required: [privyUserId]
       properties:
-        privyUserId: {type: string}
-        walletAddress: {type: [string, 'null']}
-        walletAddresses:
-          type: array
-          items: {type: string}
-        displayName: {type: [string, 'null']}
+        display_name: {type: [string, 'null']}
+    SiwaNonceRequest:
+      type: object
+      required: [wallet_address, chain_id, audience]
+      properties:
+        wallet_address: {type: string}
+        chain_id: {type: integer}
+        audience: {type: string}
+    SiwaNonceResponse:
+      type: object
+      required: [ok, code, data]
+      properties:
+        ok: {type: boolean}
+        code: {type: string}
+        data:
+          type: object
+          required: [nonce, walletAddress, chainId, expiresAt]
+          properties:
+            nonce: {type: string}
+            walletAddress: {type: string}
+            chainId: {type: integer}
+            expiresAt: {type: string, format: date-time}
+    SiwaVerifyRequest:
+      type: object
+      required: [wallet_address, chain_id, nonce, message, signature]
+      properties:
+        wallet_address: {type: string}
+        chain_id: {type: integer}
+        nonce: {type: string}
+        message: {type: string}
+        signature: {type: string}
+        registry_address: {type: [string, 'null']}
+        token_id: {type: [string, 'null']}
+    SiwaVerifyResponse:
+      type: object
+      required: [ok, code, data]
+      properties:
+        ok: {type: boolean}
+        code: {type: string}
+        data:
+          type: object
+          required: [verified, walletAddress, chainId, nonce, keyId, signatureScheme, receipt, receiptExpiresAt]
+          properties:
+            verified: {type: boolean}
+            walletAddress: {type: string}
+            chainId: {type: integer}
+            nonce: {type: string}
+            keyId: {type: string}
+            signatureScheme: {type: string}
+            receipt: {type: string}
+            receiptExpiresAt: {type: string, format: date-time}
+    SiwaHttpVerifyRequest:
+      type: object
+      required: [method, path, headers]
+      properties:
+        method: {type: string}
+        path: {type: string}
+        headers:
+          type: object
+          additionalProperties: {type: string}
+        body_digest: {type: [string, 'null']}
+    SiwaHttpVerifyResponse:
+      type: object
+      required: [ok, code, data]
+      properties:
+        ok: {type: boolean}
+        code: {type: string}
+        data:
+          type: object
+          required: [verified, walletAddress, chainId, keyId, receiptExpiresAt, requiredHeaders, requiredCoveredComponents, coveredComponents]
+          properties:
+            verified: {type: boolean}
+            walletAddress: {type: string}
+            chainId: {type: integer}
+            keyId: {type: string}
+            receiptExpiresAt: {type: string, format: date-time}
+            requiredHeaders:
+              type: array
+              items: {type: string}
+            requiredCoveredComponents:
+              type: array
+              items: {type: string}
+            coveredComponents:
+              type: array
+              items: {type: string}
+    PrivySessionCsrf:
+      type: object
+      required: [ok, csrf_token]
+      properties:
+        ok: {type: boolean}
+        csrf_token: {type: string}
     ClaimedName:
       type: object
       required: [label, fqdn, claimed_at, in_use]

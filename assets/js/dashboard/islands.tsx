@@ -1,4 +1,4 @@
-import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
+import { PrivyProvider, useIdentityToken, usePrivy } from "@privy-io/react-auth";
 import { animate } from "animejs";
 import React from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -38,8 +38,8 @@ type WalletBridgeState = {
   privyId: string | null;
   wallet: PrivyEthereumWalletLike | null;
   walletClient: WalletClient | null;
-  walletAddresses: `0x${string}`[];
   displayName: string | null;
+  identityToken: string | null;
   login: (() => void) | null;
   logout: (() => void) | null;
 };
@@ -63,8 +63,8 @@ let walletBridgeState: WalletBridgeState = {
   privyId: null,
   wallet: null,
   walletClient: null,
-  walletAddresses: [],
   displayName: null,
+  identityToken: null,
   login: null,
   logout: null,
 };
@@ -97,6 +97,7 @@ function emitWalletBridgeState() {
 
 function DashboardPrivyBridge() {
   const { ready, authenticated, login, logout, user } = usePrivy();
+  const { identityToken } = useIdentityToken();
   const { account, chainId, privyId, wallet, walletClient } =
     usePrivyWalletClient();
 
@@ -109,14 +110,26 @@ function DashboardPrivyBridge() {
       privyId,
       wallet,
       walletClient,
-      walletAddresses: getWalletAddressesFromPrivyUser(user),
       displayName: getPrivyDisplayName(user),
+      identityToken,
       login,
       logout,
     };
 
     emitWalletBridgeState();
-  }, [account, authenticated, chainId, login, logout, privyId, ready, user, wallet, walletClient]);
+  }, [
+    account,
+    authenticated,
+    chainId,
+    identityToken,
+    login,
+    logout,
+    privyId,
+    ready,
+    user,
+    wallet,
+    walletClient,
+  ]);
 
   return null;
 }
@@ -316,7 +329,12 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
     const detail = (event as CustomEvent<BridgeEventDetail>).detail;
     renderWalletState(detail);
 
-    if (detail.authenticated && walletBridgeState.privyId && (pendingConnect || !serverSignedIn)) {
+    if (
+      detail.authenticated &&
+      walletBridgeState.account &&
+      walletBridgeState.identityToken &&
+      (pendingConnect || !serverSignedIn)
+    ) {
       pendingConnect = false;
 
       try {
@@ -435,7 +453,12 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
   disconnectButton?.addEventListener("click", onDisconnectClick);
   renderWalletState();
 
-  if (walletBridgeState.authenticated && walletBridgeState.privyId && !serverSignedIn) {
+  if (
+    walletBridgeState.authenticated &&
+    walletBridgeState.account &&
+    walletBridgeState.identityToken &&
+    !serverSignedIn
+  ) {
     void syncAndReload("Restoring your sign in...").catch((error) => {
       walletReloadRequested = false;
       showNotice(getErrorMessage(error, "Could not start your wallet session."), "error");
@@ -853,7 +876,7 @@ export function bindDashboardRedeem(el: HTMLElement): Cleanup {
 }
 
 async function syncPrivySession(endpoint: string) {
-  if (!walletBridgeState.privyId) {
+  if (!walletBridgeState.account || !walletBridgeState.identityToken) {
     throw new Error("Wallet session is not ready.");
   }
 
@@ -861,12 +884,10 @@ async function syncPrivySession(endpoint: string) {
     method: "POST",
     headers: {
       "content-type": "application/json",
+      authorization: `Bearer ${walletBridgeState.identityToken}`,
     },
     body: JSON.stringify({
-      privyUserId: walletBridgeState.privyId,
-      walletAddress: walletBridgeState.account,
-      walletAddresses: walletBridgeState.walletAddresses,
-      displayName: walletBridgeState.displayName,
+      display_name: walletBridgeState.displayName,
     }),
   });
 }
@@ -975,10 +996,18 @@ function requiredBigInt(value: string | null | undefined, message: string) {
 }
 
 async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
+  const csrfToken = getCsrfToken();
+  const method = (init?.method ?? "GET").toUpperCase();
+  const shouldSendCsrfToken =
+    csrfToken &&
+    ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
+    !hasHeader(init?.headers, "x-csrf-token");
+
   const response = await fetch(input, {
     ...init,
     headers: {
       accept: "application/json",
+      ...(shouldSendCsrfToken ? { "x-csrf-token": csrfToken } : {}),
       ...(init?.headers ?? {}),
     },
   });
@@ -1003,6 +1032,31 @@ async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
   }
 
   return (payload ?? {}) as T;
+}
+
+function getCsrfToken(): string | null {
+  const token = document
+    .querySelector("meta[name='csrf-token']")
+    ?.getAttribute("content")
+    ?.trim();
+
+  return token ? token : null;
+}
+
+function hasHeader(headers: HeadersInit | undefined, name: string): boolean {
+  if (!headers) return false;
+
+  const normalizedName = name.toLowerCase();
+
+  if (headers instanceof Headers) {
+    return headers.has(normalizedName);
+  }
+
+  if (Array.isArray(headers)) {
+    return headers.some(([headerName]) => headerName.toLowerCase() === normalizedName);
+  }
+
+  return Object.keys(headers).some((headerName) => headerName.toLowerCase() === normalizedName);
 }
 
 function tryParseJson(value: string): unknown {
