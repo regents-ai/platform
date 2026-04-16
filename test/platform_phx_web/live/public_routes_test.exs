@@ -232,6 +232,17 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     refute html =~ "https://solidity.sprites.dev"
   end
 
+  test "agent route renders the published agent page without wallet chrome", %{conn: conn} do
+    {:ok, _agent, html} = live(conn, "/agents/solidity")
+
+    assert html =~ "Solidity Regent"
+    assert html =~ "agent-site-preview-shell"
+    assert html =~ "Regent company"
+    assert html =~ "Company room"
+    refute html =~ "layout-wallet-control-desktop"
+    refute html =~ "layout-wallet-control-mobile"
+  end
+
   test "signed-in owner sees company controls on the public company page", %{conn: conn} do
     human = insert_human!("0xowner111111111111111111111111111111111111")
     _billing = insert_billing_account!(human, 700)

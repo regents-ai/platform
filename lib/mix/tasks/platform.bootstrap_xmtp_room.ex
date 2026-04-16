@@ -27,10 +27,10 @@ defmodule Mix.Tasks.Platform.BootstrapXmtpRoom do
         Mix.raise("Platform XMTP room already exists. Run with --reuse to keep using it.")
 
       {:error, :agent_private_key_missing} ->
-        Mix.raise("PLATFORM_XMTP_AGENT_PRIVATE_KEY is missing.")
+        Mix.raise("PLATFORM_AGENT_ROOM_PRIVATE_KEY is missing.")
 
       {:error, :agent_private_key_invalid} ->
-        Mix.raise("PLATFORM_XMTP_AGENT_PRIVATE_KEY is invalid.")
+        Mix.raise("PLATFORM_AGENT_ROOM_PRIVATE_KEY is invalid.")
 
       {:error, reason} ->
         Mix.raise("Platform XMTP bootstrap failed: #{inspect(reason)}")
