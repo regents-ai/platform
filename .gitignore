@@ -66,3 +66,9 @@ npm-debug.log
 assets/esbuild-meta.json
 assets/.DS_Store
 shaders/animata/out/
+
+# Draft planning docs and generated card variants do not belong in source control.
+docs/*_plan.md
+docs/*_notes.md
+docs/*_spec.md
+/priv/static/images/animata/cards/*-[0-9a-f]*.png
