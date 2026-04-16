@@ -4,11 +4,35 @@ import hermesAdapter from "hermes-paperclip-adapter";
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 
+function parseJsonEnv(name, fallback) {
+  const raw = process.env[name];
+
+  if (!raw) {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch (_error) {
+    return fallback;
+  }
+}
+
 const state = {
   adapterType: process.env.FORMATION_HERMES_ADAPTER_TYPE || "hermes_local",
   adapterRegistered: Boolean(hermesAdapter),
   deploymentMode: process.env.PAPERCLIP_DEPLOYMENT_MODE || "authenticated",
   port: Number(process.env.PAPERCLIP_HTTP_PORT || "3100"),
+  workspacePath: process.env.FORMATION_WORKSPACE_PATH || "/app/company",
+  workspaceSeedVersion:
+    process.env.FORMATION_WORKSPACE_SEED_VERSION || "company-workspace-v1",
+  hermesCommand: process.env.FORMATION_HERMES_COMMAND || "/app/bin/hermes-company",
+  promptTemplateVersion:
+    process.env.FORMATION_HERMES_PROMPT_TEMPLATE_VERSION || "company-workspace-prompt-v1",
+  promptTemplate:
+    parseJsonEnv("FORMATION_HERMES_PROMPT_TEMPLATE_JSON", null) ||
+    process.env.FORMATION_HERMES_PROMPT_TEMPLATE ||
+    "",
 };
 
 app.get("/health", (_req, res) => {
@@ -25,9 +49,14 @@ app.post("/internal/bootstrap-company", (req, res) => {
     adapter_type: state.adapterType,
     model: process.env.FORMATION_HERMES_MODEL || "glm-5.1",
     persist_session: process.env.FORMATION_HERMES_PERSIST_SESSION !== "false",
-    toolsets: JSON.parse(process.env.FORMATION_HERMES_TOOLSETS || "[]"),
-    runtime_plugins: JSON.parse(process.env.FORMATION_HERMES_RUNTIME_PLUGINS || "[]"),
-    shared_skills: JSON.parse(process.env.FORMATION_HERMES_SHARED_SKILLS || "[]"),
+    toolsets: parseJsonEnv("FORMATION_HERMES_TOOLSETS", []),
+    runtime_plugins: parseJsonEnv("FORMATION_HERMES_RUNTIME_PLUGINS", []),
+    shared_skills: parseJsonEnv("FORMATION_HERMES_SHARED_SKILLS", []),
+    workspace_path: state.workspacePath,
+    workspace_seed_version: state.workspaceSeedVersion,
+    hermes_command: state.hermesCommand,
+    prompt_template_version: state.promptTemplateVersion,
+    prompt_template: state.promptTemplate,
     request: req.body ?? {},
   });
 });

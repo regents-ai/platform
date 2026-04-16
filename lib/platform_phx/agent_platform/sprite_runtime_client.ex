@@ -46,13 +46,17 @@ defmodule PlatformPhx.AgentPlatform.SpriteRuntimeClient do
     end
 
     def stop_service(sprite_name, service_name) do
-      post_service_action(sprite_name, service_name, "stop")
-      {:ok, %{state: "paused"}}
+      case post_service_action(sprite_name, service_name, "stop") do
+        :ok -> {:ok, %{state: "paused"}}
+        {:error, _reason} = error -> error
+      end
     end
 
     def start_service(sprite_name, service_name) do
-      post_service_action(sprite_name, service_name, "start")
-      {:ok, %{state: "active"}}
+      case post_service_action(sprite_name, service_name, "start") do
+        :ok -> {:ok, %{state: "active"}}
+        {:error, _reason} = error -> error
+      end
     end
 
     defp post_service_action(sprite_name, service_name, action) do

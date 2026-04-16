@@ -7,6 +7,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
   alias PlatformPhx.AgentPlatform.FormationEvent
+  alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.AgentPlatform.WelcomeCreditGrant
   alias PlatformPhx.AgentPlatform.Workers.RunFormationWorker
   alias PlatformPhx.Basenames.Mint
@@ -29,6 +30,16 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       Application.get_env(:platform_phx, :sprite_runtime_transition_states)
 
     previous_runtime_topups = Application.get_env(:platform_phx, :runtime_topups, [])
+    previous_formation = Application.get_env(:platform_phx, :formation, [])
+    previous_runtime_test_pid = Application.get_env(:platform_phx, :sprite_runtime_test_pid)
+
+    previous_runtime_start_result =
+      Application.get_env(:platform_phx, :sprite_runtime_start_result)
+
+    previous_runtime_stop_result = Application.get_env(:platform_phx, :sprite_runtime_stop_result)
+
+    previous_runtime_service_state =
+      Application.get_env(:platform_phx, :sprite_runtime_service_state)
 
     previous_api_key = System.get_env("OPENSEA_API_KEY")
     previous_stripe_secret_key = System.get_env("STRIPE_SECRET_KEY")
@@ -97,6 +108,16 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       )
 
       Application.put_env(:platform_phx, :runtime_topups, previous_runtime_topups)
+      Application.put_env(:platform_phx, :formation, previous_formation)
+      restore_app_env(:platform_phx, :sprite_runtime_test_pid, previous_runtime_test_pid)
+      restore_app_env(:platform_phx, :sprite_runtime_start_result, previous_runtime_start_result)
+      restore_app_env(:platform_phx, :sprite_runtime_stop_result, previous_runtime_stop_result)
+
+      restore_app_env(
+        :platform_phx,
+        :sprite_runtime_service_state,
+        previous_runtime_service_state
+      )
 
       restore_system_env("OPENSEA_API_KEY", previous_api_key)
       restore_system_env("STRIPE_SECRET_KEY", previous_stripe_secret_key)
@@ -218,6 +239,18 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     [formation_job] = all_enqueued(worker: RunFormationWorker)
     assert :ok == perform_job(worker_module(formation_job.worker), formation_job.args)
 
+    formation =
+      Repo.one!(
+        from formation in FormationRun,
+          join: agent in assoc(formation, :agent),
+          where: agent.slug == "startline"
+      )
+
+    assert formation.metadata["workspace_path"] == "/app/company"
+    assert formation.metadata["workspace_seed_version"] == "company-workspace-v1"
+    assert formation.metadata["hermes_command"] == "/app/bin/hermes-company"
+    assert formation.metadata["prompt_template_version"] == "company-workspace-prompt-v1"
+
     runtime_response =
       conn
       |> get("/api/agent-platform/agents/startline/runtime")
@@ -272,6 +305,208 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       |> json_response(200)
 
     assert resume_response["sprite"]["desired_runtime_state"] == "active"
+  end
+
+  test "top-up checkout stores the Stripe customer for a fresh billing account", %{conn: conn} do
+    human = insert_human!()
+
+    response =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
+      |> post("/api/agent-platform/billing/topups/checkout", %{amountUsdCents: 400})
+      |> json_response(200)
+
+    assert response["checkout_url"] =~ "runtime-topup"
+    assert response["billing_account"]["customer_id"] == "cus_test_agent_formation"
+
+    billing_account = Repo.get_by!(BillingAccount, human_user_id: human.id)
+    assert billing_account.stripe_customer_id == "cus_test_agent_formation"
+  end
+
+  test "company creation rolls back the claimed name when the launch job cannot be queued", %{
+    conn: conn
+  } do
+    human = insert_human!()
+    insert_claimed_name!(human, "rollback")
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "3"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    insert_billing_account!(human)
+    Application.put_env(:platform_phx, :formation, oban_module: PlatformPhx.ObanInsertErrorFake)
+
+    response =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
+      |> post("/api/agent-platform/formation/companies", %{claimedLabel: "rollback"})
+      |> json_response(503)
+
+    assert response["statusMessage"] =~ "launch queue is unavailable"
+
+    refute Repo.exists?(
+             from agent in PlatformPhx.AgentPlatform.Agent, where: agent.slug == "rollback"
+           )
+
+    refute Repo.get_by!(Mint, label: "rollback").is_in_use
+  end
+
+  test "company creation rolls back the claimed name when the launch job already exists", %{
+    conn: conn
+  } do
+    human = insert_human!()
+    insert_claimed_name!(human, "duplicate")
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "3"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    insert_billing_account!(human)
+    Application.put_env(:platform_phx, :formation, oban_module: PlatformPhx.ObanInsertConflictFake)
+
+    response =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
+      |> post("/api/agent-platform/formation/companies", %{claimedLabel: "duplicate"})
+      |> json_response(409)
+
+    assert response["statusMessage"] =~ "already queued"
+
+    refute Repo.exists?(
+             from agent in PlatformPhx.AgentPlatform.Agent, where: agent.slug == "duplicate"
+           )
+
+    refute Repo.get_by!(Mint, label: "duplicate").is_in_use
+  end
+
+  test "pause and resume surface sprite runtime failures instead of reporting success", %{
+    conn: conn
+  } do
+    human = insert_human!()
+    insert_billing_account!(human)
+
+    agent =
+      insert_agent!(human, "runtime-failure", %{
+        desired_runtime_state: "active",
+        observed_runtime_state: "active",
+        runtime_status: "ready"
+      })
+
+    Application.put_env(
+      :platform_phx,
+      :sprite_runtime_client,
+      PlatformPhx.SpriteRuntimeClientRecordingFake
+    )
+
+    Application.put_env(
+      :platform_phx,
+      :sprite_runtime_stop_result,
+      {:error, {:external, :sprite, "stop failed"}}
+    )
+
+    pause_response =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
+      |> post("/api/agent-platform/sprites/#{agent.slug}/pause")
+      |> json_response(502)
+
+    assert pause_response["statusMessage"] =~ "stop failed"
+    assert Repo.get!(PlatformPhx.AgentPlatform.Agent, agent.id).runtime_status == "failed"
+
+    Application.put_env(:platform_phx, :sprite_runtime_stop_result, :ok)
+
+    Application.put_env(
+      :platform_phx,
+      :sprite_runtime_start_result,
+      {:error, {:external, :sprite, "start failed"}}
+    )
+
+    resume_response =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
+      |> post("/api/agent-platform/sprites/#{agent.slug}/resume")
+      |> json_response(502)
+
+    assert resume_response["statusMessage"] =~ "start failed"
+    assert Repo.get!(PlatformPhx.AgentPlatform.Agent, agent.id).runtime_status == "failed"
+  end
+
+  test "billing-driven runtime changes call sprites.dev promptly", %{conn: _conn} do
+    human = insert_human!()
+    billing_account = insert_billing_account!(human)
+
+    paused_agent =
+      insert_agent!(human, "paused-runtime", %{
+        desired_runtime_state: "active",
+        observed_runtime_state: "paused",
+        runtime_status: "paused_for_credits"
+      })
+
+    active_agent =
+      insert_agent!(human, "active-runtime", %{
+        desired_runtime_state: "active",
+        observed_runtime_state: "active",
+        runtime_status: "ready"
+      })
+
+    Application.put_env(
+      :platform_phx,
+      :sprite_runtime_client,
+      PlatformPhx.SpriteRuntimeClientRecordingFake
+    )
+
+    Application.put_env(:platform_phx, :sprite_runtime_test_pid, self())
+    Application.put_env(:platform_phx, :sprite_runtime_service_state, "paused")
+    Application.put_env(:platform_phx, :sprite_runtime_start_result, :ok)
+    Application.put_env(:platform_phx, :sprite_runtime_stop_result, :ok)
+
+    assert :ok ==
+             perform_job(PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker, %{
+               "event_id" => "evt_runtime_resume",
+               "event_type" => "checkout.session.completed",
+               "customer_id" => billing_account.stripe_customer_id,
+               "subscription_id" => billing_account.stripe_pricing_plan_subscription_id,
+               "subscription_status" => "complete",
+               "mode" => "payment",
+               "metadata" => %{
+                 "checkout_kind" => "runtime_topup",
+                 "human_user_id" => Integer.to_string(human.id),
+                 "billing_account_id" => Integer.to_string(billing_account.id),
+                 "amount_usd_cents" => "500"
+               }
+             })
+
+    paused_sprite_name = "#{paused_agent.slug}-sprite"
+    active_sprite_name = "#{active_agent.slug}-sprite"
+
+    assert_receive {:start_service, ^paused_sprite_name, "paperclip"}
+
+    assert :ok ==
+             perform_job(PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker, %{
+               "event_id" => "evt_runtime_pause",
+               "event_type" => "customer.subscription.paused",
+               "customer_id" => billing_account.stripe_customer_id,
+               "subscription_id" => billing_account.stripe_pricing_plan_subscription_id,
+               "subscription_status" => "paused",
+               "mode" => "subscription",
+               "metadata" => %{
+                 "human_user_id" => Integer.to_string(human.id)
+               }
+             })
+
+    assert_receive {:stop_service, ^paused_sprite_name, "paperclip"}
+    assert_receive {:stop_service, ^active_sprite_name, "paperclip"}
   end
 
   test "billing setup rejects a missing csrf token", %{conn: conn} do
@@ -591,6 +826,32 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     |> Repo.insert!()
   end
 
+  defp insert_agent!(human, slug, attrs) do
+    defaults = %{
+      owner_human_id: human.id,
+      template_key: "start",
+      name: "#{String.capitalize(slug)} Regent",
+      slug: slug,
+      claimed_label: slug,
+      basename_fqdn: "#{slug}.agent.base.eth",
+      ens_fqdn: "#{slug}.regent.eth",
+      status: "published",
+      public_summary: "Runtime control test company",
+      sprite_name: "#{slug}-sprite",
+      sprite_service_name: "paperclip",
+      stripe_llm_billing_status: "active",
+      stripe_customer_id: "cus_test_agent_formation",
+      stripe_pricing_plan_subscription_id: "sub_test_agent_formation",
+      desired_runtime_state: "active",
+      observed_runtime_state: "active",
+      runtime_status: "ready"
+    }
+
+    %PlatformPhx.AgentPlatform.Agent{}
+    |> PlatformPhx.AgentPlatform.Agent.changeset(Map.merge(defaults, attrs))
+    |> Repo.insert!()
+  end
+
   defp request_url(address, collection) do
     "https://api.opensea.io/api/v2/chain/base/account/#{address}/nfts?collection=#{collection}&limit=100"
   end
@@ -600,12 +861,14 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     |> BillingAccount.changeset(%{
       human_user_id: human.id,
       billing_status: "active",
-      stripe_customer_id: "cus_test_agent_formation",
-      stripe_pricing_plan_subscription_id: "sub_test_agent_formation",
+      stripe_customer_id: unique_external_id("cus_test_agent_formation"),
+      stripe_pricing_plan_subscription_id: unique_external_id("sub_test_agent_formation"),
       runtime_credit_balance_usd_cents: 0
     })
     |> Repo.insert!()
   end
+
+  defp unique_external_id(prefix), do: "#{prefix}_#{System.unique_integer([:positive])}"
 
   defp stripe_setup_event_body(human_user_id) do
     Jason.encode!(%{

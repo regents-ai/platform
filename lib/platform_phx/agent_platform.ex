@@ -378,18 +378,15 @@ defmodule PlatformPhx.AgentPlatform do
   end
 
   def effective_metering_status(%Agent{} = agent, billing_account \\ nil) do
-    balance =
-      case billing_account do
-        %BillingAccount{} = account -> account.runtime_credit_balance_usd_cents || 0
-        _ -> 0
-      end
-
     cond do
       is_struct(agent.sprite_free_until, DateTime) and
           DateTime.compare(agent.sprite_free_until, DateTime.utc_now()) == :gt ->
         "trialing"
 
-      balance > 0 ->
+      billing_allows_runtime?(billing_account) ->
+        "paid"
+
+      is_nil(billing_account) and agent.stripe_llm_billing_status == "active" ->
         "paid"
 
       true ->
@@ -418,8 +415,25 @@ defmodule PlatformPhx.AgentPlatform do
           runtime_credit_balance_usd_cents: 0
         })
         |> Repo.insert()
+        |> case do
+          {:ok, account} ->
+            {:ok, account}
+
+          {:error, %Ecto.Changeset{} = changeset} ->
+            if Keyword.has_key?(changeset.errors, :human_user_id) do
+              {:ok, get_billing_account(human)}
+            else
+              {:error, changeset}
+            end
+        end
     end
   end
+
+  def billing_allows_runtime?(%BillingAccount{} = account) do
+    account.billing_status == "active" or (account.runtime_credit_balance_usd_cents || 0) > 0
+  end
+
+  def billing_allows_runtime?(_account), do: false
 
   def billing_usage_payload(%BillingAccount{} = account, companies) do
     company_summaries =

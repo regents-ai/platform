@@ -10,6 +10,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   alias PlatformPhx.AgentPlatform.Connection
   alias PlatformPhx.AgentPlatform.FormationEvent
   alias PlatformPhx.AgentPlatform.FormationRun
+  alias PlatformPhx.AgentPlatform.RuntimeControl
   alias PlatformPhx.AgentPlatform.Service
   alias PlatformPhx.AgentPlatform.StripeBilling
   alias PlatformPhx.AgentPlatform.Subdomain
@@ -110,8 +111,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
          {:ok, mint} <- require_available_claimed_name(human, attrs),
          false <- slug_taken?(mint.label),
          {:ok, %{agent: agent, formation: formation}} <-
-           create_company_records(human, billing_account, mint, template),
-         {:ok, _job} <- enqueue_formation(agent.id) do
+           create_company_records(human, billing_account, mint, template) do
       reloaded = AgentPlatform.get_owned_agent(human, agent.slug)
 
       {:accepted,
@@ -185,12 +185,18 @@ defmodule PlatformPhx.AgentPlatform.Formation do
     with amount when is_integer(amount) and amount > 0 <-
            normalize_positive_integer(Map.get(attrs, "amountUsdCents")),
          {:ok, billing_account} <- AgentPlatform.ensure_billing_account(human),
-         {:ok, checkout} <- StripeBilling.create_topup_checkout_session(billing_account, amount) do
+         {:ok, checkout} <- StripeBilling.create_topup_checkout_session(billing_account, amount),
+         {:ok, updated_account} <-
+           billing_account
+           |> BillingAccount.changeset(%{
+             stripe_customer_id: checkout.customer_id || billing_account.stripe_customer_id
+           })
+           |> Repo.update() do
       {:ok,
        %{
          ok: true,
          checkout_url: checkout.url,
-         billing_account: AgentPlatform.billing_account_payload(billing_account)
+         billing_account: AgentPlatform.billing_account_payload(updated_account)
        }}
     else
       false -> {:error, {:bad_request, "Amount must be a positive integer"}}
@@ -202,10 +208,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
 
   def pause_sprite(%HumanUser{} = human, slug) when is_binary(slug) do
     with %Agent{} = agent <- AgentPlatform.get_owned_agent(human, slug),
-         {:ok, updated} <-
-           agent
-           |> Agent.changeset(%{desired_runtime_state: "paused", runtime_status: "paused"})
-           |> Repo.update() do
+         {:ok, updated} <- RuntimeControl.pause(agent, runtime_status: "paused") do
       {:ok, %{ok: true, sprite: sprite_runtime_control_payload(updated)}}
     else
       nil -> {:error, {:not_found, "Company not found"}}
@@ -218,10 +221,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   def resume_sprite(%HumanUser{} = human, slug) when is_binary(slug) do
     with %Agent{} = agent <- AgentPlatform.get_owned_agent(human, slug),
          {:ok, billing_account} <- require_active_or_funded_billing_account(human, agent),
-         {:ok, updated} <-
-           agent
-           |> Agent.changeset(%{desired_runtime_state: "active", runtime_status: "ready"})
-           |> Repo.update() do
+         {:ok, updated} <- RuntimeControl.resume(agent) do
       {:ok,
        %{
          ok: true,
@@ -321,7 +321,8 @@ defmodule PlatformPhx.AgentPlatform.Formation do
                status: "succeeded",
                message: "Your company name is saved."
              })
-             |> Repo.insert() do
+             |> Repo.insert(),
+           {:ok, _job} <- enqueue_formation(agent.id) do
         %{
           agent:
             Repo.preload(agent, [:subdomain, :services, :connections, :artifacts, :formation_run]),
@@ -331,16 +332,32 @@ defmodule PlatformPhx.AgentPlatform.Formation do
         {:error, changeset} when is_map(changeset) ->
           Repo.rollback({:bad_request, AgentPlatform.format_changeset(changeset)})
 
-        {:error, _reason} = error ->
-          Repo.rollback(error)
+        {:error, reason} ->
+          Repo.rollback(reason)
       end
     end)
+    |> case do
+      {:ok, result} -> {:ok, result}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   defp enqueue_formation(agent_id) do
-    %{"agent_id" => agent_id}
-    |> RunFormationWorker.new()
-    |> Oban.insert()
+    case %{"agent_id" => agent_id}
+         |> RunFormationWorker.new()
+         |> oban_module().insert() do
+      {:ok, %Oban.Job{conflict?: true}} ->
+        {:error, {:conflict, "The launch job is already queued for this company"}}
+
+      {:ok, job} ->
+        {:ok, job}
+
+      {:error, %Oban.Job{}} ->
+        {:error, {:conflict, "The launch job is already queued for this company"}}
+
+      {:error, _reason} ->
+        {:error, {:unavailable, "The launch queue is unavailable right now"}}
+    end
   end
 
   defp ensure_wallet_connected(%HumanUser{} = human) do
@@ -376,10 +393,9 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   defp require_active_or_funded_billing_account(%HumanUser{} = human, %Agent{} = agent) do
     case AgentPlatform.ensure_billing_account(human) do
       {:ok, %BillingAccount{} = billing_account} ->
-        if billing_account.billing_status == "active" or
+        if AgentPlatform.billing_allows_runtime?(billing_account) or
              (is_struct(agent.sprite_free_until, DateTime) and
-                DateTime.compare(agent.sprite_free_until, DateTime.utc_now()) == :gt) or
-             (billing_account.runtime_credit_balance_usd_cents || 0) > 0 do
+                DateTime.compare(agent.sprite_free_until, DateTime.utc_now()) == :gt) do
           {:ok, billing_account}
         else
           {:error, {:payment_required, "Add runtime credit before resuming this company"}}
@@ -561,6 +577,12 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   end
 
   defp normalize_positive_integer(_value), do: false
+
+  defp oban_module do
+    :platform_phx
+    |> Application.get_env(:formation, [])
+    |> Keyword.get(:oban_module, Oban)
+  end
 
   defp build_billing_setup_checkout_urls(attrs) do
     claimed_label =

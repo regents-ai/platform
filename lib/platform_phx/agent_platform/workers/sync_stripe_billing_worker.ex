@@ -9,6 +9,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
+  alias PlatformPhx.AgentPlatform.RuntimeControl
   alias PlatformPhx.AgentPlatform.RuntimeTopups
   alias PlatformPhx.AgentPlatform.WelcomeCreditGrant
   alias PlatformPhx.AgentPlatform.WelcomeCredits
@@ -39,18 +40,17 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
   defp sync_checkout_completed(args) do
     case args["metadata"]["checkout_kind"] do
       "billing_setup" ->
-        with {:ok, account} <- find_billing_account(args) do
-          updated_account =
-            account
-            |> BillingAccount.changeset(%{
-              stripe_customer_id: args["customer_id"] || account.stripe_customer_id,
-              stripe_pricing_plan_subscription_id:
-                args["subscription_id"] || account.stripe_pricing_plan_subscription_id,
-              billing_status: "active"
-            })
-            |> Repo.update!()
-
-          maybe_grant_welcome_credit(updated_account)
+        with {:ok, account} <- find_billing_account(args),
+             {:ok, updated_account} <-
+               update_billing_account(account, %{
+                 stripe_customer_id: args["customer_id"] || account.stripe_customer_id,
+                 stripe_pricing_plan_subscription_id:
+                   args["subscription_id"] || account.stripe_pricing_plan_subscription_id,
+                 billing_status: "active"
+               }) do
+          with :ok <- maybe_grant_welcome_credit(updated_account) do
+            sync_runtime_state(updated_account, "active")
+          end
         else
           {:error, _reason} = error -> error
         end
@@ -70,6 +70,13 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
       source_ref = "stripe-event:#{args["event_id"]}"
 
       Repo.transaction(fn ->
+        locked_account =
+          Repo.one!(
+            from row in BillingAccount,
+              where: row.id == ^account.id,
+              lock: "FOR UPDATE"
+          )
+
         existing =
           Repo.one(
             from entry in BillingLedgerEntry,
@@ -79,14 +86,14 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
 
         if existing do
           case RuntimeTopups.maybe_enqueue_pending_sync(Repo.preload(existing, :billing_account)) do
-            {:ok, _result} -> account
+            {:ok, _result} -> locked_account
             {:error, reason} -> Repo.rollback(reason)
           end
         else
           ledger_entry =
             %BillingLedgerEntry{}
             |> BillingLedgerEntry.changeset(%{
-              billing_account_id: account.id,
+              billing_account_id: locked_account.id,
               entry_type: "topup",
               amount_usd_cents: amount,
               description: "Runtime credit added through Stripe Checkout.",
@@ -98,25 +105,18 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
             |> Repo.insert!()
 
           updated =
-            account
+            locked_account
             |> BillingAccount.changeset(%{
+              stripe_customer_id: args["customer_id"] || locked_account.stripe_customer_id,
               runtime_credit_balance_usd_cents:
-                (account.runtime_credit_balance_usd_cents || 0) + amount,
+                (locked_account.runtime_credit_balance_usd_cents || 0) + amount,
               billing_status:
-                if(account.billing_status == "not_connected",
+                if(locked_account.billing_status == "not_connected",
                   do: "active",
-                  else: account.billing_status
+                  else: locked_account.billing_status
                 )
             })
             |> Repo.update!()
-
-          from(agent in Agent, where: agent.owner_human_id == ^updated.human_user_id)
-          |> Repo.update_all(
-            set: [
-              desired_runtime_state: "active",
-              runtime_status: "ready"
-            ]
-          )
 
           %{"billing_ledger_entry_id" => ledger_entry.id}
           |> SyncTopupCreditGrantWorker.new()
@@ -126,8 +126,11 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
         end
       end)
       |> case do
-        {:ok, _updated_account} -> :ok
-        {:error, _reason} = error -> error
+        {:ok, updated_account} ->
+          sync_runtime_state(updated_account, "active")
+
+        {:error, _reason} = error ->
+          error
       end
     else
       false -> {:discard, "top-up amount missing"}
@@ -139,32 +142,15 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
     with {:ok, account} <- find_billing_account(args) do
       status = normalize_status(args["event_type"], args["subscription_status"])
 
-      Repo.transaction(fn ->
-        updated =
-          account
-          |> BillingAccount.changeset(%{
-            stripe_customer_id: args["customer_id"] || account.stripe_customer_id,
-            stripe_pricing_plan_subscription_id:
-              args["subscription_id"] || account.stripe_pricing_plan_subscription_id,
-            billing_status: status
-          })
-          |> Repo.update!()
-
-        agent_updates =
-          case status do
-            "paused" -> [desired_runtime_state: "paused", runtime_status: "paused"]
-            "active" -> [desired_runtime_state: "active"]
-            "past_due" -> [desired_runtime_state: "paused", runtime_status: "paused"]
-            _ -> []
-          end
-
-        if agent_updates != [] do
-          from(agent in Agent, where: agent.owner_human_id == ^updated.human_user_id)
-          |> Repo.update_all(set: agent_updates)
-        end
-      end)
-
-      :ok
+      with {:ok, updated_account} <-
+             update_billing_account(account, %{
+               stripe_customer_id: args["customer_id"] || account.stripe_customer_id,
+               stripe_pricing_plan_subscription_id:
+                 args["subscription_id"] || account.stripe_pricing_plan_subscription_id,
+               billing_status: status
+             }) do
+        sync_runtime_state(updated_account, runtime_target_state(status))
+      end
     else
       {:error, _reason} = error -> error
     end
@@ -218,6 +204,37 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
     end
   end
 
+  defp update_billing_account(%BillingAccount{} = account, attrs) do
+    Repo.transaction(fn ->
+      locked_account =
+        Repo.one!(
+          from row in BillingAccount,
+            where: row.id == ^account.id,
+            lock: "FOR UPDATE"
+        )
+
+      updated =
+        locked_account
+        |> BillingAccount.changeset(attrs)
+        |> Repo.update!()
+
+      from(agent in Agent, where: agent.owner_human_id == ^updated.human_user_id)
+      |> Repo.update_all(
+        set: [
+          stripe_llm_billing_status: updated.billing_status,
+          stripe_customer_id: updated.stripe_customer_id,
+          stripe_pricing_plan_subscription_id: updated.stripe_pricing_plan_subscription_id
+        ]
+      )
+
+      updated
+    end)
+    |> case do
+      {:ok, updated} -> {:ok, updated}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp normalize_status("customer.subscription.paused", _subscription_status), do: "paused"
   defp normalize_status("customer.subscription.resumed", _subscription_status), do: "active"
   defp normalize_status("checkout.session.completed", _subscription_status), do: "active"
@@ -233,6 +250,11 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
     end
   end
 
+  defp runtime_target_state("active"), do: "active"
+  defp runtime_target_state("paused"), do: "paused"
+  defp runtime_target_state("past_due"), do: "paused"
+  defp runtime_target_state(_status), do: nil
+
   defp normalize_positive_integer(value) when is_integer(value) and value > 0, do: value
 
   defp normalize_positive_integer(value) when is_binary(value) do
@@ -243,6 +265,15 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
   end
 
   defp normalize_positive_integer(_value), do: false
+
+  defp sync_runtime_state(_billing_account, nil), do: :ok
+
+  defp sync_runtime_state(%BillingAccount{} = billing_account, target_state) do
+    case RuntimeControl.sync_agents_for_billing_account(billing_account, target_state) do
+      {:ok, _result} -> :ok
+      {:error, _reason} = error -> error
+    end
+  end
 
   defp maybe_grant_welcome_credit(%BillingAccount{} = account) do
     case WelcomeCredits.maybe_grant(account) do

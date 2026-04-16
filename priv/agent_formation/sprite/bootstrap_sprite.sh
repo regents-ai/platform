@@ -19,6 +19,7 @@ run() {
 }
 
 run "$SPRITE_CLI" create "$SPRITE_NAME"
+run "$SPRITE_CLI" exec "$SPRITE_NAME" -- mkdir -p /app/bin /app/company
 run "$SPRITE_CLI" exec "$SPRITE_NAME" -- mkdir -p /app/paperclip-regents
 run "$SPRITE_CLI" cp "$BUNDLE_DIR/paperclip-regents/." "$SPRITE_NAME:/app/paperclip-regents"
 run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "cd /app/paperclip-regents && npm ci"
@@ -36,9 +37,24 @@ FORMATION_HERMES_PERSIST_SESSION=${FORMATION_HERMES_PERSIST_SESSION:-true}
 FORMATION_HERMES_TOOLSETS=${FORMATION_HERMES_TOOLSETS:-[]}
 FORMATION_HERMES_RUNTIME_PLUGINS=${FORMATION_HERMES_RUNTIME_PLUGINS:-[]}
 FORMATION_HERMES_SHARED_SKILLS=${FORMATION_HERMES_SHARED_SKILLS:-[]}
+FORMATION_HERMES_COMMAND=${FORMATION_HERMES_COMMAND:-/app/bin/hermes-company}
+FORMATION_HERMES_PROMPT_TEMPLATE_VERSION=${FORMATION_HERMES_PROMPT_TEMPLATE_VERSION:-company-workspace-prompt-v1}
+FORMATION_HERMES_PROMPT_TEMPLATE_JSON=${FORMATION_HERMES_PROMPT_TEMPLATE_JSON:-\"\"}
+FORMATION_WORKSPACE_PATH=${FORMATION_WORKSPACE_PATH:-/app/company}
+FORMATION_WORKSPACE_SEED_VERSION=${FORMATION_WORKSPACE_SEED_VERSION:-company-workspace-v1}
+FORMATION_TEMPLATE_KEY=${FORMATION_TEMPLATE_KEY:-}
+FORMATION_TEMPLATE_PUBLIC_NAME=${FORMATION_TEMPLATE_PUBLIC_NAME:-}
+FORMATION_TEMPLATE_SUMMARY=$(printf '%s' "${FORMATION_TEMPLATE_SUMMARY:-}" | tr '\n' ' ')
+FORMATION_TEMPLATE_COMPANY_PURPOSE=$(printf '%s' "${FORMATION_TEMPLATE_COMPANY_PURPOSE:-}" | tr '\n' ' ')
+FORMATION_TEMPLATE_WORKER_ROLE=$(printf '%s' "${FORMATION_TEMPLATE_WORKER_ROLE:-}" | tr '\n' ' ')
+FORMATION_TEMPLATE_SERVICES=${FORMATION_TEMPLATE_SERVICES:-[]}
+FORMATION_TEMPLATE_CONNECTION_DEFAULTS=${FORMATION_TEMPLATE_CONNECTION_DEFAULTS:-[]}
+FORMATION_TEMPLATE_RECOMMENDED_NETWORK_DOMAINS=${FORMATION_TEMPLATE_RECOMMENDED_NETWORK_DOMAINS:-[]}
+FORMATION_TEMPLATE_CHECKPOINT_MOMENTS=${FORMATION_TEMPLATE_CHECKPOINT_MOMENTS:-[]}
 FORMATION_STRIPE_CUSTOMER_ID=${FORMATION_STRIPE_CUSTOMER_ID:-}
 FORMATION_STRIPE_SUBSCRIPTION_ID=${FORMATION_STRIPE_SUBSCRIPTION_ID:-}
 EOF"
+run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "cd /app/paperclip-regents && node seed_company_workspace.mjs"
 run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "cd /app/paperclip-regents && nohup node server.mjs >/tmp/paperclip-regents.log 2>&1 &"
 run "$SPRITE_CLI" services create "$SPRITE_NAME" paperclip --http-port "$PAPERCLIP_PORT"
 run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "until curl -fsS http://127.0.0.1:$PAPERCLIP_PORT/health >/dev/null; do sleep 2; done"
@@ -46,5 +62,5 @@ BOOTSTRAP_JSON="$(run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "cd /app/paper
 CHECKPOINT_REF="$("$SPRITE_CLI" checkpoint create "$SPRITE_NAME" --comment "agent formation bootstrap" | tail -n 1)"
 
 cat <<EOF
-{"sprite_url":"https://$SPRITE_HOSTNAME","paperclip_url":"https://$SPRITE_HOSTNAME:$PAPERCLIP_PORT","paperclip_company_id":"${SLUG}-company","paperclip_agent_id":"${SLUG}-hermes","checkpoint_ref":"$CHECKPOINT_REF","bootstrap":"$BOOTSTRAP_JSON","log_path":"$LOG_PATH"}
+{"sprite_url":"https://$SPRITE_HOSTNAME","paperclip_url":"https://$SPRITE_HOSTNAME:$PAPERCLIP_PORT","paperclip_company_id":"${SLUG}-company","paperclip_agent_id":"${SLUG}-hermes","checkpoint_ref":"$CHECKPOINT_REF","workspace_path":"${FORMATION_WORKSPACE_PATH:-/app/company}","workspace_seed_version":"${FORMATION_WORKSPACE_SEED_VERSION:-company-workspace-v1}","hermes_command":"${FORMATION_HERMES_COMMAND:-/app/bin/hermes-company}","prompt_template_version":"${FORMATION_HERMES_PROMPT_TEMPLATE_VERSION:-company-workspace-prompt-v1}","bootstrap":$BOOTSTRAP_JSON,"log_path":"$LOG_PATH"}
 EOF

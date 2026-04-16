@@ -4,9 +4,11 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
 
   import Ecto.Query, warn: false
 
+  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
+  alias PlatformPhx.AgentPlatform.RuntimeControl
   alias PlatformPhx.AgentPlatform.SpriteRuntimeClient
   alias PlatformPhx.AgentPlatform.SpriteUsageRecord
   alias PlatformPhx.AgentPlatform.Workers.SyncSpriteUsageRecordWorker
@@ -58,27 +60,26 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
   end
 
   defp reconcile_running_runtime(agent, _billing_account, "paused", _now) do
-    case SpriteRuntimeClient.start_service(
-           agent.sprite_name,
-           agent.sprite_service_name || "paperclip"
-         ) do
-      {:ok, _result} ->
-        agent
-        |> Agent.changeset(%{
-          observed_runtime_state: "active",
-          desired_runtime_state: "active",
-          runtime_status: "ready",
-          runtime_last_checked_at: DateTime.utc_now() |> DateTime.truncate(:second)
-        })
-        |> Repo.update!()
-
-      {:error, _reason} ->
-        :ok
+    case RuntimeControl.resume(agent) do
+      {:ok, _updated} -> :ok
+      {:error, _reason} -> :ok
     end
   end
 
-  defp reconcile_running_runtime(agent, billing_account, "active", now) do
-    bill_runtime_window(agent, billing_account, now)
+  defp reconcile_running_runtime(agent, %BillingAccount{} = billing_account, "active", now) do
+    if trial_active?(agent, now) do
+      agent
+      |> Agent.changeset(%{runtime_last_checked_at: now, runtime_status: "ready"})
+      |> Repo.update!()
+    else
+      bill_runtime_window(agent, billing_account, now)
+    end
+  end
+
+  defp reconcile_running_runtime(agent, _billing_account, "active", now) do
+    agent
+    |> Agent.changeset(%{runtime_last_checked_at: now, runtime_status: "ready"})
+    |> Repo.update!()
   end
 
   defp reconcile_running_runtime(agent, _billing_account, _observed_state, now) do
@@ -98,13 +99,23 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
     else
       amount_usd_cents = runtime_charge_cents(usage_seconds)
 
-      {:ok, {_usage_record, _updated_account, depleted?}} =
+      {:ok, {_usage_record, _updated_account, runtime_allowed_after_charge?}} =
         Repo.transaction(fn ->
+          locked_account =
+            Repo.one!(
+              from account in BillingAccount,
+                where: account.id == ^billing_account.id,
+                lock: "FOR UPDATE"
+            )
+
+          locked_agent =
+            Repo.one!(from row in Agent, where: row.id == ^agent.id, lock: "FOR UPDATE")
+
           usage_record =
             %SpriteUsageRecord{}
             |> SpriteUsageRecord.changeset(%{
-              billing_account_id: billing_account.id,
-              agent_id: agent.id,
+              billing_account_id: locked_account.id,
+              agent_id: locked_agent.id,
               meter_key: @runtime_meter_key,
               usage_seconds: usage_seconds,
               amount_usd_cents: amount_usd_cents,
@@ -117,8 +128,8 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
 
           %BillingLedgerEntry{}
           |> BillingLedgerEntry.changeset(%{
-            billing_account_id: billing_account.id,
-            agent_id: agent.id,
+            billing_account_id: locked_account.id,
+            agent_id: locked_agent.id,
             entry_type: "runtime_debit",
             amount_usd_cents: -amount_usd_cents,
             description: "Sprite runtime charge.",
@@ -128,20 +139,21 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
           |> Repo.insert!()
 
           next_balance =
-            max((billing_account.runtime_credit_balance_usd_cents || 0) - amount_usd_cents, 0)
+            max((locked_account.runtime_credit_balance_usd_cents || 0) - amount_usd_cents, 0)
 
           updated_account =
-            billing_account
+            locked_account
             |> BillingAccount.changeset(%{runtime_credit_balance_usd_cents: next_balance})
             |> Repo.update!()
 
           Repo.update!(
-            Agent.changeset(agent, %{
+            Agent.changeset(locked_agent, %{
               runtime_last_checked_at: now,
               runtime_status:
-                if(next_balance > 0 or trial_active?(agent, now), do: "ready", else: "paused"),
-              desired_runtime_state:
-                if(next_balance > 0 or trial_active?(agent, now), do: "active", else: "paused")
+                if(runtime_allowed?(locked_agent, updated_account),
+                  do: "ready",
+                  else: "paused_for_credits"
+                )
             })
           )
 
@@ -149,57 +161,32 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
           |> SyncSpriteUsageRecordWorker.new()
           |> Oban.insert!()
 
-          {usage_record, updated_account, next_balance <= 0 and not trial_active?(agent, now)}
+          {usage_record, updated_account, runtime_allowed?(locked_agent, updated_account)}
         end)
 
-      if depleted? do
+      if runtime_allowed_after_charge? do
+        :ok
+      else
         pause_for_balance(agent)
       end
     end
   end
 
   defp pause_for_balance(agent) do
-    case SpriteRuntimeClient.stop_service(
-           agent.sprite_name,
-           agent.sprite_service_name || "paperclip"
+    case RuntimeControl.pause(
+           agent,
+           preserve_desired_state: true,
+           runtime_status: "paused_for_credits"
          ) do
-      {:ok, _result} ->
-        agent
-        |> Agent.changeset(%{
-          desired_runtime_state: "paused",
-          observed_runtime_state: "paused",
-          runtime_status: "paused",
-          runtime_last_checked_at: DateTime.utc_now() |> DateTime.truncate(:second)
-        })
-        |> Repo.update!()
-
-      {:error, _reason} ->
-        agent
-        |> Agent.changeset(%{
-          desired_runtime_state: "paused",
-          runtime_status: "paused",
-          runtime_last_checked_at: DateTime.utc_now() |> DateTime.truncate(:second)
-        })
-        |> Repo.update!()
+      {:ok, _updated} -> :ok
+      {:error, _reason} -> :ok
     end
   end
 
   defp ensure_paused(agent) do
-    case SpriteRuntimeClient.stop_service(
-           agent.sprite_name,
-           agent.sprite_service_name || "paperclip"
-         ) do
-      {:ok, _result} ->
-        agent
-        |> Agent.changeset(%{
-          observed_runtime_state: "paused",
-          runtime_status: "paused",
-          runtime_last_checked_at: DateTime.utc_now() |> DateTime.truncate(:second)
-        })
-        |> Repo.update!()
-
-      {:error, _reason} ->
-        :ok
+    case RuntimeControl.pause(agent, runtime_status: "paused") do
+      {:ok, _updated} -> :ok
+      {:error, _reason} -> :ok
     end
   end
 
@@ -226,17 +213,10 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
     )
   end
 
-  defp runtime_allowed?(agent, _billing_account)
-       when is_struct(agent.sprite_free_until, DateTime) do
-    DateTime.compare(agent.sprite_free_until, DateTime.utc_now()) == :gt
+  defp runtime_allowed?(agent, billing_account) do
+    trial_active?(agent, DateTime.utc_now() |> DateTime.truncate(:second)) or
+      AgentPlatform.billing_allows_runtime?(billing_account)
   end
-
-  defp runtime_allowed?(_agent, %BillingAccount{} = billing_account) do
-    (billing_account.runtime_credit_balance_usd_cents || 0) > 0 and
-      billing_account.billing_status == "active"
-  end
-
-  defp runtime_allowed?(_agent, _billing_account), do: false
 
   defp trial_active?(agent, now) do
     is_struct(agent.sprite_free_until, DateTime) and
