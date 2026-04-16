@@ -44,12 +44,14 @@ defmodule PlatformPhx.OperatorReports.BugReport do
     summary
     details
     status
+  )a
+  @optional_fields ~w(
     reporter_wallet_address
     reporter_chain_id
     reporter_registry_address
     reporter_token_id
+    reporter_label
   )a
-  @optional_fields ~w(reporter_label)a
   @sanitized_fields ~w(summary details reporter_label)a
 
   @spec statuses() :: [String.t()]
@@ -62,6 +64,7 @@ defmodule PlatformPhx.OperatorReports.BugReport do
     |> ensure_report_id()
     |> sanitize_fields(@sanitized_fields)
     |> validate_required(@required_fields)
+    |> validate_reporting_agent()
     |> validate_number(:reporter_chain_id, greater_than: 0)
     |> validate_length(:summary, max: 280)
     |> validate_length(:details, max: 20_000)
@@ -71,6 +74,18 @@ defmodule PlatformPhx.OperatorReports.BugReport do
     |> validate_format(:reporter_wallet_address, @address_pattern)
     |> validate_format(:reporter_registry_address, @address_pattern)
     |> unique_constraint(:report_id, name: :agent_bug_reports_report_id_unique)
+  end
+
+  defp validate_reporting_agent(changeset) do
+    wallet_address = get_field(changeset, :reporter_wallet_address)
+    chain_id = get_field(changeset, :reporter_chain_id)
+
+    if is_nil(wallet_address) and is_nil(chain_id) do
+      changeset
+    else
+      changeset
+      |> validate_required([:reporter_wallet_address, :reporter_chain_id])
+    end
   end
 
   defp ensure_report_id(changeset) do

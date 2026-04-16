@@ -12,6 +12,10 @@ defmodule PlatformPhx.RuntimeConfig do
   def stripe_secret_key, do: fetch("STRIPE_SECRET_KEY")
   def stripe_webhook_secret, do: fetch("STRIPE_WEBHOOK_SECRET")
   def stripe_webhook_tolerance_seconds, do: fetch_integer("STRIPE_WEBHOOK_TOLERANCE_SECONDS", 300)
+
+  def siwa_http_signature_tolerance_seconds,
+    do: fetch_integer("SIWA_HTTP_SIGNATURE_TOLERANCE_SECONDS", 300)
+
   def stripe_billing_pricing_plan_id, do: fetch("STRIPE_BILLING_PRICING_PLAN_ID")
   def stripe_billing_topup_success_url, do: fetch("STRIPE_BILLING_TOPUP_SUCCESS_URL")
   def stripe_billing_topup_cancel_url, do: fetch("STRIPE_BILLING_TOPUP_CANCEL_URL")

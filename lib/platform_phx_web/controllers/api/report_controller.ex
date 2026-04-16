@@ -5,11 +5,17 @@ defmodule PlatformPhxWeb.Api.ReportController do
   alias PlatformPhxWeb.ApiErrors
 
   def bug(conn, params) do
-    ApiErrors.respond(conn, OperatorReports.create_bug_report_payload(params))
+    params
+    |> Map.delete("reporting_agent")
+    |> OperatorReports.create_bug_report_payload()
+    |> then(&ApiErrors.respond(conn, &1))
   end
 
   def security(conn, params) do
-    ApiErrors.respond(conn, OperatorReports.create_security_report_payload(params))
+    params
+    |> Map.delete("reporting_agent")
+    |> OperatorReports.create_security_report_payload()
+    |> then(&ApiErrors.respond(conn, &1))
   end
 
   def agent_bug(conn, params) do
@@ -31,14 +37,7 @@ defmodule PlatformPhxWeb.Api.ReportController do
       "registry_address" => Map.get(claims, "registry_address"),
       "token_id" => Map.get(claims, "token_id")
     }
-    |> maybe_put("label", params_label(conn))
-  end
-
-  defp params_label(conn) do
-    case conn.body_params do
-      %{"reporting_agent" => %{"label" => label}} when is_binary(label) -> label
-      _ -> nil
-    end
+    |> maybe_put("label", nil)
   end
 
   defp maybe_put(payload, _key, nil), do: payload

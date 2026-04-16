@@ -5,7 +5,15 @@ defmodule PlatformPhxWeb.Api.AgentSiwaController do
 
   def nonce(conn, params), do: render_result(conn, Siwa.issue_nonce(params))
   def verify(conn, params), do: render_result(conn, Siwa.verify_session(params))
-  def http_verify(conn, params), do: render_result(conn, Siwa.verify_http_request(params))
+
+  def http_verify(conn, params) do
+    render_result(
+      conn,
+      params
+      |> Map.take(["method", "path", "headers", "body"])
+      |> Siwa.verify_http_request()
+    )
+  end
 
   defp render_result(conn, {:ok, payload}), do: json(conn, payload)
 

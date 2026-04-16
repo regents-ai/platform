@@ -27,6 +27,7 @@ import {
 } from "./animations";
 import { FooterVoxelHook } from "./footer_voxel";
 import { HomeRegentScene } from "./home_regent_scene";
+import { mountDemo2Tunnel } from "./demo2";
 import { mountProceduralHeerichDemo } from "./heerich_demo";
 import { AnimatedHomeLogoSceneHook } from "./home_logo_scene";
 import { LogoStudiesHook } from "./logos";
@@ -178,6 +179,19 @@ const HeerichProceduralDemoHook = {
   },
   updated(this: HookContext) {
     mountProceduralHeerichDemo(this.el as HTMLElement);
+  },
+};
+const Demo2TunnelHook = {
+  mounted(this: HookContext & { __demo2Cleanup?: () => void }) {
+    this.__demo2Cleanup?.();
+    this.__demo2Cleanup = mountDemo2Tunnel(this.el as HTMLElement);
+  },
+  updated(this: HookContext & { __demo2Cleanup?: () => void }) {
+    this.__demo2Cleanup?.();
+    this.__demo2Cleanup = mountDemo2Tunnel(this.el as HTMLElement);
+  },
+  destroyed(this: HookContext & { __demo2Cleanup?: () => void }) {
+    this.__demo2Cleanup?.();
   },
 };
 const ClipboardCopyHook = {
@@ -706,6 +720,7 @@ const hooks: HooksOptions = {
   SidebarCommunity: SidebarCommunityHook,
   DashboardReveal: DashboardRevealHook,
   DemoReveal: DemoRevealHook,
+  Demo2Tunnel: Demo2TunnelHook,
   HeerichProceduralDemo: HeerichProceduralDemoHook,
   FooterVoxel: FooterVoxelHook,
   LogoStudies: LogoStudiesHook,

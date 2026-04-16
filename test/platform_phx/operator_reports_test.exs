@@ -53,6 +53,20 @@ defmodule PlatformPhx.OperatorReportsTest do
     refute Map.has_key?(payload["report"]["reporting_agent"], "label")
   end
 
+  test "reports may be stored without an asserted agent identity" do
+    assert {:ok, payload} =
+             OperatorReports.create_bug_report_payload(%{
+               "summary" => "anonymous",
+               "details" => "no verified agent"
+             })
+
+    assert payload["report"]["reporting_agent"] == nil
+
+    stored = Repo.get_by!(BugReport, report_id: payload["report"]["report_id"])
+    assert stored.reporter_wallet_address == nil
+    assert stored.reporter_chain_id == nil
+  end
+
   test "reports reject non-positive chain ids" do
     assert {:error, {:bad_request, message}} =
              OperatorReports.create_bug_report(%{

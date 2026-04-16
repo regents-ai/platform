@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Regent CLI Contract
   version: 0.1.0
-  description: Canonical Regent CLI surface for local shader work and platform account, billing, company, and runtime operations.
+  description: Canonical Regent CLI surface for two jobs: local shader work and guided platform account, billing, company, and runtime control from the terminal.
 commands:
   - name: regent shader list
     summary: List the available shader avatars and their editable parameters.
@@ -168,7 +168,7 @@ commands:
                 additionalProperties:
                   type: string
   - name: regent platform auth login
-    summary: Start a signed-in platform session from a Privy identity token and save it for later platform commands.
+    summary: Sign in to the Regent website from the terminal and save the session for later platform commands.
     auth:
       mode: privy-identity-token
     transport:
@@ -210,7 +210,7 @@ commands:
           profile:
             $ref: '#/components/schemas/CurrentHumanProfile'
   - name: regent platform auth status
-    summary: Read the current signed-in platform profile from the saved platform session.
+    summary: Show who is signed in through the saved platform session.
     auth:
       mode: session-file
     transport:
@@ -240,7 +240,7 @@ commands:
           profile:
             $ref: '#/components/schemas/CurrentHumanProfile'
   - name: regent platform auth logout
-    summary: Clear the saved platform session and sign out from the platform account.
+    summary: Delete the saved platform session and sign out from platform commands.
     auth:
       mode: session-file
     transport:
@@ -268,7 +268,7 @@ commands:
           origin: {type: string}
           sessionFile: {type: string}
   - name: regent platform formation status
-    summary: Read the current platform launch state, available claims, billing state, and owned companies.
+    summary: Show launch readiness from the saved session, including claimed names, billing, and owned companies.
     auth:
       mode: session-file
     transport:
@@ -297,7 +297,7 @@ commands:
           formation:
             $ref: '#/components/schemas/AgentFormationResponse'
   - name: regent platform billing account
-    summary: Read the current platform billing account from the saved session.
+    summary: Show the billing account tied to the saved platform session.
     auth:
       mode: session-file
     transport:
@@ -331,7 +331,7 @@ commands:
               billing_account:
                 $ref: '#/components/schemas/BillingAccount'
   - name: regent platform billing usage
-    summary: Read shared runtime credit and company usage from the saved session.
+    summary: Show shared runtime credit and company usage from the saved platform session.
     auth:
       mode: session-file
     transport:
@@ -365,7 +365,7 @@ commands:
               usage:
                 $ref: '#/components/schemas/BillingUsageSummary'
   - name: regent platform billing setup
-    summary: Start hosted billing setup for the saved platform account.
+    summary: Open billing setup for the saved platform account.
     auth:
       mode: session-file
     transport:
@@ -404,7 +404,7 @@ commands:
               billing_account:
                 $ref: '#/components/schemas/BillingAccount'
   - name: regent platform billing topup
-    summary: Start hosted runtime credit checkout for the saved platform account.
+    summary: Open runtime credit checkout for the saved platform account.
     auth:
       mode: session-file
     transport:
@@ -443,7 +443,7 @@ commands:
               billing_account:
                 $ref: '#/components/schemas/BillingAccount'
   - name: regent platform company create
-    summary: Start a new company launch for one claimed name from the saved platform account.
+    summary: Launch a company for one claimed name from the saved platform account.
     auth:
       mode: session-file
     transport:
@@ -483,7 +483,7 @@ commands:
               formation:
                 $ref: '#/components/schemas/AgentFormation'
   - name: regent platform company runtime
-    summary: Read runtime state for one owned company from the saved platform session.
+    summary: Show runtime state for one owned company from the saved platform session.
     auth:
       mode: session-file
     transport:

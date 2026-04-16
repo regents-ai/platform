@@ -17,10 +17,16 @@ defmodule PlatformPhxWeb.Plugs.RequireAgentSiwa do
     case Siwa.verify_http_request(%{
            "method" => conn.method,
            "path" => conn.request_path,
-           "headers" => headers
+           "headers" => headers,
+           "body" => conn.assigns[:raw_body]
          }) do
-      {:ok, _payload} ->
-        case Siwa.current_agent_claims(headers) do
+      {:ok, %{"data" => %{"agent_claims" => agent_claims}}} ->
+        case Siwa.current_agent_claims(%{
+               "sub" => agent_claims["wallet_address"],
+               "chain_id" => agent_claims["chain_id"],
+               "registry_address" => agent_claims["registry_address"],
+               "token_id" => agent_claims["token_id"]
+             }) do
           {:ok, claims} ->
             assign(conn, :current_agent_claims, claims)
 

@@ -5,6 +5,32 @@ This is a web application written using the Phoenix web framework.
 - Use `mix precommit` alias when you are done with all changes and fix any pending issues
 - Use the already included and available `:req` (`Req`) library for HTTP requests, **avoid** `:httpoison`, `:tesla`, and `:httpc`. Req is included by default and is the preferred HTTP client for Phoenix apps
 
+## Concept Surfaces
+
+Keep the main explanation surfaces aligned. The canonical story lives in:
+
+- `README.md`
+- `AGENTS.md`
+- `/services`
+- `/agent-formation`
+- `/regent-cli`
+- adjacent CLI docs and help in `../regent-cli`
+
+Use these names consistently:
+
+- `Services`: guided browser tasks for wallet access, pass redemption, and name claims
+- `Agent Formation`: guided browser flow for choosing a claimed name, adding billing, and launching a company
+- Public company page: the live `slug.regents.sh` page after launch
+- `Regent CLI`: local tool for Techtree, Autolaunch, automation, and repeatable terminal work
+
+Use this process consistently:
+
+1. Sign in and check wallet access in `Services`.
+2. Redeem passes and claim names when needed.
+3. Open Agent Formation, choose a claimed name, add billing, and launch a company.
+4. Use the public company page and company controls after launch.
+5. Use Regent CLI when the work starts on a machine or inside an agent.
+
 ## TODO
 
 - Replace the stale fallback Autolaunch auction sample data so fresh environments do not show out-of-date launches as current.

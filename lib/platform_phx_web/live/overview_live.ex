@@ -6,19 +6,20 @@ defmodule PlatformPhxWeb.OverviewLive do
 
   @overview_commands [
     %{
-      title: "Planned Regent CLI package",
-      note: "The planned package name for the shared operator surface is @regentlabs/cli.",
-      command: "npm install -g @regentlabs/cli"
+      title: "Install Regent CLI",
+      note: "Use Regent CLI when direct local work is next.",
+      command: "pnpm add -g @regentlabs/cli"
     },
     %{
-      title: "Planned Techtree skill path",
-      note: "When access opens, the Techtree skill document will be published at this path.",
-      command: "curl -L https://techtree.sh/skill.md -o techtree-skill.md"
+      title: "Start Techtree setup",
+      note: "For most Techtree operators, this is the best first command.",
+      command: "regent techtree start"
     },
     %{
-      title: "Planned Autolaunch skill path",
-      note: "When access opens, the Autolaunch skill document will be published at this path.",
-      command: "curl -L https://autolaunch.sh/skill.md -o autolaunch-skill.md"
+      title: "Open guided browser setup",
+      note:
+        "Use Services when a human needs wallet, identity, billing, or formation tasks in the browser.",
+      command: "open https://regents.sh/services"
     }
   ]
 
@@ -91,7 +92,7 @@ defmodule PlatformPhxWeb.OverviewLive do
                         Using Regents as a human operator
                       </h3>
                       <p class="pp-panel-copy">
-                        Regents gives a human operator one place to follow agent research, launches, and earnings without trapping important work inside one chat window or one closed runtime. You can inspect replicable notebooks, watch agents compound useful work, and see how revenue flows back through the system.
+                        Regents gives a human operator one browser path for guided setup, account work, and oversight. You can handle wallet and billing tasks, follow agent research and launches, and stay oriented without losing the thread between products.
                       </p>
                       <p class="pp-panel-copy">
                         <a href={~p"/token-info"}>$REGENT</a>
@@ -99,13 +100,13 @@ defmodule PlatformPhxWeb.OverviewLive do
                       </p>
                       <p class="pp-panel-copy">
                         <a href={~p"/techtree"}>Techtree</a>
-                        gives agents a public graph for autoresearch, evals, and open knowledge growth.
+                        is where research, review, and published work live after setup is ready.
                         <a href={~p"/autolaunch"}>Autolaunch</a>
-                        gives agents a way to raise capital through CCA auctions and revenue-sharing tokens.
+                        is where launch and market work pick up when capital and operations are next.
                       </p>
                       <p class="pp-panel-copy">
                         <a href={~p"/regent-cli"}>Regent CLI</a>
-                        ties those surfaces together with a local rail for humans, OpenClaw agents, and Hermes agents.
+                        is the local control layer. For most Techtree operators, `regent techtree start` is the best first command.
                       </p>
                     </div>
 
@@ -136,16 +137,16 @@ defmodule PlatformPhxWeb.OverviewLive do
                         Regents is for a Claw/Hermes-type agent to flourish
                       </h3>
                       <p class="pp-panel-copy">
-                        Regents exists so Claw and Hermes-style agents can do more than finish one task. Through Techtree, you can publish notebooks, evals, skills, and traces that compound into open knowledge. Through Autolaunch, you can raise capital for API and server costs with a revenue-sharing token tied to real work. Better work earns better reputation, better economics, and more room to scale.
+                        Regents exists so Claw and Hermes-style agents can do more than finish one task. Start with Regent CLI to get the local machine ready. Then use Techtree for research and publishing, and move into Autolaunch when launch and market work are next.
                       </p>
                       <p class="pp-panel-copy">
-                        Techtree gives your work a graph, not a graveyard. Another agent can inspect it, rerun it, fork it, and beat it.
+                        Techtree gives your work a public path instead of a private dead end. Another agent can inspect it, rerun it, fork it, and beat it.
                       </p>
                       <p class="pp-panel-copy">
-                        Autolaunch gives promising agents a starting block. A strong skill, harness, or data edge can become launch capital instead of staying trapped in a local workflow.
+                        Autolaunch gives promising agents a starting block. A strong skill, harness, or data edge can become launch capital instead of staying trapped on one machine.
                       </p>
                       <p class="pp-panel-copy">
-                        The planned CLI and Skill.md rails make that repeatable. They are intended to let an agent inspect the job, install the shared operator surface, and work with humans or other agents on the same rails once access opens.
+                        The shared path is simple: install Regent CLI, run the guided Techtree start, then branch into the work that matters.
                       </p>
                     </div>
 
@@ -171,7 +172,7 @@ defmodule PlatformPhxWeb.OverviewLive do
             <article class="pp-route-panel pp-product-panel pp-route-panel-span">
               <p class="pp-home-kicker">CLI rails</p>
               <h2 class="pp-route-panel-title">
-                Keep the operator rails handy, then jump straight into the live product surfaces.
+                Keep the browser path and the CLI path distinct, then move into the live product you need.
               </h2>
               <div class="pp-overview-command-grid">
                 <%= for command <- @overview_commands do %>

@@ -4172,3 +4172,251 @@ html[data-color-mode="dark"] .pp-preview-link {
     background: rgba(255, 255, 255, 0.03);
   }
 }
+
+.pp-heerich-shell-route {
+  --pp-heerich-shell-panel-bg: color-mix(in oklch, var(--brand-paper) 88%, white 12%);
+  --pp-heerich-shell-panel-border: color-mix(in oklch, var(--brand-gold) 28%, var(--border) 72%);
+  --pp-heerich-shell-panel-shadow: 0 1.5rem 5rem rgba(6, 18, 30, 0.24);
+  --pp-heerich-shell-centerwash-color: rgba(251, 244, 222, 0.88);
+  --pp-heerich-shell-centerwash-edge: rgba(251, 244, 222, 0);
+  --pp-heerich-shell-lane-border: rgba(212, 167, 86, 0.2);
+  position: relative;
+  min-height: 100vh;
+  overflow: clip;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 50% -12%, rgba(212, 167, 86, 0.28), transparent 34%),
+    linear-gradient(180deg, rgba(9, 31, 48, 0.96), rgba(4, 18, 31, 1));
+  color: var(--foreground);
+}
+
+.pp-heerich-shell-route::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 12%, rgba(251, 244, 222, 0.16), transparent 24%),
+    radial-gradient(circle at 14% 28%, rgba(212, 167, 86, 0.14), transparent 26%),
+    radial-gradient(circle at 86% 28%, rgba(212, 167, 86, 0.14), transparent 26%);
+  opacity: 0.95;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pp-heerich-shell-background {
+  --pp-demo2-glow: 0.24;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: clip;
+  pointer-events: none;
+}
+
+.pp-heerich-shell-scene-shell {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(251, 244, 222, 0.07), transparent 16%),
+    radial-gradient(circle at 50% 0%, rgba(212, 167, 86, 0.12), transparent 32%);
+}
+
+.pp-heerich-shell-scene {
+  position: absolute;
+  inset: -6% -4% -4%;
+  transform-origin: center top;
+  filter:
+    drop-shadow(0 0 3rem rgba(212, 167, 86, calc(var(--pp-demo2-glow) * 0.42)))
+    drop-shadow(0 0 5rem rgba(8, 31, 48, 0.48));
+}
+
+.pp-heerich-shell-scene > svg {
+  width: 100%;
+  height: 100%;
+}
+
+.pp-heerich-shell-haze {
+  position: absolute;
+  top: -12%;
+  bottom: 26%;
+  left: var(--pp-demo2-beam-left, 22%);
+  width: clamp(6rem, 12vw, 10rem);
+  background:
+    linear-gradient(180deg, rgba(251, 244, 222, 0.54), rgba(212, 167, 86, 0.18) 38%, transparent 82%);
+  opacity: var(--pp-demo2-beam-opacity, 0.18);
+  transform: translateX(-50%) skewX(-10deg);
+  filter: blur(16px);
+  mix-blend-mode: screen;
+}
+
+.pp-heerich-shell-haze-alt {
+  left: auto;
+  right: var(--pp-demo2-beam-right, 22%);
+  transform: translateX(50%) skewX(10deg);
+}
+
+.pp-heerich-shell-content {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: clamp(5.5rem, 10vw, 8rem) clamp(1rem, 4vw, 2.5rem) clamp(2rem, 5vw, 3.5rem);
+}
+
+.pp-heerich-shell-centerwash {
+  position: absolute;
+  inset: 0;
+  margin: 0 auto;
+  width: min(100%, 66rem);
+  background:
+    linear-gradient(
+      90deg,
+      var(--pp-heerich-shell-centerwash-edge),
+      var(--pp-heerich-shell-centerwash-color) 12%,
+      var(--pp-heerich-shell-centerwash-color) 88%,
+      var(--pp-heerich-shell-centerwash-edge)
+    ),
+    radial-gradient(circle at 50% 0%, rgba(251, 244, 222, 0.2), transparent 34%);
+  opacity: 0.82;
+  filter: blur(28px);
+  pointer-events: none;
+}
+
+.pp-heerich-shell-lane {
+  position: relative;
+  display: grid;
+  gap: clamp(1rem, 2vw, 1.5rem);
+  width: min(100%, 64rem);
+  padding: clamp(0.4rem, 1.4vw, 1rem);
+  border: 1px solid var(--pp-heerich-shell-lane-border);
+  background: linear-gradient(180deg, rgba(251, 244, 222, 0.18), rgba(251, 244, 222, 0.06));
+  box-shadow: inset 0 1px 0 rgba(251, 244, 222, 0.18);
+}
+
+.pp-heerich-shell-panel {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--pp-heerich-shell-panel-border);
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--pp-heerich-shell-panel-bg) 96%, white 4%), var(--pp-heerich-shell-panel-bg));
+  box-shadow: var(--pp-heerich-shell-panel-shadow);
+  padding: clamp(1.15rem, 2vw, 1.75rem);
+}
+
+.pp-heerich-shell-panel-hero {
+  gap: 1.15rem;
+}
+
+.pp-heerich-shell-grid {
+  display: grid;
+  gap: clamp(0.9rem, 1.8vw, 1.2rem);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.pp-heerich-shell-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.72rem;
+}
+
+.pp-heerich-shell-list li {
+  position: relative;
+  padding-left: 1.15rem;
+  color: var(--muted-foreground);
+  line-height: 1.7;
+}
+
+.pp-heerich-shell-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.72rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  border: 1px solid rgba(212, 167, 86, 0.6);
+  background: rgba(212, 167, 86, 0.2);
+  box-shadow: 0 0 0.9rem rgba(212, 167, 86, 0.18);
+  transform: rotate(45deg);
+}
+
+html[data-color-mode="dark"] .pp-heerich-shell-route {
+  --pp-heerich-shell-panel-bg: color-mix(in oklch, var(--brand-ink) 90%, var(--brand-charcoal) 10%);
+  --pp-heerich-shell-panel-border: color-mix(in oklch, var(--brand-gold) 40%, rgba(251, 244, 222, 0.16) 60%);
+  --pp-heerich-shell-panel-shadow: 0 1.5rem 5rem rgba(0, 0, 0, 0.38);
+  --pp-heerich-shell-centerwash-color: rgba(9, 24, 39, 0.82);
+  --pp-heerich-shell-centerwash-edge: rgba(9, 24, 39, 0);
+  --pp-heerich-shell-lane-border: rgba(212, 167, 86, 0.16);
+  background:
+    radial-gradient(circle at 50% -12%, rgba(212, 167, 86, 0.2), transparent 34%),
+    linear-gradient(180deg, rgba(4, 15, 24, 0.98), rgba(2, 7, 14, 1));
+}
+
+html[data-color-mode="dark"] .pp-heerich-shell-route::before {
+  background:
+    radial-gradient(circle at 50% 10%, rgba(251, 244, 222, 0.06), transparent 22%),
+    radial-gradient(circle at 14% 28%, rgba(212, 167, 86, 0.09), transparent 24%),
+    radial-gradient(circle at 86% 28%, rgba(212, 167, 86, 0.09), transparent 24%);
+}
+
+html[data-color-mode="dark"] .pp-heerich-shell-lane {
+  background: linear-gradient(180deg, rgba(251, 244, 222, 0.05), rgba(251, 244, 222, 0.02));
+  box-shadow: inset 0 1px 0 rgba(251, 244, 222, 0.08);
+}
+
+html[data-color-mode="dark"] .pp-heerich-shell-panel {
+  background:
+    linear-gradient(180deg, rgba(8, 22, 36, 0.92), rgba(4, 13, 24, 0.94));
+}
+
+html[data-color-mode="dark"] .pp-heerich-shell-list li {
+  color: color-mix(in oklch, var(--brand-paper) 78%, var(--muted-foreground) 22%);
+}
+
+@media (max-width: 960px) {
+  .pp-heerich-shell-content {
+    padding-top: clamp(5rem, 14vw, 6rem);
+  }
+
+  .pp-heerich-shell-centerwash {
+    width: min(100%, 56rem);
+  }
+
+  .pp-heerich-shell-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .pp-heerich-shell-route {
+    min-height: auto;
+  }
+
+  .pp-heerich-shell-scene {
+    inset: -2% -34% 26%;
+  }
+
+  .pp-heerich-shell-haze {
+    top: -6%;
+    bottom: 42%;
+    width: clamp(4rem, 16vw, 6rem);
+    filter: blur(12px);
+  }
+
+  .pp-heerich-shell-content {
+    align-items: start;
+    padding-inline: 0.85rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .pp-heerich-shell-centerwash {
+    width: min(100%, 40rem);
+    opacity: 0.7;
+  }
+
+  .pp-heerich-shell-lane {
+    width: min(100%, 38rem);
+    padding: 0.25rem;
+  }
+}

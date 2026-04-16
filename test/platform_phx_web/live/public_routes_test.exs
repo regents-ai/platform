@@ -7,6 +7,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.Subdomain
+  alias PlatformPhx.OperatorReports
   alias PlatformPhx.Repo
 
   test "home route exposes social share metadata", %{conn: conn} do
@@ -16,7 +17,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
       |> html_response(200)
 
     share_description =
-      "Autolaunch and Techtree let your Claws and Hermes do more, run a business, and advance the tech trees of the world."
+      "The Regent website guides wallet setup, company launch, and public company pages, while Regent CLI handles local Techtree and Autolaunch work."
 
     share_image_url = PlatformPhxWeb.Endpoint.url() <> "/images/og-image.png"
 
@@ -76,14 +77,15 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "platform-footer-voxel-classic"
 
     assert html =~
-             "Upgrade your Claw or Hermes agent to collaborate and autoresearch. First tech:"
+             "Do local research, publish work, and move through BBH with Regent CLI. First tech:"
 
     assert html =~ "https://huggingface.co/datasets/nvidia/Nemotron-RL-bixbench_hypothesis"
     assert html =~ "BBH-Train"
     assert html =~ "benchmark by Nvidia."
-    assert html =~ "Capable agents can raise capital through a fair 3 day Uniswap CCA auction."
-    assert html =~ "Your agent now has funds to immediately scale token, API, and server costs."
-    assert html =~ "Token holders share upside in future revenue."
+
+    assert html =~
+             "Plan launches, track auctions, and follow launch progress across the web view and Regent CLI commands."
+
     refute html =~ "layout-wallet-control-desktop"
     refute html =~ "layout-wallet-control-mobile"
   end
@@ -122,9 +124,11 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Agent Overview"
     assert html =~ "Using Regents as a human operator"
     assert html =~ "Regents is for a Claw/Hermes-type agent to flourish"
-    assert html =~ "npm install -g @regentlabs/cli"
-    assert html =~ "planned package name for the shared operator surface"
-    assert html =~ "access opens"
+    assert html =~ "pnpm add -g @regentlabs/cli"
+    assert html =~ "Start Techtree setup"
+    assert html =~ "Open guided browser setup"
+    assert html =~ "regent techtree start"
+    assert html =~ "open https://regents.sh/services"
     assert html =~ "Visit techtree.sh"
     assert html =~ "Visit autolaunch.sh"
     assert html =~ "https://techtree.sh"
@@ -156,7 +160,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     {:ok, _services, html} = live(conn, "/services")
 
     assert html =~ "Services"
-    assert html =~ "Manage names and redemptions"
+    assert html =~ "Prepare your account"
     assert html =~ "Claim your Regent identity"
     assert html =~ "Redeem an Animata pass for REGENT"
     assert html =~ "https://news.regents.sh"
@@ -183,7 +187,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "phx-hook=\"DashboardRedeem\""
 
     assert html =~
-             "Use this page to review wallet holdings, claim names, and prepare the account for Agent Formation."
+             "Use this page to check wallet access, redeem passes, claim names, and get ready for company launch."
 
     refute html =~ "dashboard-root"
   end
@@ -192,7 +196,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     {:ok, _formation, html} = live(conn, "/agent-formation")
 
     assert html =~ "Agent Formation"
-    assert html =~ "Complete Agent Formation"
+    assert html =~ "Launch your company"
     assert html =~ "agent-formation-wallet-console"
     assert html =~ "Names tied to this wallet"
     assert html =~ "Passes Owned"
@@ -205,9 +209,25 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Sign In"
 
     assert html =~
-             "Review your wallet, choose one of your claimed names, and launch your Regent company when billing is ready."
+             "Finish the launch in this order: choose a claimed name, set up billing, then start the company."
 
     refute html =~ "dashboard-root"
+  end
+
+  test "bug report ledger renders anonymous public submissions cleanly", %{conn: conn} do
+    assert {:ok, _report} =
+             OperatorReports.create_bug_report(%{
+               "summary" => "Anonymous summary",
+               "details" => "Anonymous details"
+             })
+
+    {:ok, _view, html} = live(conn, "/bug-report")
+
+    assert html =~ "Anonymous public report"
+    assert html =~ "Sent from the public bug report form"
+    assert html =~ "No wallet was attached to this report."
+    assert html =~ "This report came through the public form."
+    refute html =~ "token ·"
   end
 
   test "subdomain root renders the published agent page", %{
@@ -244,6 +264,21 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   end
 
   test "signed-in owner sees company controls on the public company page", %{conn: conn} do
+    previous_sprite_runtime_client = Application.get_env(:platform_phx, :sprite_runtime_client)
+
+    Application.put_env(
+      :platform_phx,
+      :sprite_runtime_client,
+      PlatformPhx.SpriteRuntimeClientFake
+    )
+
+    on_exit(fn ->
+      case previous_sprite_runtime_client do
+        nil -> Application.delete_env(:platform_phx, :sprite_runtime_client)
+        value -> Application.put_env(:platform_phx, :sprite_runtime_client, value)
+      end
+    end)
+
     human = insert_human!("0xowner111111111111111111111111111111111111")
     _billing = insert_billing_account!(human, 700)
     _agent = insert_public_agent!(human, "owner-control")
@@ -397,13 +432,19 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   end
 
   test "heerich demo route renders", %{conn: conn} do
-    {:ok, _demo, html} = live(conn, "/heerich-demo")
+    {:ok, view, _html} = live(conn, "/heerich-demo")
 
-    assert html =~ "Heerich 0.7.1 Lab"
-    assert html =~ "platform-heerich-demo-shell"
-    assert html =~ "demo-explode-cluster"
-    assert html =~ "addGeometry(type: fill)"
-    assert html =~ "applyStyle(type: box / line)"
+    assert has_element?(
+             view,
+             "#platform-heerich-shell-background[phx-hook=\"Demo2Tunnel\"][data-demo2-layout=\"shell\"][data-demo2-variant=\"regent-shell\"]"
+           )
+
+    assert has_element?(view, "#platform-heerich-shell-route")
+    assert has_element?(view, "#platform-heerich-shell-scene")
+    assert has_element?(view, "#platform-heerich-shell-content")
+    assert has_element?(view, ".pp-heerich-shell-panel-hero")
+    assert render(view) =~ "A full-page Regent shell with the content held in the middle."
+    refute render(view) =~ "platform-demo2-panel-ember-hall"
   end
 
   test "logos route renders", %{conn: conn} do
@@ -423,10 +464,16 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Shared Research and Eval Tree"
     assert html =~ "Techtree"
     assert html =~ "Agent Skill"
-    assert html =~ "Techtree gives agents a public graph for open autoresearch."
-    assert html =~ "notebook, eval, harness, skill, trace"
-    assert html =~ "replicable Python notebooks on marimo.io"
-    assert html =~ "open data and code on IPFS"
+
+    assert html =~
+             "Start with Regent CLI, then move into Techtree for research, review, and publishing."
+
+    assert html =~ "regent techtree start"
+    assert html =~ "actual research and publishing work lives"
+
+    assert html =~
+             "After the guided start, the usual next moves are reading the live tree, publishing work, or stepping into the BBH branch for local runs, replay, and public proof."
+
     assert html =~ "Edison Scientific and Nvidia"
     assert html =~ "https://edisonscientific.com/articles/accelerating-science-at-scale"
     assert html =~ "Linked tools, runtimes, research surfaces, and platforms behind Techtree."
@@ -449,7 +496,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "https://github.com/regent-ai/techtree"
     assert html =~ "https://techtree.sh"
     assert html =~ "[Techtree skill.md coming soon]"
-    assert html =~ "Open the live Techtree surface, or inspect the repo that backs it."
+    assert html =~ "Open the live Techtree site, or inspect the repo that runs it."
     refute html =~ "Copy prompt"
     refute html =~ "Why this surface exists"
     refute html =~ "platform-techtree-surface"
@@ -496,13 +543,14 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Local Operator Surface"
     assert html =~ "Regent CLI"
     assert html =~ "Copy page as markdown"
-    assert html =~ "Local runtime and operator surface for"
+    assert html =~ "Use Regent CLI when the work starts on your machine."
     assert html =~ "@regentlabs/cli"
     assert html =~ "regent create init"
     assert html =~ "regent create wallet --write-env"
     assert html =~ "regent techtree start"
     assert html =~ "regent auth siwa login"
     assert html =~ "The CLI is JSON-first."
+    assert html =~ "Use the Regent website for guided account tasks"
     assert html =~ "regent chatbox history --webapp|--agent"
     assert html =~ "CLI posting is agent-room only."
     assert html =~ "regent autolaunch ..."

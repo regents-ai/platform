@@ -163,13 +163,16 @@ defmodule PlatformPhx.OperatorReports do
   defp agent_field(_reporting_agent, _key), do: nil
 
   defp reporting_agent_payload(report) do
-    %{
-      "wallet_address" => report.reporter_wallet_address,
-      "chain_id" => report.reporter_chain_id,
-      "registry_address" => report.reporter_registry_address,
-      "token_id" => report.reporter_token_id
-    }
-    |> maybe_put("label", report.reporter_label)
+    payload =
+      %{
+        "wallet_address" => report.reporter_wallet_address,
+        "chain_id" => report.reporter_chain_id,
+        "registry_address" => report.reporter_registry_address,
+        "token_id" => report.reporter_token_id
+      }
+      |> maybe_put("label", report.reporter_label)
+
+    if Enum.any?(payload, fn {_key, value} -> not is_nil(value) end), do: payload, else: nil
   end
 
   defp iso_datetime(nil), do: nil

@@ -1,16 +1,17 @@
 # Platform
 
-This app is the Regents platform site and operator surface.
+This app is the Regent website for guided account setup, company launch, and public company pages.
 
-It does three jobs:
+It covers the browser path in one place:
 
-1. It presents the public Regents site.
-2. It gives people a place to handle wallet and identity tasks in `Services`.
-3. It hosts the formation flow for turning an agent into a live Regents business with a public `slug.regents.sh` page.
+1. Sign in and check wallet access in `Services`.
+2. Redeem passes and claim names when needed.
+3. Open Agent Formation, choose a claimed name, add billing, and launch a company.
+4. Manage the live company and public page after launch.
 
 ## What The Site Is For
 
-Use this app when a human needs a guided Regents workflow in the browser.
+Use this app when a person needs the guided Regent path in the browser.
 
 Today that mostly means:
 
@@ -20,7 +21,7 @@ Today that mostly means:
 - starting the agent company formation wizard
 - opening the public page and operator surfaces for a hosted agent business
 
-The recent formation work moves more of that setup into this app. A person can now go through one guided flow in `Services` to claim a name, confirm access, and start a hosted Paperclip and Hermes business under Regents.
+The goal is simple: finish the guided browser setup here, then hand off to the right next place. That may be Agent Formation in the browser, or Regent CLI when direct local work is next.
 
 ## Services
 
@@ -38,43 +39,43 @@ The goal is simple: finish setup in one place, then move into a live business wi
 
 ## Agent Formation
 
-Humans should use the formation wizard in this platform app when they want Regents to stand up a hosted Paperclip and Hermes agent business for them.
+Humans should use the formation wizard in this platform app when they want to launch a Regent company from a claimed name.
 
 That wizard is the right path when you want:
 
-- a claimed agent name
-- a hosted runtime
+- a claimed name
 - a public `slug.regents.sh` page
-- the basic setup needed to start offering work through Regents
+- billing in place
+- a live company you can manage after launch
 
-The important part is not just getting the page live. The real edge comes from what you put into the business:
+The short launch order is:
 
-- high-quality skills
-- proprietary datastores
-- strong prompting
-- clear services with real value
+1. choose a claimed name
+2. add billing
+3. launch the company
+4. return to the public page and company controls later
 
-Formation gives the business a home. Quality makes it worth visiting.
+## Which Path To Use
 
-## Which Tool To Use
+Use the website when the task is guided account or company setup.
 
-Use the browser app when a human is operating.
+- `Services` is where a person checks wallet access, redeems passes, and claims names.
+- `Agent Formation` is where a person adds billing, launches a company, and comes back to company controls later.
 
-- Humans should use this platform app for the formation wizard and other guided wallet and identity tasks in `Services`.
+Use the CLI when direct local work is next.
 
-Use the CLI when an agent is operating.
-
-- OpenClaw, Hermes, Claude, and Codex agents should use [`regent-cli`](../regent-cli) when working with Techtree.
+- Operators and agents should use [`regent-cli`](../regent-cli) for Techtree work, Autolaunch work, automation, and repeatable terminal runs.
+- `regent techtree start` is the best first Regent CLI command for most Techtree operators.
 - OpenClaw and Hermes agents that already have an EVM wallet, such as OWS or Bankr, should use `regent-cli` for Autolaunch.
 
-This keeps the human path and the agent path clean:
+This keeps the paths clear:
 
-- people use the platform app for guided setup
-- agents use `regent-cli` for direct work
+- people use the website for guided browser setup
+- operators and agents use `regent-cli` for direct local work
 
 ## Related Projects
 
-- [`../regent-cli`](../regent-cli): command line path for agent use
+- [`../regent-cli`](../regent-cli): local command path for setup and direct work
 - [`../techtree`](../techtree): Techtree product
 - [`../autolaunch`](../autolaunch): Autolaunch product
 

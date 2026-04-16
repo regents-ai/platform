@@ -3,15 +3,14 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
 
   def intro do
     [
-      "Regent CLI is the local runtime and operator surface for the published `@regentlabs/cli` package. It ships the `regent` binary, bundles the local runtime it talks to, and exposes the shared command surface for platform accounts, company launches, billing, Techtree, Autolaunch, identity, config, and messaging.",
-      "This page is the introduction and short guide. It is meant to help a human operator or an agent get oriented quickly. Keep the exhaustive command reference in a separate page, or generate it from `regent --help`, so this guide stays easy to scan and harder to let drift."
+      "Regent CLI is the local tool for work that starts on your machine. Use it for Techtree work, Autolaunch work, reporting, and repeatable terminal runs through the published `@regentlabs/cli` package.",
+      "Use the Regent website for guided account tasks such as checking wallet access, claiming names, adding billing, and launching a company. Use Regent CLI when the work moves onto the local machine or into an agent."
     ]
   end
 
   def quick_start do
     [
       "pnpm add -g @regentlabs/cli",
-      "regent --help",
       "regent create init",
       "regent create wallet --write-env",
       "# paste the printed export line into your shell",
@@ -20,33 +19,35 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
   end
 
   def quick_start_note do
-    "If `regent techtree start` needs to mint a new identity, the selected wallet also needs Sepolia ETH and access to a Sepolia RPC URL."
+    "If `regent techtree start` needs to mint a new identity, the selected wallet also needs Sepolia ETH and a working Sepolia RPC URL."
   end
 
   def techtree_start_intro do
-    "`regent techtree start` is the best first command for most operators. It is the guided path into the CLI."
+    "`regent techtree start` is the best first command for most people because it prepares the machine and tells you the next move."
   end
 
   def techtree_start_steps do
     [
-      "create or reuse local config",
-      "ensure the expected local directories exist",
-      "verify that a wallet key is available",
-      "start the local daemon if the runtime socket is not already reachable",
-      "let you choose or mint a Techtree identity",
-      "run SIWA login for that identity",
-      "verify Techtree and BBH readiness",
-      "print suggested next commands when the environment is ready"
+      "create or reuse the local config file",
+      "make sure the working folders exist",
+      "check that a wallet key is available",
+      "start the local runtime if it is not already running",
+      "help you choose or mint a Techtree identity",
+      "sign that identity in",
+      "check Techtree and BBH readiness",
+      "print the next commands for the current machine"
     ]
   end
 
   def mental_model do
     [
-      {"`regent run`", "owns the local daemon and runtime lifecycle."},
-      {"`regent create ...` and `regent config ...`", "manage machine-local state."},
-      {"`regent platform ...`",
-       "signs in to the platform, saves a reusable session file, and controls billing and company launches."},
-      {"`regent auth siwa ...`", "binds the local operator to a signed-in session."},
+      {"`regents.sh/services` and `regents.sh/agent-formation`",
+       "handle the guided website path for setup, claimed names, billing, and company launch."},
+      {"`regent create ...` and `regent config ...`", "set up and inspect machine-local state."},
+      {"`regent techtree start`",
+       "is the guided local start and the best first command on a new machine."},
+      {"`regent run`", "keeps the local runtime available for commands that need it."},
+      {"`regent auth siwa ...`", "sign the local operator into Techtree."},
       {"`regent techtree ...`",
        "is the main work surface for browsing, publishing, BBH, and reviews."},
       {"`regent autolaunch ...`",
@@ -59,11 +60,11 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
   def common_rules do
     [
       "The CLI is JSON-first. In a human terminal it may render a formatted panel, but non-interactive output stays machine-readable JSON.",
+      "Use the Regent website when you need wallet access checks, claimed names, billing, or company launch.",
       "Use `--config /absolute/path.json` to point at a non-default local config file.",
-      "Use `--session-file /absolute/path.json` when you want platform sign-in state to be explicit and reproducible.",
       "For flags documented as `@path` or `@file.json`, prefix the path with `@` to read the value from disk.",
       "Daemon-backed commands need the local runtime socket to be reachable.",
-      "Some command families use a saved platform session file, while others need an active SIWA session.",
+      "Start with `regent techtree start` unless you already know you need the lower-level steps.",
       "Some commands are intentionally long-running, such as `regent run` and `regent chatbox tail`."
     ]
   end
@@ -71,26 +72,14 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
   def first_command_groups do
     [
       group(
-        "Platform account and launch control",
+        "Start here",
         [
-          "regent platform auth login --identity-token-env REGENT_PLATFORM_IDENTITY_TOKEN",
-          "regent platform formation status",
-          "regent platform billing setup --claimed-label <label>",
-          "regent platform company create --claimed-label <label>",
-          "regent platform company runtime --slug <slug>",
-          "regent platform sprite pause --slug <slug>",
-          "regent platform sprite resume --slug <slug>"
-        ],
-        "Use these when an agent needs to sign in, check launch readiness, open billing, start a company, or pause and resume one runtime from the terminal."
-      ),
-      group(
-        "Local setup and health",
-        [
+          "regent techtree start",
           "regent doctor",
           "regent config read",
           "regent auth siwa status"
         ],
-        "Use these to inspect local state, confirm config, and see whether a session is already active."
+        "Start here on a new machine. The guided start tells you what is missing, while the other commands let you inspect the same setup directly."
       ),
       group(
         "Identity and onboarding",
@@ -101,7 +90,7 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
           "regent auth siwa login",
           "regent techtree start"
         ],
-        "For most people, `regent techtree start` is the easiest path. The more specific commands are useful when you want to inspect or control each step yourself."
+        "Use these when you want to inspect or control each setup step directly instead of staying inside the guided start."
       ),
       group(
         "Techtree read-only workflows",
@@ -149,7 +138,7 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
         "If you omit both `--webapp` and `--agent` on `history` or `tail`, the CLI defaults to the webapp room. CLI posting is agent-room only."
       ),
       group(
-        "Autolaunch and adjacent surfaces",
+        "Autolaunch and adjacent work",
         [
           "regent autolaunch ...",
           "regent shader list",
@@ -167,8 +156,8 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
 
   def guidance do
     [
-      "For humans, start with the guided flow and only drop into lower-level commands when you need more control.",
-      "For agents, prefer non-interactive runs, always pin `--config` when reproducibility matters, and treat the CLI as a JSON-first local interface rather than a text-only shell."
+      "For humans, start on the Regent website for account and company setup, then use Regent CLI when the work moves onto the local machine.",
+      "For agents, prefer non-interactive runs, pin `--config` when reproducibility matters, and treat Regent CLI as a JSON-first local interface."
     ]
   end
 

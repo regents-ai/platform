@@ -66,7 +66,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
                 <div class="space-y-3">
                   <p class="pp-home-kicker">Regent CLI</p>
                   <h2 class="pp-route-panel-title">
-                    Local runtime and operator surface for <code>@regentlabs/cli</code>.
+                    Use Regent CLI when the work starts on your machine.
                   </h2>
                 </div>
                 <button
@@ -95,7 +95,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
             <article class="pp-route-panel">
               <p class="pp-home-kicker">Quick start</p>
               <h2 class="pp-route-panel-title">
-                Start with the package, create local state, write the wallet export, then open the guided Techtree flow.
+                Install the package, set up local files, export the wallet, then start the guided Techtree path.
               </h2>
               <pre class="pp-product-cli-command">{Enum.join(@quick_start, "\n")}</pre>
               <p class="pp-panel-copy">{@quick_start_note}</p>
@@ -104,7 +104,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
             <article class="pp-route-panel">
               <p class="pp-home-kicker">Best first command</p>
               <h2 class="pp-route-panel-title">
-                What <code>regent techtree start</code> does
+                Start with <code>regent techtree start</code>
               </h2>
               <p class="pp-panel-copy">{@techtree_start_intro}</p>
               <ul class="pp-fact-list">
@@ -119,7 +119,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
             <article class="pp-route-panel">
               <p class="pp-home-kicker">Mental model</p>
               <h2 class="pp-route-panel-title">
-                Think of Regent CLI as the local control layer for the Regent stack.
+                The CLI handles local work. The website handles guided account and company setup.
               </h2>
               <ul class="pp-fact-list">
                 <%= for {command, body} <- @mental_model do %>
@@ -133,7 +133,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
             <article class="pp-route-panel">
               <p class="pp-home-kicker">Common rules</p>
               <h2 class="pp-route-panel-title">
-                The CLI is JSON-first, daemon-aware, and happiest when local state is explicit.
+                Keep local files explicit and treat command output as data first.
               </h2>
               <ul class="pp-fact-list">
                 <%= for rule <- @common_rules do %>
@@ -147,7 +147,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
             <article class="pp-route-panel pp-route-panel-span">
               <p class="pp-home-kicker">First commands to know</p>
               <h2 class="pp-route-panel-title">
-                Learn the first commands by task, not by trying to memorize the whole surface.
+                Learn the next commands by task instead of trying to memorize the whole tool.
               </h2>
               <div class="pp-product-cli-grid pp-product-cli-grid--two-up">
                 <%= for group <- @first_command_groups do %>
@@ -165,7 +165,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
             <article class="pp-route-panel">
               <p class="pp-home-kicker">Guidance for humans and agents</p>
               <h2 class="pp-route-panel-title">
-                Use the guided path first, then drop lower only when you need tighter control.
+                Use the website for guided setup. Use the CLI for local work and repeatable runs.
               </h2>
               <ul class="pp-fact-list">
                 <%= for item <- @guidance do %>
@@ -204,7 +204,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
       "",
       quick_start_note,
       "",
-      "## What `regent techtree start` does",
+      "## Start with `regent techtree start`",
       "",
       techtree_start_intro,
       ""
@@ -214,7 +214,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
       "",
       "## Mental model",
       "",
-      "Think of Regent CLI as the local control layer for the Regent stack.",
+      "The CLI handles local work. The Regent website handles guided account and company setup.",
       ""
     ])
     |> Kernel.++(

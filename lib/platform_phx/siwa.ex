@@ -2,6 +2,7 @@ defmodule PlatformPhx.Siwa do
   @moduledoc false
 
   alias PlatformPhx.Ethereum
+  alias PlatformPhx.RuntimeConfig
 
   @nonce_table :platform_siwa_nonces
   @replay_table :platform_siwa_replays
@@ -9,6 +10,7 @@ defmodule PlatformPhx.Siwa do
   @positive_int_regex ~r/^[1-9][0-9]*$/
   @signature_input_regex ~r/^sig1=\((?<components>.+)\)(?<params>(?:;.+)*)$/
   @signature_regex ~r/^sig1=:(?<payload>[A-Za-z0-9+\/=]+):$/
+  @content_digest_regex ~r/^sha-256=:(?<payload>[A-Za-z0-9+\/=]+):$/
   @required_headers ~w(
     x-siwa-receipt
     signature
@@ -64,7 +66,6 @@ defmodule PlatformPhx.Siwa do
          {:ok, nonce} <- required_string(params, "nonce"),
          {:ok, message} <- required_string(params, "message"),
          {:ok, signature} <- required_string(params, "signature"),
-         :ok <- validate_optional_binding(params),
          :ok <- validate_siwa_message(message, wallet_address, chain_id, nonce),
          :ok <- verify_wallet_signature(wallet_address, message, signature),
          {:ok, nonce_record} <- consume_nonce(wallet_address, chain_id, nonce) do
@@ -83,8 +84,6 @@ defmodule PlatformPhx.Siwa do
           "nonce" => nonce,
           "key_id" => key_id
         }
-        |> maybe_put("registry_address", Map.get(params, "registry_address"))
-        |> maybe_put("token_id", Map.get(params, "token_id"))
 
       receipt = issue_receipt(claims)
 
@@ -111,19 +110,30 @@ defmodule PlatformPhx.Siwa do
   def verify_http_request(params) when is_map(params) do
     with {:ok, method} <- required_string(params, "method"),
          {:ok, request_path} <- required_path(params, "path"),
+         {:ok, request_body} <- optional_body(params, "body"),
          {:ok, normalized_headers} <- required_header_map(params, "headers"),
-         :ok <- ensure_required_headers(normalized_headers),
+         body_digest = request_body_digest(request_body),
+         :ok <- ensure_required_headers(normalized_headers, body_digest),
          {:ok, parsed_signature_input} <-
            parse_signature_input(Map.fetch!(normalized_headers, "signature-input")),
-         :ok <- ensure_required_components(parsed_signature_input.components, normalized_headers),
+         :ok <- ensure_signature_window(parsed_signature_input, normalized_headers),
+         :ok <-
+           ensure_required_components(
+             parsed_signature_input.components,
+             normalized_headers,
+             body_digest
+           ),
          {:ok, receipt_claims} <- verify_receipt(Map.fetch!(normalized_headers, "x-siwa-receipt")),
+         :ok <- ensure_body_binding(normalized_headers, body_digest),
          :ok <- ensure_header_binding(normalized_headers, receipt_claims),
          :ok <-
            ensure_replay_fresh(
              receipt_claims["sub"],
              parsed_signature_input.nonce,
              method,
-             request_path
+             request_path,
+             body_digest,
+             parsed_signature_input.expires
            ),
          {:ok, signature} <- decode_signature(Map.fetch!(normalized_headers, "signature")),
          signing_message <-
@@ -143,9 +153,11 @@ defmodule PlatformPhx.Siwa do
            "walletAddress" => receipt_claims["sub"],
            "chainId" => receipt_claims["chain_id"],
            "keyId" => receipt_claims["key_id"],
+           "agent_claims" => verified_agent_claims(receipt_claims),
            "receiptExpiresAt" => unix_to_iso8601(receipt_claims["exp"]),
-           "requiredHeaders" => @required_headers,
-           "requiredCoveredComponents" => required_components_for_headers(normalized_headers),
+           "requiredHeaders" => required_headers(body_digest),
+           "requiredCoveredComponents" =>
+             required_components_for_headers(normalized_headers, body_digest),
            "coveredComponents" => parsed_signature_input.components
          }
        }}
@@ -154,39 +166,22 @@ defmodule PlatformPhx.Siwa do
     end
   end
 
-  def current_agent_claims(headers) when is_map(headers) do
-    with {:ok, wallet_address} <- required_address(headers, "x-agent-wallet-address"),
-         {:ok, chain_id} <- required_positive_integer(headers, "x-agent-chain-id") do
-      {:ok,
-       %{
-         "wallet_address" => wallet_address,
-         "chain_id" => chain_id,
-         "registry_address" =>
-           normalize_optional_address(Map.get(headers, "x-agent-registry-address")),
-         "token_id" => normalize_optional_text(Map.get(headers, "x-agent-token-id"))
-       }}
-    end
+  def current_agent_claims(%{"sub" => _sub, "chain_id" => _chain_id} = receipt_claims) do
+    {:ok, verified_agent_claims(receipt_claims)}
   end
 
-  defp validate_optional_binding(params) do
-    registry_address = Map.get(params, "registry_address")
-    token_id = Map.get(params, "token_id")
+  def current_agent_claims(_claims),
+    do: {:error, {401, "receipt_invalid", "invalid SIWA receipt"}}
 
-    case {registry_address, token_id} do
-      {nil, nil} ->
-        :ok
+  def content_digest_for_body(body) when is_binary(body) do
+    digest =
+      :crypto.hash(:sha256, body)
+      |> Base.encode64()
 
-      {registry_address, token_id} when is_binary(registry_address) and is_binary(token_id) ->
-        with {:ok, _} <- required_address(params, "registry_address"),
-             {:ok, _} <- required_string(params, "token_id") do
-          :ok
-        end
-
-      _ ->
-        {:error,
-         {400, "invalid_binding", "registry_address and token_id must be provided together"}}
-    end
+    "sha-256=:#{digest}:"
   end
+
+  def content_digest_for_body(_body), do: nil
 
   defp validate_siwa_message(message, wallet_address, chain_id, nonce) do
     normalized_message = String.trim(message)
@@ -239,9 +234,9 @@ defmodule PlatformPhx.Siwa do
     end
   end
 
-  defp ensure_required_headers(headers) do
+  defp ensure_required_headers(headers, body_digest) do
     missing =
-      @required_headers
+      required_headers(body_digest)
       |> Enum.reject(&Map.has_key?(headers, &1))
 
     if missing == [] do
@@ -318,8 +313,8 @@ defmodule PlatformPhx.Siwa do
     end
   end
 
-  defp ensure_required_components(components, headers) do
-    required = required_components_for_headers(headers)
+  defp ensure_required_components(components, headers, body_digest) do
+    required = required_components_for_headers(headers, body_digest)
     missing = Enum.reject(required, &(&1 in components))
 
     if missing == [] do
@@ -329,14 +324,53 @@ defmodule PlatformPhx.Siwa do
     end
   end
 
-  defp required_components_for_headers(headers) do
+  defp required_components_for_headers(headers, body_digest) do
     @base_components
+    |> maybe_append_content_digest(body_digest)
     |> maybe_append_component(headers, "x-agent-registry-address")
     |> maybe_append_component(headers, "x-agent-token-id")
   end
 
+  defp required_headers(body_digest) do
+    if is_binary(body_digest),
+      do: @required_headers ++ ["content-digest"],
+      else: @required_headers
+  end
+
+  defp maybe_append_content_digest(components, body_digest) do
+    if is_binary(body_digest), do: components ++ ["content-digest"], else: components
+  end
+
   defp maybe_append_component(components, headers, header_name) do
     if Map.has_key?(headers, header_name), do: components ++ [header_name], else: components
+  end
+
+  defp ensure_signature_window(parsed_signature_input, headers) do
+    now = now_unix_seconds()
+    tolerance = RuntimeConfig.siwa_http_signature_tolerance_seconds()
+
+    case required_positive_integer(headers, "x-timestamp") do
+      {:ok, header_timestamp} ->
+        cond do
+          header_timestamp != parsed_signature_input.created ->
+            {:error, {401, "http_signature_invalid", "invalid x-timestamp header"}}
+
+          parsed_signature_input.created > now + tolerance ->
+            {:error, {401, "http_signature_invalid", "signed request is not yet valid"}}
+
+          parsed_signature_input.created < now - tolerance ->
+            {:error, {401, "http_signature_invalid", "signed request is too old"}}
+
+          parsed_signature_input.expires < now ->
+            {:error, {401, "http_signature_invalid", "signed request has expired"}}
+
+          true ->
+            :ok
+        end
+
+      {:error, _reason} ->
+        {:error, {401, "http_signature_invalid", "invalid x-timestamp header"}}
+    end
   end
 
   defp verify_receipt(receipt) when is_binary(receipt) do
@@ -372,31 +406,80 @@ defmodule PlatformPhx.Siwa do
         {:error,
          {401, "receipt_binding_mismatch", "x-agent-registry-address does not match SIWA receipt"}}
 
+      Map.has_key?(headers, "x-agent-registry-address") && is_nil(claims["registry_address"]) ->
+        {:error,
+         {401, "receipt_binding_mismatch",
+          "x-agent-registry-address is not verified in the SIWA receipt"}}
+
       claims["token_id"] && Map.get(headers, "x-agent-token-id") != claims["token_id"] ->
         {:error,
          {401, "receipt_binding_mismatch", "x-agent-token-id does not match SIWA receipt"}}
+
+      Map.has_key?(headers, "x-agent-token-id") && is_nil(claims["token_id"]) ->
+        {:error,
+         {401, "receipt_binding_mismatch", "x-agent-token-id is not verified in the SIWA receipt"}}
 
       true ->
         :ok
     end
   end
 
-  defp ensure_replay_fresh(wallet_address, nonce, method, request_path) do
+  defp ensure_body_binding(headers, nil) do
+    if Map.has_key?(headers, "content-digest") do
+      {:error,
+       {401, "http_body_binding_missing",
+        "request body is required when content-digest is present"}}
+    else
+      :ok
+    end
+  end
+
+  defp ensure_body_binding(headers, body_digest) do
+    with content_digest when is_binary(content_digest) <- Map.get(headers, "content-digest"),
+         true <- content_digest == body_digest,
+         %{"payload" => payload} <- Regex.named_captures(@content_digest_regex, content_digest),
+         {:ok, _decoded} <- Base.decode64(payload) do
+      :ok
+    else
+      nil ->
+        {:error, {401, "http_body_binding_missing", "missing content-digest header"}}
+
+      false ->
+        {:error,
+         {401, "http_body_binding_invalid", "content-digest does not match the request body"}}
+
+      _ ->
+        {:error, {401, "http_body_binding_invalid", "content-digest is invalid"}}
+    end
+  end
+
+  defp ensure_replay_fresh(
+         wallet_address,
+         nonce,
+         method,
+         request_path,
+         body_digest,
+         expires_at_unix
+       ) do
     ensure_tables!()
-    replay_key = "#{wallet_address}|#{nonce}|#{String.upcase(method)}|#{request_path}"
+
+    replay_key =
+      "#{wallet_address}|#{nonce}|#{String.upcase(method)}|#{request_path}|#{body_digest || ""}"
+
     now = now_unix_seconds()
+    replay_expires_at_unix = max(now, expires_at_unix)
 
     case :ets.lookup(@replay_table, replay_key) do
       [{^replay_key, expires_at_unix}] ->
         if expires_at_unix > now do
           {:error, {409, "request_replayed", "request replay detected"}}
         else
-          :ets.insert(@replay_table, {replay_key, now + 120})
+          :ets.insert(@replay_table, {replay_key, replay_expires_at_unix})
           :ok
         end
 
       _ ->
-        :ets.insert(@replay_table, {replay_key, now + 120})
+        :ets.insert(@replay_table, {replay_key, replay_expires_at_unix})
         :ok
     end
   end
@@ -508,6 +591,14 @@ defmodule PlatformPhx.Siwa do
     end
   end
 
+  defp optional_body(params, key) do
+    case Map.get(params, key) do
+      nil -> {:ok, nil}
+      body when is_binary(body) -> {:ok, body}
+      _value -> {:error, {"invalid_#{key}", "#{key} must be a string when present"}}
+    end
+  end
+
   defp required_path(params, key) do
     with {:ok, value} <- required_string(params, key),
          true <- String.starts_with?(value, "/") do
@@ -541,13 +632,6 @@ defmodule PlatformPhx.Siwa do
   defp required_value(""), do: {:error, :missing}
   defp required_value(value), do: {:ok, value}
 
-  defp normalize_optional_address(value) when is_binary(value) do
-    normalized = String.downcase(String.trim(value))
-    if Regex.match?(@address_regex, normalized), do: normalized, else: nil
-  end
-
-  defp normalize_optional_address(_value), do: nil
-
   defp normalize_optional_text(value) when is_binary(value) do
     case String.trim(value) do
       "" -> nil
@@ -557,8 +641,17 @@ defmodule PlatformPhx.Siwa do
 
   defp normalize_optional_text(_value), do: nil
 
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+  defp request_body_digest(nil), do: nil
+  defp request_body_digest(body) when is_binary(body), do: content_digest_for_body(body)
+
+  defp verified_agent_claims(receipt_claims) do
+    %{
+      "wallet_address" => receipt_claims["sub"],
+      "chain_id" => receipt_claims["chain_id"],
+      "registry_address" => receipt_claims["registry_address"],
+      "token_id" => receipt_claims["token_id"]
+    }
+  end
 
   defp ensure_tables! do
     if :ets.whereis(@nonce_table) == :undefined do

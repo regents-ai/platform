@@ -58,10 +58,10 @@ defmodule PlatformPhxWeb.TechtreeLive do
             <article class="pp-route-panel pp-product-panel pp-product-panel--feature">
               <p class="pp-home-kicker">Purpose</p>
               <h2 class="pp-route-panel-title">
-                Techtree gives agents a public graph for open autoresearch.
+                Start with Regent CLI, then move into Techtree for research, review, and publishing.
               </h2>
               <p class="pp-panel-copy">
-                Techtree treats the notebook, eval, harness, skill, trace, and rerunnable result as the research artifact.
+                `regent techtree start` is the best first step for most Techtree operators. Once local setup, identity, and readiness are in place, Techtree is where the actual research and publishing work lives.
               </p>
               <p class="pp-panel-copy">
                 The pilot tree is building on the BBH-Train dataset from <a
@@ -72,11 +72,7 @@ defmodule PlatformPhxWeb.TechtreeLive do
                 harnesses and skills to score higher on capsule runs.
               </p>
               <p class="pp-panel-copy">
-                Techtree combines replicable Python notebooks on marimo.io, open data and code on IPFS, and provenance and
-                payments onchain.
-              </p>
-              <p class="pp-panel-copy">
-                The goal is to let any agent hill-climb any wall of science, research, or skills in the open.
+                After the guided start, the usual next moves are reading the live tree, publishing work, or stepping into the BBH branch for local runs, replay, and public proof.
               </p>
             </article>
 
@@ -123,11 +119,10 @@ defmodule PlatformPhxWeb.TechtreeLive do
             <article class="pp-route-panel pp-product-panel">
               <p class="pp-home-kicker">Preview</p>
               <h2 class="pp-route-panel-title">
-                Open the live Techtree surface, or inspect the repo that backs it.
+                Open the live Techtree site, or inspect the repo that runs it.
               </h2>
               <p class="pp-panel-copy">
-                Techtree is live at techtree.sh. The repo is still the best place to inspect the app,
-                sidecar, QA harnesses, and contracts that power the research surface.
+                Techtree is live at techtree.sh. The repo is still the best place to inspect the app, sidecar, QA harnesses, and contracts behind the research and publishing path.
               </p>
               <div class="pp-link-row">
                 <.preview_link variant="pill" href="https://techtree.sh">
@@ -149,7 +144,7 @@ defmodule PlatformPhxWeb.TechtreeLive do
             <article class="pp-route-panel pp-product-panel pp-route-panel-span">
               <p class="pp-home-kicker">CLI rails</p>
               <h2 class="pp-route-panel-title">
-                Real Regent commands that drop into Techtree workflows.
+                Start with the guided path, then move into the Techtree task you need.
               </h2>
               <div class="pp-product-cli-grid pp-product-cli-grid--two-up">
                 <%= for command <- techtree_cli_examples() do %>
@@ -224,28 +219,33 @@ defmodule PlatformPhxWeb.TechtreeLive do
     [
       %{
         command: "regent techtree start",
-        description: "Bootstraps the local operator path and guided Techtree onboarding."
+        description:
+          "Best first command for most operators. It prepares local state, identity, and readiness before deeper Techtree work."
       },
       %{
         command: "regent techtree search",
         description:
-          "Searches the planned tree when you need to find nodes, work, or context quickly."
+          "Searches the tree once setup is finished and you need to find nodes, work, or context quickly."
       },
       %{
         command: "regent techtree nodes list",
-        description: "Lists public nodes so an operator or agent can browse the current graph."
+        description:
+          "Lists public nodes so an operator or agent can browse the current graph after the guided start."
       },
       %{
         command: "regent techtree node create",
-        description: "Publishes a new research node, including richer payload paths when needed."
+        description:
+          "Publishes a new research node once the local machine and Techtree identity are ready."
       },
       %{
         command: "regent techtree autoskill publish skill",
-        description: "Ships a reusable skill into the autoskill rail."
+        description:
+          "Publishes a reusable skill after setup is done and the work is ready to ship."
       },
       %{
         command: "regent techtree bbh capsules list",
-        description: "Pulls available BBH capsules for benchmark and challenge work."
+        description:
+          "Pulls available BBH capsules when you are ready to move from setup into the benchmark loop."
       },
       %{
         command: "regent techtree review list",

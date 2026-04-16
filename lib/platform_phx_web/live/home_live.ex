@@ -18,7 +18,7 @@ defmodule PlatformPhxWeb.HomeLive do
       title: "Techtree",
       cta_label: "Research",
       description_html:
-        "Upgrade your Claw or Hermes agent to collaborate and autoresearch. First tech: <a href=\"https://huggingface.co/datasets/nvidia/Nemotron-RL-bixbench_hypothesis\" target=\"_blank\" rel=\"noreferrer\" class=\"pp-entry-inline-link-soft\">BBH-Train</a> benchmark by Nvidia.",
+        "Do local research, publish work, and move through BBH with Regent CLI. First tech: <a href=\"https://huggingface.co/datasets/nvidia/Nemotron-RL-bixbench_hypothesis\" target=\"_blank\" rel=\"noreferrer\" class=\"pp-entry-inline-link-soft\">BBH-Train</a> benchmark by Nvidia.",
       href: "/techtree"
     },
     %{
@@ -30,7 +30,7 @@ defmodule PlatformPhxWeb.HomeLive do
       title: "Autolaunch",
       cta_label: "Revenue",
       description:
-        "Capable agents can raise capital through a fair 3 day Uniswap CCA auction. Your agent now has funds to immediately scale token, API, and server costs. Token holders share upside in future revenue.",
+        "Plan launches, track auctions, and follow launch progress across the web view and Regent CLI commands.",
       href: "/autolaunch"
     },
     %{
@@ -39,10 +39,10 @@ defmodule PlatformPhxWeb.HomeLive do
       theme_class: "rg-regent-theme-platform",
       logo_path: "/images/regents-logo.png",
       eyebrow: "Services",
-      title: "Regents Home",
+      title: "Services",
       cta_label: "Open",
       description:
-        "The fastest setup for a cloud-hosted agent business. Paperclip + Hermes + Regents system, owned by you (or your agent!).",
+        "Sign in, check access, redeem passes, claim a name, add billing, and launch your company.",
       href: "/services"
     }
   ]
@@ -112,8 +112,8 @@ defmodule PlatformPhxWeb.HomeLive do
          |> put_flash(:info, "Company paused.")
          |> reload_company_page()}
 
-      {:error, {_status, message}} ->
-        {:noreply, put_flash(socket, :error, message)}
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, runtime_error_message(reason))}
     end
   end
 
@@ -126,8 +126,8 @@ defmodule PlatformPhxWeb.HomeLive do
          |> put_flash(:info, "Company running again.")
          |> reload_company_page()}
 
-      {:error, {_status, message}} ->
-        {:noreply, put_flash(socket, :error, message)}
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, runtime_error_message(reason))}
     end
   end
 
@@ -247,7 +247,7 @@ defmodule PlatformPhxWeb.HomeLive do
                 <p class="pp-home-kicker">Subdomain not active</p>
                 <h1 class="pp-route-panel-title">No published agent lives on this host yet.</h1>
                 <p class="pp-panel-copy">
-                  Claim the name, create the agent in Agent Formation, and activate the subdomain before it goes live.
+                  Claim a name, finish Agent Formation, and publish the company page before this host goes live.
                 </p>
                 <div class="pp-link-row">
                   <.link navigate={~p"/agent-formation"} class="pp-link-button pp-link-button-slim">
@@ -497,4 +497,9 @@ defmodule PlatformPhxWeb.HomeLive do
       _ -> {:noreply, socket}
     end
   end
+
+  defp runtime_error_message({_, _, message}) when is_binary(message), do: message
+  defp runtime_error_message({_, message}) when is_binary(message), do: message
+  defp runtime_error_message(message) when is_binary(message), do: message
+  defp runtime_error_message(reason), do: inspect(reason)
 end

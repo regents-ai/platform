@@ -21,7 +21,23 @@ export interface HelpCommand {
 export type RegentCommand = ShaderListCommand | ShaderExportCommand | PlatformCommand | HelpCommand;
 
 export function usageText() {
-  return [...shaderUsageLines(), ...platformUsageLines()].join("\n");
+  return [
+    "Regent helper surfaces",
+    "",
+    "Use `regent shader ...` for local shader export.",
+    "Use `regent platform ...` to sign in, check launch readiness, add billing, launch a company, and manage runtime state from the terminal.",
+    "",
+    "Suggested platform flow:",
+    "regent platform auth login --identity-token-env REGENT_PLATFORM_IDENTITY_TOKEN",
+    "regent platform formation status",
+    "regent platform billing setup --claimed-label <label>",
+    "regent platform company create --claimed-label <label>",
+    "regent platform company runtime --slug <slug>",
+    "",
+    "Commands:",
+    ...shaderUsageLines(),
+    ...platformUsageLines(),
+  ].join("\n");
 }
 
 export function parseRegentCommand(argv: readonly string[], cwd: string): RegentCommand {

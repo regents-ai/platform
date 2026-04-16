@@ -668,7 +668,6 @@ defmodule PlatformPhxWeb.RegentScenes do
     |> place_quadrant_cells(2)
     |> rotate_quadrants()
     |> centered_cells()
-    |> restore_top_left_voxel()
     |> voxel_boxes(0, 2)
     |> build_box_commands(target_id, [0.705, 0.705, 0.66], nil)
   end
@@ -677,7 +676,6 @@ defmodule PlatformPhxWeb.RegentScenes do
     alpha = techtree_t_cells({0, 0}, 4, 4, 5)
     beta = shift_cells(alpha, 5, 6)
     [alpha, beta] = centered_layer_sets([alpha, beta])
-    alpha = restore_top_left_voxel(alpha)
 
     (voxel_boxes(alpha, 0, 2) ++ voxel_boxes(beta, 2, 2))
     |> build_box_commands(target_id, [0.95, 0.95, 0.92], nil)
@@ -692,6 +690,7 @@ defmodule PlatformPhxWeb.RegentScenes do
       rect_cells(6, 0, 2, 1)
     ]
     |> List.flatten()
+    |> List.delete({0, 0})
     |> uniq_cells()
     |> centered_cells()
     |> voxel_boxes(0, 3)
@@ -891,21 +890,6 @@ defmodule PlatformPhxWeb.RegentScenes do
   end
 
   defp uniq_cells(cells), do: cells |> Enum.uniq() |> Enum.sort()
-
-  defp restore_top_left_voxel(cells) do
-    top_y =
-      cells
-      |> Enum.map(&elem(&1, 1))
-      |> Enum.min()
-
-    left_x =
-      cells
-      |> Enum.filter(&(elem(&1, 1) == top_y))
-      |> Enum.map(&elem(&1, 0))
-      |> Enum.min()
-
-    uniq_cells([{left_x - 1, top_y} | cells])
-  end
 
   def techtree_bridge(focus, scene_version) do
     focus = techtree_focus(focus)

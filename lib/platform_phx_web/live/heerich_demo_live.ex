@@ -1,34 +1,32 @@
 defmodule PlatformPhxWeb.HeerichDemoLive do
   use PlatformPhxWeb, :live_view
 
-  alias PlatformPhxWeb.HeerichDemoScenes
+  @highlights [
+    "Ceiling lattice stays bright while the reading lane stays calm.",
+    "Side walls carry the chamber feeling without crowding the copy.",
+    "The center stays open for headlines, controls, or long-form pages."
+  ]
+
+  @fit_notes [
+    "Landing pages with one main message",
+    "Product or token pages that need ceremonial framing",
+    "Editorial pages that still need obvious actions"
+  ]
+
+  @clarity_notes [
+    "Headlines and paragraphs stay on normal panels",
+    "Buttons and links stay in the middle lane",
+    "Dense tables and forms never have to live inside the scene"
+  ]
 
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
      socket
-     |> assign(:page_title, "Heerich Demo")
-     |> assign(:demo_samples, HeerichDemoScenes.samples())
-     |> assign(:knob_rows, HeerichDemoScenes.knob_rows())
-     |> assign(:feature_rows, HeerichDemoScenes.feature_rows())
-     |> assign(:primer_rules, HeerichDemoScenes.primer_rules())}
-  end
-
-  def handle_event("regent:node_select", _params, socket), do: {:noreply, socket}
-
-  def handle_event(event, _params, socket)
-      when event in ["regent:node_hover", "regent:surface_ready"] do
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("regent:surface_error", _params, socket) do
-    {:noreply,
-     put_flash(
-       socket,
-       :error,
-       "One of the Heerich demo surfaces could not render in this browser session."
-     )}
+     |> assign(:page_title, "Heerich Chamber Study")
+     |> assign(:highlights, @highlights)
+     |> assign(:fit_notes, @fit_notes)
+     |> assign(:clarity_notes, @clarity_notes)}
   end
 
   @impl true
@@ -38,207 +36,100 @@ defmodule PlatformPhxWeb.HeerichDemoLive do
       flash={@flash}
       current_scope={assigns[:current_scope]}
       current_human={assigns[:current_human]}
-      chrome={:app}
+      chrome={:none}
+      show_wallet_control={false}
       theme_class="rg-regent-theme-platform"
+      content_class="p-0"
     >
-      <div
-        id="platform-heerich-demo-shell"
-        class="pp-demo-shell rg-regent-theme-platform"
-        phx-hook="DemoReveal"
+      <section
+        id="platform-heerich-shell-route"
+        class="pp-heerich-shell-route rg-regent-theme-platform"
       >
-        <main id="platform-heerich-demo" class="pp-demo-stage" aria-label="Heerich hover cycle demos">
-          <section class="pp-demo-hero" data-demo-block>
-            <div class="space-y-4">
-              <p class="pp-home-kicker">Heerich 0.7.1 Lab</p>
-              <div class="space-y-3">
-                <h1 class="pp-home-title">
-                  Shared Regent surfaces, raw Heerich commands, and direct procedural scenes.
-                </h1>
-                <p class="pp-home-copy">
-                  This page now shows the full Heerich 0.7.1 range in Platform: shared Regent surfaces driven by raw commands, carved wall styling, voxel scaling, restyling, and a direct JavaScript gallery for procedural shapes that do not belong in the scene catalog.
-                </p>
-              </div>
+        <div
+          id="platform-heerich-shell-background"
+          class="pp-heerich-shell-background"
+          phx-hook="Demo2Tunnel"
+          phx-update="ignore"
+          data-demo2-layout="shell"
+          data-demo2-variant="regent-shell"
+          aria-hidden="true"
+        >
+          <div class="pp-heerich-shell-scene-shell">
+            <div
+              id="platform-heerich-shell-scene"
+              class="pp-heerich-shell-scene"
+              data-demo2-scene
+            >
             </div>
+          </div>
+          <div class="pp-heerich-shell-haze" data-demo2-beam></div>
+          <div class="pp-heerich-shell-haze pp-heerich-shell-haze-alt" data-demo2-beam></div>
+        </div>
 
-            <div class="pp-home-chip-row" aria-label="Demo rules">
-              <span>Real Regent scenes</span>
-              <span>HoverCycle on scaled geometry</span>
-              <span>Carve and restyle primitives</span>
-              <span>Direct JS procedural gallery</span>
-            </div>
-          </section>
+        <div id="platform-heerich-shell-content" class="pp-heerich-shell-content">
+          <div class="pp-heerich-shell-centerwash" aria-hidden="true"></div>
 
-          <section class="pp-demo-grid" data-demo-block aria-label="Heerich demo cards">
-            <%= for sample <- @demo_samples do %>
-              <.hover_cycle_demo sample={sample} />
-            <% end %>
-          </section>
-
-          <section class="pp-demo-reference" data-demo-block>
-            <article class="pp-demo-panel">
-              <div class="space-y-3">
-                <p class="pp-home-kicker">Configuration atlas</p>
-                <h2 class="pp-route-panel-title">What each HoverCycle control changes</h2>
-                <p class="pp-panel-copy">
-                  The effect is small on purpose. These controls let you tune how dramatic, how fast, and how tightly grouped the break-and-rebuild loop should feel.
-                </p>
-              </div>
-
-              <div class="pp-table-scroll">
-                <table class="rg-table pp-demo-atlas-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Control</th>
-                      <th scope="col">What it changes</th>
-                      <th scope="col">Seen on</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <%= for {label, meaning, example} <- @knob_rows do %>
-                      <tr>
-                        <th scope="row">{label}</th>
-                        <td>{meaning}</td>
-                        <td>{example}</td>
-                      </tr>
-                    <% end %>
-                  </tbody>
-                </table>
-              </div>
-            </article>
-
-            <article class="pp-demo-panel">
-              <div class="space-y-3">
-                <p class="pp-home-kicker">Heerich 0.7.1 additions</p>
-                <h2 class="pp-route-panel-title">What the raw command path unlocks</h2>
-                <p class="pp-panel-copy">
-                  These are the new features this upgrade is using directly, either in the shipped Regent scenes or in the demos on this page.
-                </p>
-              </div>
-
-              <div class="pp-table-scroll">
-                <table class="rg-table pp-demo-atlas-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Feature</th>
-                      <th scope="col">What it changes</th>
-                      <th scope="col">Where it shows up</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <%= for {label, meaning, example} <- @feature_rows do %>
-                      <tr>
-                        <th scope="row">{label}</th>
-                        <td>{meaning}</td>
-                        <td>{example}</td>
-                      </tr>
-                    <% end %>
-                  </tbody>
-                </table>
-              </div>
-            </article>
-
-            <article class="pp-demo-panel">
-              <div class="space-y-3">
-                <p class="pp-home-kicker">Working rules</p>
-                <h2 class="pp-route-panel-title">Use it as scene polish, not hidden state.</h2>
-                <p class="pp-panel-copy">
-                  HoverCycle should help a surface feel alive, but it should never become the only way someone understands meaning or completes a critical action.
-                </p>
-              </div>
-
-              <ul class="pp-demo-rule-list">
-                <%= for rule <- @primer_rules do %>
-                  <li>{rule}</li>
-                <% end %>
-              </ul>
-
-              <div class="pp-demo-code-grid">
-                <article class="pp-demo-code-card">
-                  <p class="pp-home-kicker">Turn it on</p>
-                  <code class="pp-command">{"hoverCycle: true"}</code>
-                </article>
-
-                <article class="pp-demo-code-card">
-                  <p class="pp-home-kicker">Group multiple shapes</p>
-                  <code class="pp-command">
-                    {"hoverCycle: %{\"group\" => \"launch-cluster\", \"mode\" => \"explode\"}"}
-                  </code>
-                </article>
-
-                <article class="pp-demo-code-card">
-                  <p class="pp-home-kicker">Turn it off explicitly</p>
-                  <code class="pp-command">{"hoverCycle: %{\"enabled\" => false}"}</code>
-                </article>
-              </div>
-            </article>
-          </section>
-
-          <section class="pp-demo-panel" data-demo-block>
-            <div class="space-y-3">
-              <p class="pp-home-kicker">Direct JS ownership</p>
-              <h2 class="pp-route-panel-title">
-                Procedural shapes that stay outside Phoenix scene JSON
-              </h2>
-              <p class="pp-panel-copy">
-                These three examples are rendered directly in the browser with the real Heerich runtime. They use `applyGeometry(type: "fill")`, functional style, and functional scale, which stay on the JS side by design instead of crossing the LiveView boundary.
+          <main class="pp-heerich-shell-lane" aria-label="Heerich chamber study">
+            <article class="pp-heerich-shell-panel pp-heerich-shell-panel-hero">
+              <p class="pp-home-kicker">Heerich chamber study</p>
+              <h1 class="pp-home-title">
+                A full-page Regent shell with the content held in the middle.
+              </h1>
+              <p class="pp-home-copy">
+                This study keeps the gold lattice on the ceiling and side walls while the center stays quiet enough for real reading, actions, and long-form pages.
               </p>
+
+              <div class="pp-home-chip-row" aria-label="Chamber study traits">
+                <span>Gold ceiling grid</span>
+                <span>Ink and charcoal walls</span>
+                <span>Centered reading lane</span>
+              </div>
+            </article>
+
+            <section class="pp-heerich-shell-grid" aria-label="Chamber study notes">
+              <article class="pp-heerich-shell-panel">
+                <p class="pp-home-kicker">What this proves</p>
+                <h2 class="pp-route-panel-title">
+                  The shell can frame a page without taking it over.
+                </h2>
+                <ul class="pp-heerich-shell-list">
+                  <%= for item <- @highlights do %>
+                    <li>{item}</li>
+                  <% end %>
+                </ul>
+              </article>
+
+              <article class="pp-heerich-shell-panel">
+                <p class="pp-home-kicker">Best fit</p>
+                <h2 class="pp-route-panel-title">
+                  Use this look when the page needs ceremony and focus.
+                </h2>
+                <ul class="pp-heerich-shell-list">
+                  <%= for item <- @fit_notes do %>
+                    <li>{item}</li>
+                  <% end %>
+                </ul>
+              </article>
+
+              <article class="pp-heerich-shell-panel">
+                <p class="pp-home-kicker">What stays clear</p>
+                <h2 class="pp-route-panel-title">The middle lane still carries the work.</h2>
+                <ul class="pp-heerich-shell-list">
+                  <%= for item <- @clarity_notes do %>
+                    <li>{item}</li>
+                  <% end %>
+                </ul>
+              </article>
+            </section>
+
+            <div class="pp-link-row">
+              <.link navigate={~p"/"} class="pp-link-button">
+                Back to Regents Home <span aria-hidden="true">→</span>
+              </.link>
             </div>
-
-            <div class="pp-procedural-grid">
-              <article class="pp-procedural-card">
-                <div class="space-y-2">
-                  <p class="pp-home-kicker">applyGeometry(type: "fill")</p>
-                  <h3 class="pp-route-panel-title">Procedural torus shell</h3>
-                  <p class="pp-panel-copy">
-                    A shape defined entirely by a test function over `(x, y, z)`, not by boxes or spheres.
-                  </p>
-                </div>
-                <div
-                  id="platform-procedural-demo-fill"
-                  class="pp-procedural-canvas"
-                  phx-hook="HeerichProceduralDemo"
-                  data-demo-kind="fill"
-                >
-                </div>
-              </article>
-
-              <article class="pp-procedural-card">
-                <div class="space-y-2">
-                  <p class="pp-home-kicker">Functional style</p>
-                  <h3 class="pp-route-panel-title">Spectral block</h3>
-                  <p class="pp-panel-copy">
-                    The color is computed per voxel from position, so the shape gets its palette from geometry instead of a single flat fill.
-                  </p>
-                </div>
-                <div
-                  id="platform-procedural-demo-style"
-                  class="pp-procedural-canvas"
-                  phx-hook="HeerichProceduralDemo"
-                  data-demo-kind="style"
-                >
-                </div>
-              </article>
-
-              <article class="pp-procedural-card">
-                <div class="space-y-2">
-                  <p class="pp-home-kicker">Functional scale</p>
-                  <h3 class="pp-route-panel-title">Tapered tower</h3>
-                  <p class="pp-panel-copy">
-                    The mass decays by height, which gives you staircase and taper behaviors without manually authoring every cell.
-                  </p>
-                </div>
-                <div
-                  id="platform-procedural-demo-scale"
-                  class="pp-procedural-canvas"
-                  phx-hook="HeerichProceduralDemo"
-                  data-demo-kind="scale"
-                >
-                </div>
-              </article>
-            </div>
-          </section>
-        </main>
-      </div>
+          </main>
+        </div>
+      </section>
     </Layouts.app>
     """
   end

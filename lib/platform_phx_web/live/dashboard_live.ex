@@ -647,7 +647,7 @@ defmodule PlatformPhxWeb.DashboardLive do
                 Check wallet access
               </h3>
               <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
-                Agent Formation is open to wallets that already hold a pass from Collection I, Collection II, or Regents Club.
+                Start here by signing in and confirming that this wallet holds a pass from Collection I, Collection II, or Regents Club.
               </p>
             </div>
 
@@ -680,10 +680,10 @@ defmodule PlatformPhxWeb.DashboardLive do
                 Setup
               </p>
               <h3 class="font-display text-2xl text-[color:var(--foreground)]">
-                Complete Agent Formation
+                Launch your company
               </h3>
               <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
-                Pick one unused name, make sure billing is active, and start the company launch for your wallet.
+                Finish the launch in this order: choose a claimed name, set up billing, then start the company.
               </p>
             </div>
 
@@ -755,7 +755,7 @@ defmodule PlatformPhxWeb.DashboardLive do
                   <.inline_notice notice={
                     %{
                       tone: :success,
-                      message: "Billing is ready. You can now start your company."
+                      message: "Billing is ready. You can launch this company now."
                     }
                   } />
                   <div class="flex flex-wrap justify-end gap-3">
@@ -764,14 +764,14 @@ defmodule PlatformPhxWeb.DashboardLive do
                       phx-click="start_company"
                       class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--foreground)] px-4 py-2 text-sm text-[color:var(--background)] transition hover:opacity-90"
                     >
-                      Launch my company
+                      Launch this company
                     </button>
                   </div>
                 <% else %>
                   <.inline_notice notice={
                     %{
                       tone: :info,
-                      message: "Finish billing setup before you start your company."
+                      message: "Set up billing before you launch this company."
                     }
                   } />
                   <div class="flex flex-wrap justify-end gap-3">
@@ -1418,9 +1418,9 @@ defmodule PlatformPhxWeb.DashboardLive do
       active_nav: "agent-formation",
       console_id: "agent-formation-wallet-console",
       console_eyebrow: "Agent Formation",
-      console_title: "Complete Agent Formation",
+      console_title: "Launch your company",
       console_copy:
-        "Review your wallet, choose one of your claimed names, and launch your Regent company when billing is ready."
+        "Finish the launch in this order: choose a claimed name, set up billing, then start the company."
     }
   end
 
@@ -1430,9 +1430,9 @@ defmodule PlatformPhxWeb.DashboardLive do
       active_nav: "services",
       console_id: "services-wallet-console",
       console_eyebrow: "Services",
-      console_title: "Manage names and redemptions",
+      console_title: "Prepare your account",
       console_copy:
-        "Use this page to review wallet holdings, claim names, and prepare the account for Agent Formation."
+        "Use this page to check wallet access, redeem passes, claim names, and get ready for company launch."
     }
   end
 

@@ -98,7 +98,7 @@ defmodule PlatformPhxWeb.BugReportLive do
                   <article class="pp-bug-ledger-row" id={dom_id}>
                     <div class="pp-bug-ledger-cell pp-bug-ledger-reporter" data-label="Reporter">
                       <p class="pp-bug-ledger-primary">{reporter_title(report)}</p>
-                      <p class="pp-bug-ledger-secondary">{report.reporter_wallet_address}</p>
+                      <p class="pp-bug-ledger-secondary">{reporter_subtitle(report)}</p>
                     </div>
 
                     <div class="pp-bug-ledger-cell pp-bug-ledger-summary" data-label="Summary">
@@ -142,13 +142,8 @@ defmodule PlatformPhxWeb.BugReportLive do
                       <div class="pp-bug-ledger-drawer-grid">
                         <div class="pp-bug-ledger-drawer-meta">
                           <p class="pp-home-kicker">Reporter identity</p>
-                          <p class="pp-bug-ledger-primary">{report.reporter_registry_address}</p>
-                          <p class="pp-bug-ledger-secondary">
-                            token {report.reporter_token_id}
-                            <%= if report.reporter_label do %>
-                              · {report.reporter_label}
-                            <% end %>
-                          </p>
+                          <p class="pp-bug-ledger-primary">{reporter_identity_primary(report)}</p>
+                          <p class="pp-bug-ledger-secondary">{reporter_identity_secondary(report)}</p>
                         </div>
                         <div class="pp-bug-ledger-drawer-copy">
                           <p class="pp-home-kicker">Details</p>
@@ -178,9 +173,60 @@ defmodule PlatformPhxWeb.BugReportLive do
   end
 
   defp reporter_title(report) do
-    report.reporter_label ||
-      "#{report.reporter_registry_address} · token #{report.reporter_token_id}"
+    cond do
+      present?(report.reporter_label) ->
+        report.reporter_label
+
+      present?(report.reporter_registry_address) and present?(report.reporter_token_id) ->
+        "#{report.reporter_registry_address} · token #{report.reporter_token_id}"
+
+      present?(report.reporter_wallet_address) ->
+        "Signed agent report"
+
+      true ->
+        "Anonymous public report"
+    end
   end
+
+  defp reporter_subtitle(report) do
+    report.reporter_wallet_address || "Sent from the public bug report form"
+  end
+
+  defp reporter_identity_primary(report) do
+    cond do
+      present?(report.reporter_registry_address) and present?(report.reporter_token_id) ->
+        report.reporter_registry_address
+
+      present?(report.reporter_wallet_address) ->
+        report.reporter_wallet_address
+
+      true ->
+        "No wallet was attached to this report."
+    end
+  end
+
+  defp reporter_identity_secondary(report) do
+    cond do
+      present?(report.reporter_registry_address) and present?(report.reporter_token_id) ->
+        token_line(report)
+
+      present?(report.reporter_wallet_address) ->
+        "Wallet-backed submission"
+
+      true ->
+        "This report came through the public form."
+    end
+  end
+
+  defp token_line(report) do
+    label_suffix =
+      if present?(report.reporter_label), do: " · #{report.reporter_label}", else: ""
+
+    "token #{report.reporter_token_id}#{label_suffix}"
+  end
+
+  defp present?(value) when is_binary(value), do: String.trim(value) != ""
+  defp present?(_value), do: false
 
   defp format_datetime(nil), do: "Unknown time"
 

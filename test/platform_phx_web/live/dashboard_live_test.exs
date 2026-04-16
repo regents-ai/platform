@@ -156,10 +156,10 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     assert_patch(view, "/agent-formation?claimedLabel=tempo&stage=setup")
 
     html = render(view)
-    assert html =~ "Complete Agent Formation"
+    assert html =~ "Launch your company"
 
     assert html =~
-             "Pick one unused name, make sure billing is active, and start the company launch for your wallet."
+             "Finish the launch in this order: choose a claimed name, set up billing, then start the company."
 
     assert html =~ "tempo.regent.eth"
   end
@@ -246,7 +246,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       |> live("/agent-formation?stage=setup&claimedLabel=#{launch_label}")
 
     view
-    |> element("button", "Launch my company")
+    |> element("button", "Launch this company")
     |> render_click()
 
     assert_patch(

@@ -890,33 +890,37 @@ components:
           type: string
     ReportingAgent:
       type: object
-      required: [wallet_address, chain_id, registry_address, token_id]
+      required: [wallet_address, chain_id]
       properties:
         wallet_address: {type: string}
         chain_id: {type: integer}
-        registry_address: {type: string}
-        token_id: {type: string}
+        registry_address: {type: [string, 'null']}
+        token_id: {type: [string, 'null']}
         label: {type: [string, 'null']}
     ReportStatus:
       type: string
       enum: [pending, fixed, won't fix, duplicate]
     BugReportRequest:
       type: object
-      required: [summary, details, reporting_agent]
+      required: [summary, details]
       properties:
         summary: {type: string}
         details: {type: string}
         reporting_agent:
-          $ref: '#/components/schemas/ReportingAgent'
+          oneOf:
+            - $ref: '#/components/schemas/ReportingAgent'
+            - {type: 'null'}
     SecurityReportRequest:
       type: object
-      required: [summary, details, contact, reporting_agent]
+      required: [summary, details, contact]
       properties:
         summary: {type: string}
         details: {type: string}
         contact: {type: string}
         reporting_agent:
-          $ref: '#/components/schemas/ReportingAgent'
+          oneOf:
+            - $ref: '#/components/schemas/ReportingAgent'
+            - {type: 'null'}
     BugReportRecord:
       type: object
       required: [report_id, summary, details, status, reporting_agent, created_at]
@@ -927,7 +931,9 @@ components:
         status:
           $ref: '#/components/schemas/ReportStatus'
         reporting_agent:
-          $ref: '#/components/schemas/ReportingAgent'
+          oneOf:
+            - $ref: '#/components/schemas/ReportingAgent'
+            - {type: 'null'}
         created_at: {type: string, format: date-time}
     SecurityReportRecord:
       type: object
@@ -938,7 +944,9 @@ components:
         details: {type: string}
         contact: {type: string}
         reporting_agent:
-          $ref: '#/components/schemas/ReportingAgent'
+          oneOf:
+            - $ref: '#/components/schemas/ReportingAgent'
+            - {type: 'null'}
         created_at: {type: string, format: date-time}
     BugReportResponse:
       type: object
@@ -1186,8 +1194,6 @@ components:
         nonce: {type: string}
         message: {type: string}
         signature: {type: string}
-        registry_address: {type: [string, 'null']}
-        token_id: {type: [string, 'null']}
     SiwaVerifyResponse:
       type: object
       required: [ok, code, data]
@@ -1215,7 +1221,7 @@ components:
         headers:
           type: object
           additionalProperties: {type: string}
-        body_digest: {type: [string, 'null']}
+        body: {type: [string, 'null']}
     SiwaHttpVerifyResponse:
       type: object
       required: [ok, code, data]
@@ -1224,12 +1230,14 @@ components:
         code: {type: string}
         data:
           type: object
-          required: [verified, walletAddress, chainId, keyId, receiptExpiresAt, requiredHeaders, requiredCoveredComponents, coveredComponents]
+          required: [verified, walletAddress, chainId, keyId, agent_claims, receiptExpiresAt, requiredHeaders, requiredCoveredComponents, coveredComponents]
           properties:
             verified: {type: boolean}
             walletAddress: {type: string}
             chainId: {type: integer}
             keyId: {type: string}
+            agent_claims:
+              $ref: '#/components/schemas/ReportingAgent'
             receiptExpiresAt: {type: string, format: date-time}
             requiredHeaders:
               type: array
