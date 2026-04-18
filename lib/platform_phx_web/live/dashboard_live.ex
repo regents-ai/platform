@@ -876,11 +876,9 @@ defmodule PlatformPhxWeb.DashboardLive do
                     aria-label={"Open Regents Club ##{token_id} on OpenSea"}
                   >
                     <%= if entry = Map.get(@formation_token_cards, token_id) do %>
-                      <script type="application/json" data-token-card-json>
-                        <%= raw(Jason.encode!(entry)) %>
-                      </script>
                       <div
                         data-token-card-root
+                        data-token-card-entry={PlatformPhxWeb.TokenCardPayload.encode(entry)}
                         data-token-card-layout="embedded"
                         data-token-card-active="false"
                       >

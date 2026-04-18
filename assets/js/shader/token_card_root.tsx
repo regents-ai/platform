@@ -10,15 +10,26 @@ type MountedTokenCardRoot = {
 
 const roots = new WeakMap<Element, MountedTokenCardRoot>();
 
-function readEntry(el: Element): TokenCardManifestEntry {
-  const container = el.closest("[data-token-card-page]") ?? el.parentElement;
-  const script = container?.querySelector<HTMLScriptElement>("[data-token-card-json]");
+function decodeBase64Url(raw: string): string {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(raw, "base64url").toString("utf8");
+  }
 
-  if (!script?.textContent) {
+  const normalized = raw.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  const binary = globalThis.atob(padded);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function readEntry(el: Element): TokenCardManifestEntry {
+  const payload = el.getAttribute("data-token-card-entry");
+
+  if (!payload) {
     throw new Error("Token card page is missing its manifest payload.");
   }
 
-  return JSON.parse(script.textContent) as TokenCardManifestEntry;
+  return JSON.parse(decodeBase64Url(payload)) as TokenCardManifestEntry;
 }
 
 function readLayout(el: Element): "page" | "embedded" {

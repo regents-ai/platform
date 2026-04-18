@@ -2,6 +2,7 @@ import { animate } from "animejs";
 import type { HeerichInstance } from "../regent/js/heerich_types";
 import { prefersReducedMotion } from "../regent/js/regent_motion";
 import { COLOR_MODE_CHANGE_EVENT, type ColorMode } from "./color_mode";
+import { mountSvgMarkup } from "./svg_mount.ts";
 
 type VoxelBackgroundVariant = "home" | "dashboard";
 
@@ -383,7 +384,7 @@ class VoxelBackgroundController implements VoxelBackgroundCleanup {
 
     const frame = this.doc.createElement("div");
     frame.className = "pp-voxel-background-frame";
-    frame.innerHTML = engine.toSVG({ padding: 12 });
+    mountSvgMarkup(frame, engine.toSVG({ padding: 12 }));
     this.el.replaceChildren(frame);
 
     const svg = frame.querySelector<SVGSVGElement>("svg");

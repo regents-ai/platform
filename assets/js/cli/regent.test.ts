@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import type { AddressInfo } from "node:net";
 
-import { executeRegentCommand, parseRegentCommand, usageText } from "./regent_cli.ts";
+import { executeRegentCommand, parseRegentCommand, usageText } from "./regents_cli.ts";
 
 test("usage text mentions shader and platform commands", () => {
   const help = usageText();
@@ -17,7 +17,7 @@ test("usage text mentions shader and platform commands", () => {
 });
 
 test("shader list command still parses usage filter", () => {
-  const command = parseRegentCommand(["shader", "list", "--usage", "avatar"], "/tmp/regent-cli");
+  const command = parseRegentCommand(["shader", "list", "--usage", "avatar"], "/tmp/regents-cli");
   assert.deepEqual(command, {
     kind: "shader-list",
     usage: "avatar",
@@ -39,7 +39,7 @@ test("platform auth login can read the identity token from the default environme
         "--session-file",
         "./platform-session.json",
       ],
-      "/tmp/regent-cli",
+      "/tmp/regents-cli",
     );
 
     assert.equal(command.kind, "platform-auth-login");
@@ -47,7 +47,7 @@ test("platform auth login can read the identity token from the default environme
 
     assert.equal(command.identityToken, "env-token");
     assert.equal(command.display_name, "Regent Operator");
-    assert.equal(command.sessionFile, "/tmp/regent-cli/platform-session.json");
+    assert.equal(command.sessionFile, "/tmp/regents-cli/platform-session.json");
   } finally {
     if (previousToken === undefined) {
       delete process.env.REGENT_PLATFORM_IDENTITY_TOKEN;
@@ -58,7 +58,7 @@ test("platform auth login can read the identity token from the default environme
 });
 
 test("platform CLI signs in, reuses the saved session, performs a write action, and logs out", async (t) => {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), "regent-cli-"));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "regents-cli-"));
   const sessionFile = path.join(tempDir, "platform-session.json");
   const requests: Array<{ method: string; url: string; cookie: string | null; csrf: string | null; body: string }> = [];
 

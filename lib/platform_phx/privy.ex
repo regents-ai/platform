@@ -15,8 +15,7 @@ defmodule PlatformPhx.Privy do
           | {:error, term()}
   def verify_token(token) when is_binary(token) do
     with {:ok, app_id, verification_key} <- fetch_config(),
-         signer <- Joken.Signer.create("ES256", %{"pem" => verification_key}),
-         {:ok, claims} <- Joken.verify(token, signer),
+         {:ok, claims} <- verify_claims(token, verification_key),
          :ok <- validate_issuer(claims),
          :ok <- validate_audience(claims, app_id),
          :ok <- validate_time_claims(claims),
@@ -37,6 +36,42 @@ defmodule PlatformPhx.Privy do
     _ -> {:error, :invalid_token}
   end
 
+  def describe_verify_error(:missing_privy_config),
+    do: "Privy settings are missing from this environment."
+
+  def describe_verify_error(:invalid_verification_key),
+    do: "The Privy verification key could not be used."
+
+  def describe_verify_error(:token_verification_failed),
+    do: "The Privy identity token could not be verified."
+
+  def describe_verify_error(:invalid_issuer),
+    do: "The Privy identity token issuer was not accepted."
+
+  def describe_verify_error(:invalid_audience),
+    do: "The Privy identity token was issued for a different Privy app."
+
+  def describe_verify_error(:token_expired),
+    do: "The Privy identity token has expired."
+
+  def describe_verify_error(:token_not_yet_valid),
+    do: "The Privy identity token is not valid yet."
+
+  def describe_verify_error(:token_issued_in_future),
+    do: "The Privy identity token issue time is in the future."
+
+  def describe_verify_error(:invalid_subject),
+    do: "The Privy identity token did not include a valid person identifier."
+
+  def describe_verify_error(:invalid_linked_accounts),
+    do: "The Privy identity token linked wallet data was invalid."
+
+  def describe_verify_error(:invalid_token),
+    do: "The Privy identity token was malformed or unreadable."
+
+  def describe_verify_error(reason),
+    do: "Unexpected Privy verification failure: #{inspect(reason)}"
+
   def fetch_config do
     app_id = RuntimeConfig.privy_app_id()
     verification_key = RuntimeConfig.privy_verification_key()
@@ -49,18 +84,30 @@ defmodule PlatformPhx.Privy do
     end
   end
 
+  defp verify_claims(token, verification_key) do
+    signer = Joken.Signer.create("ES256", %{"pem" => verification_key})
+
+    case Joken.verify(token, signer) do
+      {:ok, claims} when is_map(claims) -> {:ok, claims}
+      {:error, _reason} -> {:error, :token_verification_failed}
+      _ -> {:error, :invalid_token}
+    end
+  rescue
+    _ -> {:error, :invalid_verification_key}
+  end
+
   defp validate_issuer(%{"iss" => "privy.io"}), do: :ok
-  defp validate_issuer(_claims), do: {:error, :invalid_claims}
+  defp validate_issuer(_claims), do: {:error, :invalid_issuer}
 
   defp validate_audience(%{"aud" => audience}, app_id) when is_binary(audience) do
-    if audience == app_id, do: :ok, else: {:error, :invalid_claims}
+    if audience == app_id, do: :ok, else: {:error, :invalid_audience}
   end
 
   defp validate_audience(%{"aud" => audiences}, app_id) when is_list(audiences) do
-    if app_id in audiences, do: :ok, else: {:error, :invalid_claims}
+    if app_id in audiences, do: :ok, else: {:error, :invalid_audience}
   end
 
-  defp validate_audience(_claims, _app_id), do: {:error, :invalid_claims}
+  defp validate_audience(_claims, _app_id), do: {:error, :invalid_audience}
 
   defp validate_time_claims(claims) do
     now = System.system_time(:second)
@@ -77,7 +124,7 @@ defmodule PlatformPhx.Privy do
     case Map.fetch(claims, "nbf") do
       :error -> :ok
       {:ok, nbf} when is_integer(nbf) and nbf <= now -> :ok
-      _ -> {:error, :invalid_claims}
+      _ -> {:error, :token_not_yet_valid}
     end
   end
 
@@ -85,26 +132,26 @@ defmodule PlatformPhx.Privy do
     case Map.fetch(claims, "iat") do
       :error -> :ok
       {:ok, iat} when is_integer(iat) and iat <= now + 60 -> :ok
-      _ -> {:error, :invalid_claims}
+      _ -> {:error, :token_issued_in_future}
     end
   end
 
   defp fetch_integer_claim(claims, claim_name) do
     case Map.fetch(claims, claim_name) do
       {:ok, value} when is_integer(value) -> {:ok, value}
-      _ -> {:error, :invalid_claims}
+      _ -> {:error, :invalid_token}
     end
   end
 
   defp ensure_future(exp, now) when exp > now, do: :ok
-  defp ensure_future(_exp, _now), do: {:error, :invalid_claims}
+  defp ensure_future(_exp, _now), do: {:error, :token_expired}
 
   defp fetch_subject(%{"sub" => privy_user_id})
        when is_binary(privy_user_id) and privy_user_id != "" do
     {:ok, privy_user_id}
   end
 
-  defp fetch_subject(_claims), do: {:error, :invalid_claims}
+  defp fetch_subject(_claims), do: {:error, :invalid_subject}
 
   defp fetch_wallet_addresses(%{"linked_accounts" => linked_accounts})
        when is_binary(linked_accounts) do
@@ -115,7 +162,7 @@ defmodule PlatformPhx.Privy do
        |> Enum.flat_map(&linked_account_addresses/1)
        |> Enum.uniq()}
     else
-      _ -> {:error, :invalid_claims}
+      _ -> {:error, :invalid_linked_accounts}
     end
   end
 

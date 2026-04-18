@@ -11,6 +11,8 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
   @signed_wallet_address "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
   @signed_chain_id 84_532
   @registry_address "0x2222222222222222222222222222222222222222"
+  @signed_registry_address "0x3333333333333333333333333333333333333333"
+  @signed_token_id "77"
 
   test "bug endpoint stores and confirms a report", %{conn: conn} do
     response =
@@ -104,7 +106,7 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
     assert response["statusMessage"] =~ "can't be blank"
   end
 
-  test "signed agent bug route stores the verified wallet-backed identity", %{conn: conn} do
+  test "signed agent bug route stores the verified agent identity", %{conn: conn} do
     body =
       Jason.encode!(%{"summary" => "signed route", "details" => "keeps verified identity only"})
 
@@ -117,8 +119,30 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
 
     assert response["report"]["reporting_agent"]["wallet_address"] == @signed_wallet_address
     assert response["report"]["reporting_agent"]["chain_id"] == @signed_chain_id
-    assert response["report"]["reporting_agent"]["registry_address"] == nil
-    assert response["report"]["reporting_agent"]["token_id"] == nil
+    assert response["report"]["reporting_agent"]["registry_address"] == @signed_registry_address
+    assert response["report"]["reporting_agent"]["token_id"] == @signed_token_id
+    refute Map.has_key?(response["report"]["reporting_agent"], "label")
+  end
+
+  test "signed agent security route stores the verified agent identity", %{conn: conn} do
+    body =
+      Jason.encode!(%{
+        "summary" => "signed security route",
+        "details" => "keeps verified identity only",
+        "contact" => "ops@regents.sh"
+      })
+
+    response =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_headers(agent_headers("/v1/agent/security-report", body))
+      |> post("/v1/agent/security-report", body)
+      |> json_response(200)
+
+    assert response["report"]["reporting_agent"]["wallet_address"] == @signed_wallet_address
+    assert response["report"]["reporting_agent"]["chain_id"] == @signed_chain_id
+    assert response["report"]["reporting_agent"]["registry_address"] == @signed_registry_address
+    assert response["report"]["reporting_agent"]["token_id"] == @signed_token_id
     refute Map.has_key?(response["report"]["reporting_agent"], "label")
   end
 
@@ -137,6 +161,8 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
       "x-timestamp" => Integer.to_string(created),
       "x-agent-wallet-address" => @signed_wallet_address,
       "x-agent-chain-id" => Integer.to_string(@signed_chain_id),
+      "x-agent-registry-address" => @signed_registry_address,
+      "x-agent-token-id" => @signed_token_id,
       "content-digest" => Siwa.content_digest_for_body(body)
     }
 
@@ -148,6 +174,8 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
       "x-timestamp",
       "x-agent-wallet-address",
       "x-agent-chain-id",
+      "x-agent-registry-address",
+      "x-agent-token-id",
       "content-digest"
     ]
 
@@ -187,6 +215,8 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
              Siwa.issue_nonce(%{
                "wallet_address" => @signed_wallet_address,
                "chain_id" => @signed_chain_id,
+               "registry_address" => @signed_registry_address,
+               "token_id" => @signed_token_id,
                "audience" => "regents.sh"
              })
 
@@ -205,6 +235,8 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
              Siwa.verify_session(%{
                "wallet_address" => @signed_wallet_address,
                "chain_id" => @signed_chain_id,
+               "registry_address" => @signed_registry_address,
+               "token_id" => @signed_token_id,
                "nonce" => nonce,
                "message" => String.trim(message),
                "signature" =>

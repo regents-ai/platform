@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
-  title: Regent CLI Contract
+  title: Regents CLI Contract
   version: 0.1.0
-  description: Canonical Regent CLI surface for two jobs: local shader work and guided platform account, billing, company, and runtime control from the terminal.
+  description: Canonical Regents CLI surface for two jobs: local shader work and guided platform account, billing, company, and runtime control from the terminal.
 commands:
   - name: regent shader list
     summary: List the available shader avatars and their editable parameters.

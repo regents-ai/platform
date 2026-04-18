@@ -140,6 +140,65 @@ export interface UsePrivyWalletClientResult {
   ready: boolean;
 }
 
+export function getLinkedWalletAddressesFromPrivyUser(
+  privyUser: unknown,
+): `0x${string}`[] {
+  const user = privyUser as PrivyUserLike | null | undefined;
+
+  if (!user) return [];
+
+  const candidateAddresses = new Set<`0x${string}`>();
+
+  if (user.wallet?.address) {
+    candidateAddresses.add(user.wallet.address);
+  }
+
+  const linkedAccounts = Array.isArray(user.linkedAccounts) ? user.linkedAccounts : [];
+
+  linkedAccounts.forEach((account) => {
+    if (
+      (account.type === "wallet" ||
+        account.type === "wallet_account" ||
+        account.type === "ethereum") &&
+      typeof account.address === "string"
+    ) {
+      candidateAddresses.add(account.address);
+    }
+  });
+
+  return Array.from(candidateAddresses);
+}
+
+export function formatPrivySessionErrorMessage(error: unknown): string {
+  const message =
+    error instanceof Error && typeof error.message === "string"
+      ? error.message.trim()
+      : "";
+  const status =
+    typeof error === "object" &&
+      error !== null &&
+      "status" in error &&
+      typeof error.status === "number"
+      ? error.status
+      : null;
+
+  if (status === 429 || /too many requests/i.test(message)) {
+    return "Too many sign-in attempts just now.\nWait a few seconds, then try again.";
+  }
+
+  if (
+    message === "" ||
+    status === 401 ||
+    /privy identity token/i.test(message) ||
+    /linked wallet required/i.test(message) ||
+    /wallet session is not ready/i.test(message)
+  ) {
+    return "Could not finish sign in.\nWait a few seconds, then try again. If it keeps happening, disconnect your wallet and connect it again.";
+  }
+
+  return message;
+}
+
 export function usePrivyWalletClient(): UsePrivyWalletClientResult {
   const { user: privyUser } = usePrivy();
   const { wallet: activeWallet } = useActiveWallet();

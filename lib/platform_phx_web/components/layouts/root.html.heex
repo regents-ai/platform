@@ -3,7 +3,7 @@
   <head>
     <% share_title = assigns[:page_title] || "Regents Labs" %>
     <% share_description =
-      "The Regent website guides wallet setup, company launch, and public company pages, while Regent CLI handles local Techtree and Autolaunch work." %>
+      "The Regent website guides wallet setup, company launch, and public company pages, while Regents CLI handles local Techtree and Autolaunch work." %>
     <% site_url = PlatformPhxWeb.Endpoint.url() %>
     <% share_image_url = site_url <> ~p"/images/og-image.png" %>
 
@@ -39,7 +39,7 @@
     <.live_title default="Regent Platform" suffix="">
       {assigns[:page_title]}
     </.live_title>
-    <script>
+    <script nonce={assigns[:csp_nonce]}>
       (() => {
         const prefersDark = () => {
           try {

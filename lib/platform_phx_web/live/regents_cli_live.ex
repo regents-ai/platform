@@ -17,7 +17,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
 
     {:ok,
      socket
-     |> assign(:page_title, "Regent CLI")
+     |> assign(:page_title, "Regents CLI")
      |> assign(:intro, intro)
      |> assign(:quick_start, quick_start)
      |> assign(:quick_start_note, quick_start_note)
@@ -51,11 +51,11 @@ defmodule PlatformPhxWeb.RegentCliLive do
       current_scope={assigns[:current_scope]}
       current_human={assigns[:current_human]}
       chrome={:app}
-      active_nav="regent-cli"
+      active_nav="regents-cli"
       theme_class="rg-regent-theme-platform"
     >
       <div
-        id="platform-regent-cli-shell"
+        id="platform-regents-cli-shell"
         class="pp-route-shell rg-regent-theme-platform"
         phx-hook="BridgeReveal"
       >
@@ -64,18 +64,18 @@ defmodule PlatformPhxWeb.RegentCliLive do
             <article class="pp-route-panel pp-route-panel-span">
               <div class="pp-route-panel-heading">
                 <div class="space-y-3">
-                  <p class="pp-home-kicker">Regent CLI</p>
+                  <p class="pp-home-kicker">Regents CLI</p>
                   <h2 class="pp-route-panel-title">
-                    Use Regent CLI when the work starts on your machine.
+                    Use Regents CLI when the work starts on your machine.
                   </h2>
                 </div>
                 <button
-                  id="platform-regent-cli-markdown-copy"
+                  id="platform-regents-cli-markdown-copy"
                   type="button"
                   phx-hook="ClipboardCopy"
                   class="pp-copy-chip pp-copy-chip--wide"
-                  aria-label="Copy Regent CLI page as markdown"
-                  title="Copy Regent CLI page as markdown"
+                  aria-label="Copy Regents CLI page as markdown"
+                  title="Copy Regents CLI page as markdown"
                   data-copy-text={@page_markdown}
                 >
                   <span>Copy page as markdown</span>
@@ -122,9 +122,9 @@ defmodule PlatformPhxWeb.RegentCliLive do
                 The CLI handles local work. The website handles guided account and company setup.
               </h2>
               <ul class="pp-fact-list">
-                <%= for {command, body} <- @mental_model do %>
+                <%= for item <- @mental_model do %>
                   <li>
-                    {Phoenix.HTML.raw(command)} {body}
+                    <.rich_fragments fragments={item} />
                   </li>
                 <% end %>
               </ul>
@@ -137,7 +137,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
               </h2>
               <ul class="pp-fact-list">
                 <%= for rule <- @common_rules do %>
-                  <li>{Phoenix.HTML.raw(rule)}</li>
+                  <li><.rich_fragments fragments={rule} /></li>
                 <% end %>
               </ul>
             </article>
@@ -154,7 +154,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
                   <section class="pp-product-cli-card">
                     <p class="pp-home-kicker">{group.title}</p>
                     <pre class="pp-product-cli-command">{Enum.join(group.commands, "\n")}</pre>
-                    <p class="pp-panel-copy">{Phoenix.HTML.raw(group.body)}</p>
+                    <p class="pp-panel-copy"><.rich_fragments fragments={group.body_fragments} /></p>
                   </section>
                 <% end %>
               </div>
@@ -169,7 +169,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
               </h2>
               <ul class="pp-fact-list">
                 <%= for item <- @guidance do %>
-                  <li>{Phoenix.HTML.raw(item)}</li>
+                  <li><.rich_fragments fragments={item} /></li>
                 <% end %>
               </ul>
             </article>
@@ -192,7 +192,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
          guidance: guidance
        }) do
     [
-      "# Regent CLI",
+      "# Regents CLI",
       "",
       intro,
       "",
@@ -218,8 +218,8 @@ defmodule PlatformPhxWeb.RegentCliLive do
       ""
     ])
     |> Kernel.++(
-      Enum.map(mental_model, fn {command, body} ->
-        "- #{String.replace(command, "`", "")} #{body}"
+      Enum.map(mental_model, fn fragments ->
+        "- #{fragments_to_markdown(fragments)}"
       end)
     )
     |> Kernel.++([
@@ -227,7 +227,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
       "## Common rules",
       ""
     ])
-    |> Kernel.++(Enum.map(common_rules, &"- #{strip_backticks(&1)}"))
+    |> Kernel.++(Enum.map(common_rules, &"- #{fragments_to_markdown(&1)}"))
     |> Kernel.++([
       "",
       "## First commands to know",
@@ -242,7 +242,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
           Enum.join(group.commands, "\n"),
           "```",
           "",
-          strip_backticks(group.body),
+          fragments_to_markdown(group.body_fragments),
           ""
         ]
       end)
@@ -251,12 +251,21 @@ defmodule PlatformPhxWeb.RegentCliLive do
       "## Guidance for humans and agents",
       ""
     ])
-    |> Kernel.++(Enum.map(guidance, &"- #{strip_backticks(&1)}"))
+    |> Kernel.++(Enum.map(guidance, &"- #{fragments_to_markdown(&1)}"))
     |> List.flatten()
     |> Enum.join("\n")
   end
 
-  defp strip_backticks(text) when is_binary(text) do
-    String.replace(text, "`", "")
+  defp fragments_to_markdown(fragments) when is_list(fragments) do
+    fragments
+    |> Enum.map(fn fragment ->
+      case fragment.type do
+        :text -> fragment.text
+        :code -> "`#{fragment.text}`"
+        :highlight -> fragment.text
+        :link -> "[#{fragment.label}](#{fragment.href})"
+      end
+    end)
+    |> Enum.join()
   end
 end

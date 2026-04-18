@@ -11,6 +11,7 @@ import {
   mountDashboardPrivyBridge,
   unmountDashboardPrivyBridge,
 } from "./dashboard/islands";
+import { mountBoundHook } from "./dashboard/hook_lifecycle";
 import { DashboardXmtpRoomHook } from "./dashboard/xmtp_room";
 import { mountShaderRoot, unmountShaderRoot } from "./shader/root";
 import { mountTokenCardRoot, unmountTokenCardRoot, updateTokenCardRoot } from "./shader/token_card_root";
@@ -61,14 +62,6 @@ function createRevealHook(
   };
 }
 
-function mountDashboardHook(
-  context: HookContext,
-  binder: (el: HTMLElement) => () => void,
-) {
-  context.__dashboardCleanup?.();
-  context.__dashboardCleanup = binder(context.el as HTMLElement);
-}
-
 const DashboardPrivyBridgeHook = {
   mounted(this: HookContext) {
     mountDashboardPrivyBridge(this.el);
@@ -80,10 +73,10 @@ const DashboardPrivyBridgeHook = {
 
 const DashboardWalletHook = {
   mounted(this: HookContext) {
-    mountDashboardHook(this, bindDashboardWallet);
+    mountBoundHook(this, bindDashboardWallet);
   },
   updated(this: HookContext) {
-    mountDashboardHook(this, bindDashboardWallet);
+    mountBoundHook(this, bindDashboardWallet);
   },
   destroyed(this: HookContext) {
     this.__dashboardCleanup?.();
@@ -92,10 +85,10 @@ const DashboardWalletHook = {
 
 const DashboardNameClaimHook = {
   mounted(this: HookContext) {
-    mountDashboardHook(this, bindDashboardNameClaim);
+    mountBoundHook(this, bindDashboardNameClaim);
   },
   updated(this: HookContext) {
-    mountDashboardHook(this, bindDashboardNameClaim);
+    mountBoundHook(this, bindDashboardNameClaim);
   },
   destroyed(this: HookContext) {
     this.__dashboardCleanup?.();
@@ -104,10 +97,10 @@ const DashboardNameClaimHook = {
 
 const DashboardRedeemHook = {
   mounted(this: HookContext) {
-    mountDashboardHook(this, bindDashboardRedeem);
+    mountBoundHook(this, bindDashboardRedeem);
   },
   updated(this: HookContext) {
-    mountDashboardHook(this, bindDashboardRedeem);
+    mountBoundHook(this, bindDashboardRedeem);
   },
   destroyed(this: HookContext) {
     this.__dashboardCleanup?.();

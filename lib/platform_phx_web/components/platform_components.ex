@@ -43,10 +43,10 @@ defmodule PlatformPhxWeb.PlatformComponents do
           <p class="pp-entry-eyebrow">{@card.eyebrow}</p>
           <div class="space-y-3">
             <h2 class="pp-entry-title">{@card.title}</h2>
-            <p :if={Map.has_key?(@card, :description_html)} class="pp-entry-description">
-              {Phoenix.HTML.raw(@card.description_html)}
+            <p :if={Map.has_key?(@card, :description_fragments)} class="pp-entry-description">
+              <.rich_fragments fragments={@card.description_fragments} />
             </p>
-            <p :if={!Map.has_key?(@card, :description_html)} class="pp-entry-description">
+            <p :if={!Map.has_key?(@card, :description_fragments)} class="pp-entry-description">
               {@card.description}
             </p>
           </div>
@@ -103,7 +103,7 @@ defmodule PlatformPhxWeb.PlatformComponents do
     ~H"""
     <section class="pp-cli-boot" aria-label={"#{@title} CLI setup"}>
       <div class="space-y-3">
-        <p class="pp-home-kicker">Regent CLI</p>
+        <p class="pp-home-kicker">Regents CLI</p>
         <h2 class="pp-route-panel-title">{@title}</h2>
         <p class="pp-panel-copy">{@summary}</p>
       </div>
@@ -180,6 +180,45 @@ defmodule PlatformPhxWeb.PlatformComponents do
       </span>
     <% end %>
     """
+  end
+
+  attr :fragments, :list, required: true
+
+  def rich_fragments(assigns) do
+    ~H"""
+    <%= for fragment <- @fragments do %>
+      <%= case fragment.type do %>
+        <% :text -> %>
+          {fragment.text}
+        <% :code -> %>
+          <code>{fragment.text}</code>
+        <% :highlight -> %>
+          <span class={Map.get(fragment, :class, "pp-token-fee-highlight")}>{fragment.text}</span>
+        <% :link -> %>
+          <a
+            href={fragment_href!(fragment)}
+            target={if Map.get(fragment, :external, true), do: "_blank", else: nil}
+            rel={if Map.get(fragment, :external, true), do: "noreferrer", else: nil}
+            class={Map.get(fragment, :class, "pp-entry-inline-link-soft")}
+          >
+            {fragment.label}
+          </a>
+      <% end %>
+    <% end %>
+    """
+  end
+
+  defp fragment_href!(fragment) do
+    href = Map.fetch!(fragment, :href)
+
+    case URI.parse(href) do
+      %URI{scheme: scheme, host: host}
+      when scheme in ["http", "https"] and is_binary(host) and host != "" ->
+        href
+
+      _other ->
+        raise ArgumentError, "rich_fragments link fragments require an http or https URL"
+    end
   end
 
   attr :sample, :map, required: true

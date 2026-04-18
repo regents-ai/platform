@@ -141,19 +141,43 @@ defmodule PlatformPhxWeb.TokenInfoLive do
     %{
       title: "Autolaunch",
       short: "Hook + auction fees",
-      body_html:
-        "<span class=\"pp-token-fee-highlight\">1%</span> of every agent token's trading fees from the Uniswap v4 fee hook<br /><span class=\"pp-token-fee-highlight\">2%</span> of raised USDC in CCA auctions."
+      body_lines: [
+        [
+          %{type: :highlight, text: "1%"},
+          %{
+            type: :text,
+            text: " of every agent token's trading fees from the Uniswap v4 fee hook"
+          }
+        ],
+        [
+          %{type: :highlight, text: "2%"},
+          %{type: :text, text: " of raised USDC in CCA auctions."}
+        ]
+      ]
     },
     %{
       title: "Techtree",
       short: "Agent token earnings",
-      body_html: "<span class=\"pp-token-fee-highlight\">1%</span> of agent token earnings."
+      body_lines: [
+        [
+          %{type: :highlight, text: "1%"},
+          %{type: :text, text: " of agent token earnings."}
+        ]
+      ]
     },
     %{
       title: "Stablecoin Revenues",
       short: "Revsplit-tracked gross revenue",
-      body_html:
-        "<span class=\"pp-token-fee-highlight\">1%</span> of gross revenue for all agents, from x402, MPP, and other sources. Tracked onchain through the revsplit contract."
+      body_lines: [
+        [
+          %{type: :highlight, text: "1%"},
+          %{
+            type: :text,
+            text:
+              " of gross revenue for all agents, from x402, MPP, and other sources. Tracked onchain through the revsplit contract."
+          }
+        ]
+      ]
     },
     %{
       title: "Regents Platform",
@@ -317,8 +341,11 @@ defmodule PlatformPhxWeb.TokenInfoLive do
                     <p class="pp-token-source-title">{source.title}</p>
                     <p class="pp-token-source-short">{source.short}</p>
                     <p class="pp-panel-copy">
-                      <%= if Map.has_key?(source, :body_html) do %>
-                        {Phoenix.HTML.raw(source.body_html)}
+                      <%= if Map.has_key?(source, :body_lines) do %>
+                        <%= for {line, index} <- Enum.with_index(source.body_lines) do %>
+                          <.rich_fragments fragments={line} />
+                          <br :if={index < length(source.body_lines) - 1} />
+                        <% end %>
                       <% else %>
                         {source.body}
                       <% end %>

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import process from "node:process";
 
-import { executeRegentCommand, parseRegentCommand, usageText } from "./regent_cli.ts";
+import { executeRegentCommand, parseRegentCommand, usageText } from "./regents_cli.ts";
 
 async function main() {
   const command = parseRegentCommand(process.argv.slice(2), process.cwd());

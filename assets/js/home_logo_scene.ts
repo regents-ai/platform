@@ -11,6 +11,7 @@ import type {
   SceneSpec,
   ScaleVector,
 } from "../regent/js/regent_scene_protocol";
+import { mountSceneError, mountSvgMarkup, parseSvgMarkup } from "./svg_mount.ts";
 
 const HOME_LOGO_BUILD_DURATION_MS = 3000;
 const HOME_LOGO_DISSOLUTION_DURATION_MS = 1000;
@@ -343,9 +344,7 @@ class AnimatedHomeLogoScene {
     });
 
     const markup = engine.toSVG({ padding: HOME_LOGO_PADDING });
-    const template = document.createElement("template");
-    template.innerHTML = markup.trim();
-    const svg = template.content.querySelector("svg");
+    const svg = parseSvgMarkup(markup, document);
     const viewBox = svg?.getAttribute("viewBox") ?? null;
 
     engine.clear();
@@ -447,8 +446,7 @@ class AnimatedHomeLogoScene {
     const engine = this.ensureEngine();
 
     if (!engine || !this.face || this.commands.length === 0) {
-      this.hook.el.innerHTML =
-        `<div class="rg-scene-error"><strong>Home logo surface unavailable.</strong></div>`;
+      mountSceneError(this.hook.el, "Home logo surface unavailable.");
       return;
     }
 
@@ -486,17 +484,20 @@ class AnimatedHomeLogoScene {
       });
     });
 
-    this.hook.el.innerHTML = engine.toSVG({
-      padding: HOME_LOGO_PADDING,
-      faceAttributes: (face) => {
-        const voxel = face.voxel;
-        if (!voxel) return {};
+    mountSvgMarkup(
+      this.hook.el,
+      engine.toSVG({
+        padding: HOME_LOGO_PADDING,
+        faceAttributes: (face) => {
+          const voxel = face.voxel;
+          if (!voxel) return {};
 
-        return {
-          "data-home-logo-voxel-key": `${voxel.x}:${voxel.y}:${voxel.z}`,
-        };
-      },
-    });
+          return {
+            "data-home-logo-voxel-key": `${voxel.x}:${voxel.y}:${voxel.z}`,
+          };
+        },
+      }),
+    );
     this.stabilizeOutputFrame();
   }
 

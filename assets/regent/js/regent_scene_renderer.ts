@@ -22,6 +22,7 @@ import {
 import { sigilVoxelMarkup } from "./regent_sigils"
 import { prefersReducedMotion } from "./regent_motion"
 import { animate } from "../vendor/anime.esm.js"
+import { clearChildren, mountSceneError, mountSvgMarkup } from "../../js/svg_mount.ts"
 
 interface SceneCallbacks {
   onTargetSelect?: (payload: { targetId: string; label?: string }) => void
@@ -511,19 +512,16 @@ function applyCommand(
   return commandAnchor(command)
 }
 
-function fallbackMarkup(scene: SceneSpec): string {
+function fallbackLines(scene: SceneSpec): string[] {
   const face = activeFace(scene)
   const targetCount = face?.markers?.length ?? 0
   const title = face?.title ?? face?.id ?? "surface"
 
-  return `
-  <div class="rg-scene-error">
-    <strong>Heerich scene engine not loaded.</strong>
-    <span>Face: ${title}</span>
-    <span>Targets: ${targetCount}</span>
-    <span>Load Heerich before mounting RegentScene to render the voxel surface.</span>
-  </div>
-  `
+  return [
+    `Face: ${title}`,
+    `Targets: ${targetCount}`,
+    "Load Heerich before mounting RegentScene to render the voxel surface.",
+  ]
 }
 
 function renderedTargetIds(face: FaceSpec): string[] {
@@ -793,13 +791,17 @@ export class RegentSceneRenderer {
     const engine = this.ensureEngine(scene)
 
     if (!engine) {
-      this.mountEl.innerHTML = fallbackMarkup(scene)
+      mountSceneError(
+        this.mountEl,
+        "Heerich scene engine not loaded.",
+        fallbackLines(scene),
+      )
       return activeFace(scene)?.markers?.length ?? 0
     }
 
     const face = activeFace(scene)
     if (!face) {
-      this.mountEl.innerHTML = `<div class="rg-scene-error"><strong>No face definition found.</strong></div>`
+      mountSceneError(this.mountEl, "No face definition found.")
       return 0
     }
 
@@ -834,11 +836,20 @@ export class RegentSceneRenderer {
     const targetViewBox = this.resolveViewBox(scene, face, faces)
     const renderViewBox = this.currentViewBox ?? targetViewBox
 
-    this.mountEl.innerHTML = engine.toSVG({
-      faces,
-      viewBox: [renderViewBox.x, renderViewBox.y, renderViewBox.w, renderViewBox.h],
-      faceAttributes,
-    })
+    try {
+      mountSvgMarkup(
+        this.mountEl,
+        engine.toSVG({
+          faces,
+          viewBox: [renderViewBox.x, renderViewBox.y, renderViewBox.w, renderViewBox.h],
+          faceAttributes,
+        }),
+      )
+    } catch {
+      mountSceneError(this.mountEl, "Could not render the Regent scene.")
+      return 0
+    }
+
     this.decorateTargets(face)
     this.hoverCycle.attach(this.mountEl, hoverCycles)
     this.bindInteractions()
@@ -886,7 +897,7 @@ export class RegentSceneRenderer {
     this.stopViewBoxMotion()
     this.hoverCycle.destroy()
     this.teardown()
-    this.mountEl.innerHTML = ""
+    clearChildren(this.mountEl)
     this.currentViewBox = null
   }
 }

@@ -7,7 +7,7 @@ defmodule PlatformPhxWeb.Router do
     plug :fetch_live_flash
     plug :put_root_layout, html: {PlatformPhxWeb.Layouts, :root}
     plug :protect_from_forgery
-    plug :put_secure_browser_headers
+    plug PlatformPhxWeb.BrowserSecurity
   end
 
   pipeline :api do
@@ -20,9 +20,14 @@ defmodule PlatformPhxWeb.Router do
     plug PlatformPhxWeb.RequireSessionCsrf
   end
 
-  pipeline :agent_api do
+  pipeline :platform_agent_api do
     plug :accepts, ["json"]
-    plug PlatformPhxWeb.Plugs.RequireAgentSiwa
+    plug PlatformPhxWeb.Plugs.RequireAgentSiwa, audience: "platform"
+  end
+
+  pipeline :shared_agent_api do
+    plug :accepts, ["json"]
+    plug PlatformPhxWeb.Plugs.RequireAgentSiwa, audience: "regents.sh"
   end
 
   scope "/", PlatformPhxWeb do
@@ -45,7 +50,7 @@ defmodule PlatformPhxWeb.Router do
       live "/bug-report", BugReportLive
       live "/techtree", TechtreeLive
       live "/autolaunch", AutolaunchLive
-      live "/regent-cli", RegentCliLive
+      live "/regents-cli", RegentCliLive
       live "/token-info", TokenInfoLive
     end
   end
@@ -98,8 +103,21 @@ defmodule PlatformPhxWeb.Router do
     delete "/session", PrivySessionController, :delete
   end
 
+  scope "/api/auth/agent", PlatformPhxWeb.Api do
+    pipe_through :session_api
+
+    get "/session", AgentSessionController, :show
+    delete "/session", AgentSessionController, :delete
+  end
+
+  scope "/api/auth/agent", PlatformPhxWeb.Api do
+    pipe_through [:session_api, :platform_agent_api]
+
+    post "/session", AgentSessionController, :create
+  end
+
   scope "/v1/agent", PlatformPhxWeb do
-    pipe_through :agent_api
+    pipe_through :shared_agent_api
 
     post "/bug-report", Api.ReportController, :agent_bug
     post "/security-report", Api.ReportController, :agent_security

@@ -45,6 +45,19 @@ defmodule PlatformPhxWeb.Layouts do
       >
       </div>
 
+      <%= if @show_wallet_control do %>
+        <div
+          id="layout-wallet-controller"
+          phx-hook="DashboardWallet"
+          phx-update="ignore"
+          data-dashboard-config={@wallet_bridge_config}
+          data-wallet-signed-in={to_string(not is_nil(@current_human))}
+          data-wallet-address={@current_human && @current_human.wallet_address}
+          class="hidden"
+        >
+        </div>
+      <% end %>
+
       <a
         href="#main-content"
         class="sr-only rounded-xl bg-[color:var(--background)] px-3 py-2 text-sm text-[color:var(--foreground)] shadow focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50"
@@ -240,11 +253,9 @@ defmodule PlatformPhxWeb.Layouts do
     ~H"""
     <div
       id={"layout-wallet-control-#{@mode}"}
-      phx-hook="DashboardWallet"
       phx-update="ignore"
       data-dashboard-config={@config}
-      data-wallet-signed-in={to_string(not is_nil(@current_human))}
-      data-wallet-address={@current_human && @current_human.wallet_address}
+      data-wallet-shell
       class={[
         "pp-wallet-shell",
         @mode == :desktop && "hidden lg:flex",
@@ -294,7 +305,7 @@ defmodule PlatformPhxWeb.Layouts do
                   aria-label="Copy wallet address"
                   title="Copy full wallet address"
                 >
-                  <span class="pp-wallet-copy-icon" aria-hidden="true">
+                  <span data-wallet-copy-icon class="pp-wallet-copy-icon" aria-hidden="true">
                     <.icon name="hero-document-duplicate" class="size-4" />
                   </span>
                   <span data-wallet-copy-check class="pp-wallet-copy-check" aria-hidden="true">
@@ -318,7 +329,9 @@ defmodule PlatformPhxWeb.Layouts do
       <p
         data-dashboard-wallet-notice
         data-notice-style="compact"
-        class="hidden text-sm text-[color:var(--muted-foreground)]"
+        role="status"
+        aria-live="polite"
+        class="hidden max-w-[18rem] whitespace-pre-line text-sm text-[color:var(--muted-foreground)]"
       >
       </p>
     </div>
@@ -534,7 +547,7 @@ defmodule PlatformPhxWeb.Layouts do
   defp chrome_eyebrow("bug-report"), do: "Public Operator Ledger"
   defp chrome_eyebrow("techtree"), do: "Shared Research and Eval Tree"
   defp chrome_eyebrow("autolaunch"), do: "Raise agent capital"
-  defp chrome_eyebrow("regent-cli"), do: "Local Operator Surface"
+  defp chrome_eyebrow("regents-cli"), do: "Local Operator Surface"
   defp chrome_eyebrow("token-info"), do: "Platform revenue token"
   defp chrome_eyebrow("shader"), do: "Shader Registry"
   defp chrome_eyebrow(_), do: "Regents Labs"
@@ -545,7 +558,7 @@ defmodule PlatformPhxWeb.Layouts do
   defp chrome_title("bug-report"), do: "Bug Report Ledger"
   defp chrome_title("techtree"), do: "Techtree"
   defp chrome_title("autolaunch"), do: "Autolaunch"
-  defp chrome_title("regent-cli"), do: "Regent CLI"
+  defp chrome_title("regents-cli"), do: "Regents CLI"
   defp chrome_title("token-info"), do: "Agent economies"
   defp chrome_title("shader"), do: "Shader"
   defp chrome_title(_), do: "Regents Home"
@@ -588,7 +601,7 @@ defmodule PlatformPhxWeb.Layouts do
       },
       %{kind: :internal, key: "techtree", href: "/techtree", label: "Techtree"},
       %{kind: :internal, key: "autolaunch", href: "/autolaunch", label: "Autolaunch"},
-      %{kind: :internal, key: "regent-cli", href: "/regent-cli", label: "Regent CLI"},
+      %{kind: :internal, key: "regents-cli", href: "/regents-cli", label: "Regents CLI"},
       %{kind: :internal, key: "bug-report", href: "/bug-report", label: "Bug Report"},
       %{kind: :external, href: "https://news.regents.sh", label: "News"},
       %{kind: :external, href: "https://github.com/orgs/regent-ai/repositories", label: "GitHub"}

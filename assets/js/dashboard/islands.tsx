@@ -1,4 +1,11 @@
-import { PrivyProvider, useIdentityToken, usePrivy } from "@privy-io/react-auth";
+import {
+  getIdentityToken,
+  PrivyProvider,
+  type PrivyClientConfig,
+  useIdentityToken,
+  usePrivy,
+  useUser,
+} from "@privy-io/react-auth";
 import { animate } from "animejs";
 import React from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -19,7 +26,13 @@ import {
   erc721Abi,
   redeemerAbi,
 } from "./redeem-constants";
-import { usePrivyWalletClient, type PrivyEthereumWalletLike } from "./privy";
+import {
+  formatPrivySessionErrorMessage,
+  getLinkedWalletAddressesFromPrivyUser,
+  usePrivyWalletClient,
+  type PrivyEthereumWalletLike,
+} from "./privy";
+import { decideWalletSessionSync } from "./wallet_session_sync";
 
 type DashboardConfig = {
   privyAppId: string | null;
@@ -40,8 +53,11 @@ type WalletBridgeState = {
   walletClient: WalletClient | null;
   displayName: string | null;
   identityToken: string | null;
+  linkedWalletAddresses: readonly `0x${string}`[];
   login: (() => void) | null;
+  linkWallet: (() => void) | null;
   logout: (() => void) | null;
+  refreshUser: (() => Promise<unknown>) | null;
 };
 
 type BridgeEventDetail = {
@@ -51,9 +67,25 @@ type BridgeEventDetail = {
   chainId: number | null;
 };
 
+type WalletNoticeTone = "error" | "info";
+
+type WalletRenderState = {
+  privyReady: boolean;
+  authenticated: boolean;
+  connected: boolean;
+  connectedAddress: `0x${string}` | null;
+};
+
 type Cleanup = () => void;
 
 const bridgeRoots = new WeakMap<Element, Root>();
+const DASHBOARD_PRIVY_CONFIG: PrivyClientConfig = {
+  loginMethods: ["wallet"],
+  appearance: {
+    walletChainType: "ethereum-only",
+    walletList: ["metamask", "coinbase_wallet", "rainbow", "wallet_connect"],
+  },
+};
 
 let walletBridgeState: WalletBridgeState = {
   privyReady: false,
@@ -65,12 +97,84 @@ let walletBridgeState: WalletBridgeState = {
   walletClient: null,
   displayName: null,
   identityToken: null,
+  linkedWalletAddresses: [],
   login: null,
+  linkWallet: null,
   logout: null,
+  refreshUser: null,
 };
 
 let walletSessionSyncInFlight: Promise<void> | null = null;
 let walletReloadRequested = false;
+let lastWalletBridgeDispatchKey: string | null = null;
+const WALLET_SESSION_SYNC_COOLDOWN_MS = 4_000;
+
+class HttpRequestError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "HttpRequestError";
+    this.status = status;
+  }
+}
+
+function privyDebugEnabled(): boolean {
+  if (typeof window === "undefined") return false;
+
+  const params = new URLSearchParams(window.location.search);
+  return params.get("debug_privy") === "1" ||
+    window.localStorage.getItem("debug:privy") === "1";
+}
+
+function redactWalletForDebug(value: string | null | undefined): string | null {
+  const address = normalizeWalletAddress(value);
+  if (!address) return null;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function privyDebugLog(
+  level: "info" | "warn" | "error",
+  event: string,
+  details: Record<string, unknown> = {},
+) {
+  if (!privyDebugEnabled()) return;
+
+  const prefix = `[privy-debug] ${event}`;
+
+  if (level === "error") {
+    console.error(prefix, details);
+    return;
+  }
+
+  if (level === "warn") {
+    console.warn(prefix, details);
+    return;
+  }
+
+  console.info(prefix, details);
+}
+
+function debugHttpError(error: unknown): Record<string, unknown> {
+  if (error instanceof HttpRequestError) {
+    return {
+      name: error.name,
+      message: error.message,
+      status: error.status,
+    };
+  }
+
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+    };
+  }
+
+  return {
+    message: String(error),
+  };
+}
 
 function parseConfig(raw: string | null | undefined): DashboardConfig | null {
   if (!raw) return null;
@@ -80,6 +184,18 @@ function parseConfig(raw: string | null | undefined): DashboardConfig | null {
   } catch {
     return null;
   }
+}
+
+function createWalletBridgeDispatchKey(state: WalletBridgeState): string {
+  return JSON.stringify({
+    privyReady: state.privyReady,
+    authenticated: state.authenticated,
+    account: state.account,
+    chainId: state.chainId,
+    privyId: state.privyId,
+    identityToken: state.identityToken ?? "",
+    linkedWalletAddresses: [...state.linkedWalletAddresses].sort(),
+  });
 }
 
 function emitWalletBridgeState() {
@@ -96,13 +212,18 @@ function emitWalletBridgeState() {
 }
 
 function DashboardPrivyBridge() {
-  const { ready, authenticated, login, logout, user } = usePrivy();
+  const { ready, authenticated, login, linkWallet, logout, user } = usePrivy();
   const { identityToken } = useIdentityToken();
+  const { refreshUser } = useUser();
   const { account, chainId, privyId, wallet, walletClient } =
     usePrivyWalletClient();
+  const linkedWalletAddresses = React.useMemo(
+    () => getLinkedWalletAddressesFromPrivyUser(user),
+    [user],
+  );
 
   React.useEffect(() => {
-    walletBridgeState = {
+    const nextWalletBridgeState: WalletBridgeState = {
       privyReady: ready,
       authenticated,
       account,
@@ -112,9 +233,33 @@ function DashboardPrivyBridge() {
       walletClient,
       displayName: getPrivyDisplayName(user),
       identityToken,
+      linkedWalletAddresses,
       login,
+      linkWallet,
       logout,
+      refreshUser,
     };
+
+    walletBridgeState = nextWalletBridgeState;
+
+    const nextDispatchKey = createWalletBridgeDispatchKey(nextWalletBridgeState);
+
+    if (nextDispatchKey === lastWalletBridgeDispatchKey) {
+      return;
+    }
+
+    lastWalletBridgeDispatchKey = nextDispatchKey;
+
+    privyDebugLog("info", "bridge-state", {
+      ready,
+      authenticated,
+      account: redactWalletForDebug(account),
+      chainId,
+      privyId,
+      hasIdentityToken: Boolean(identityToken),
+      linkedWalletAddresses: linkedWalletAddresses.map(redactWalletForDebug),
+      hasWalletClient: Boolean(walletClient),
+    });
 
     emitWalletBridgeState();
   }, [
@@ -122,9 +267,12 @@ function DashboardPrivyBridge() {
     authenticated,
     chainId,
     identityToken,
+    linkedWalletAddresses,
     login,
+    linkWallet,
     logout,
     privyId,
+    refreshUser,
     ready,
     user,
     wallet,
@@ -141,8 +289,11 @@ export function mountDashboardPrivyBridge(el: Element): void {
     walletBridgeState = {
       ...walletBridgeState,
       privyReady: false,
+      linkedWalletAddresses: [],
       login: null,
+      linkWallet: null,
       logout: null,
+      refreshUser: null,
     };
     emitWalletBridgeState();
     return;
@@ -153,11 +304,13 @@ export function mountDashboardPrivyBridge(el: Element): void {
 
   const root = createRoot(el);
   root.render(
-    <React.StrictMode>
-      <PrivyProvider appId={config.privyAppId} clientId={config.privyClientId}>
-        <DashboardPrivyBridge />
-      </PrivyProvider>
-    </React.StrictMode>,
+    <PrivyProvider
+      appId={config.privyAppId}
+      clientId={config.privyClientId}
+      config={DASHBOARD_PRIVY_CONFIG}
+    >
+      <DashboardPrivyBridge />
+    </PrivyProvider>,
   );
   bridgeRoots.set(el, root);
 }
@@ -170,8 +323,56 @@ export function unmountDashboardPrivyBridge(el: Element): void {
   bridgeRoots.delete(el);
 }
 
-export function bindDashboardWallet(el: HTMLElement): Cleanup {
-  const config = parseConfig(el.dataset.dashboardConfig);
+function walletReadyForSession(address: string | null | undefined): boolean {
+  const normalizedAddress = normalizeWalletAddress(address);
+  const linkedWalletAddresses = walletBridgeState.linkedWalletAddresses;
+
+  if (linkedWalletAddresses.length === 0) return false;
+  if (!normalizedAddress) return false;
+
+  return linkedWalletAddresses.some(
+    (candidate) => candidate.toLowerCase() === normalizedAddress.toLowerCase(),
+  );
+}
+
+function createWalletRenderState(
+  detail: Partial<BridgeEventDetail> | undefined,
+  serverSignedIn: boolean,
+  serverAddress: `0x${string}` | null,
+): WalletRenderState {
+  const privyReady = detail?.privyReady ?? walletBridgeState.privyReady;
+  const authenticated = detail?.authenticated ?? walletBridgeState.authenticated;
+  const connectedAddress =
+    normalizeWalletAddress(detail?.account) ??
+    normalizeWalletAddress(walletBridgeState.account) ??
+    serverAddress;
+
+  return {
+    privyReady,
+    authenticated,
+    connected: serverSignedIn || (authenticated && walletReadyForSession(connectedAddress)),
+    connectedAddress,
+  };
+}
+
+type WalletShellBinding = {
+  clearNotice: () => void;
+  cleanup: Cleanup;
+  renderWalletState: (state: WalletRenderState) => void;
+  showNotice: (message: string, tone?: WalletNoticeTone) => void;
+};
+
+type WalletShellBindingOptions = {
+  getDisconnecting: () => boolean;
+  onConnectClick: () => void;
+  onDisconnectClick: () => Promise<void>;
+  serverAddress: `0x${string}` | null;
+};
+
+function bindDashboardWalletShell(
+  el: HTMLElement,
+  options: WalletShellBindingOptions,
+): WalletShellBinding {
   const connectButton = el.querySelector<HTMLButtonElement>("[data-wallet-sign-in]");
   const connectedShell = el.querySelector<HTMLElement>("[data-wallet-connected]");
   const triggerButton = el.querySelector<HTMLButtonElement>("[data-wallet-trigger]");
@@ -180,17 +381,14 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
   const drawerInner = el.querySelector<HTMLElement>("[data-wallet-drawer-inner]");
   const addressText = el.querySelector<HTMLElement>("[data-wallet-address-text]");
   const copyButton = el.querySelector<HTMLButtonElement>("[data-wallet-copy]");
+  const copyIcon = el.querySelector<HTMLElement>("[data-wallet-copy-icon]");
   const copyCheck = el.querySelector<HTMLElement>("[data-wallet-copy-check]");
   const disconnectButton = el.querySelector<HTMLButtonElement>("[data-wallet-disconnect]");
   const notice = el.querySelector<HTMLElement>("[data-dashboard-wallet-notice]");
-  const serverSignedIn = el.dataset.walletSignedIn === "true";
-  const serverAddress = normalizeWalletAddress(el.dataset.walletAddress);
-  let pendingConnect = false;
   let drawerOpen = false;
   let copyResetTimer: number | undefined;
-  let disconnecting = false;
 
-  const showNotice = (message: string, tone: "error" | "info" = "info") => {
+  const showNotice = (message: string, tone: WalletNoticeTone = "info") => {
     if (!notice) return;
     setNoticeState(notice, message, tone);
   };
@@ -205,6 +403,24 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
     if (!target) return;
     target.hidden = hidden;
     target.classList.toggle("hidden", hidden);
+  };
+
+  const resetCopyFeedback = (immediate = false) => {
+    if (copyIcon) {
+      copyIcon.style.opacity = "1";
+      copyIcon.style.transform = "scale(1)";
+    }
+
+    if (copyCheck) {
+      copyCheck.style.opacity = "0";
+      copyCheck.style.transform = "translate(60%, -55%) scale(0.7)";
+
+      if (immediate) {
+        copyCheck.style.transition = "none";
+      } else {
+        copyCheck.style.removeProperty("transition");
+      }
+    }
   };
 
   const closeDrawer = (immediate = false) => {
@@ -270,93 +486,33 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
     });
   };
 
-  const renderWalletState = (detail?: Partial<BridgeEventDetail>) => {
-    const privyReady = detail?.privyReady ?? walletBridgeState.privyReady;
-    const authenticated = detail?.authenticated ?? walletBridgeState.authenticated;
-    const connectedAddress =
-      normalizeWalletAddress(detail?.account) ??
-      normalizeWalletAddress(walletBridgeState.account) ??
-      serverAddress;
-    const connected = serverSignedIn || authenticated;
-
+  const renderWalletState = (state: WalletRenderState) => {
     if (connectButton) {
-      connectButton.disabled = connected || !privyReady || disconnecting;
+      connectButton.disabled = state.connected || !state.privyReady || options.getDisconnecting();
     }
 
     if (triggerButton) {
-      triggerButton.disabled = !connected || disconnecting;
+      triggerButton.disabled = !state.connected || options.getDisconnecting();
     }
 
     if (disconnectButton) {
-      disconnectButton.disabled = disconnecting;
+      disconnectButton.disabled = options.getDisconnecting();
     }
 
-    setHidden(connectButton, connected);
-    setHidden(connectedShell, !connected);
+    setHidden(connectButton, state.connected);
+    setHidden(connectedShell, !state.connected);
 
-    if (!connected) {
+    if (!state.connected) {
       closeDrawer(true);
     }
 
     if (addressText) {
-      addressText.textContent = abbreviateWalletAddress(connectedAddress);
+      addressText.textContent = abbreviateWalletAddress(state.connectedAddress);
     }
 
     if (copyButton) {
-      copyButton.disabled = !connectedAddress;
+      copyButton.disabled = !state.connectedAddress;
     }
-  };
-
-  const syncAndReload = async (label: string) => {
-    if (!config?.privySession) return;
-
-    if (!walletSessionSyncInFlight) {
-      walletSessionSyncInFlight = syncPrivySession(config.privySession).finally(() => {
-        walletSessionSyncInFlight = null;
-      });
-    }
-
-    showNotice(label, "info");
-    await walletSessionSyncInFlight;
-
-    if (!walletReloadRequested) {
-      walletReloadRequested = true;
-      window.location.reload();
-    }
-  };
-
-  const onState = async (event: Event) => {
-    const detail = (event as CustomEvent<BridgeEventDetail>).detail;
-    renderWalletState(detail);
-
-    if (
-      detail.authenticated &&
-      walletBridgeState.account &&
-      walletBridgeState.identityToken &&
-      (pendingConnect || !serverSignedIn)
-    ) {
-      pendingConnect = false;
-
-      try {
-        await syncAndReload(
-          serverSignedIn ? "Restoring your sign in..." : "Finishing sign in...",
-        );
-      } catch (error) {
-        walletReloadRequested = false;
-        showNotice(getErrorMessage(error, "Could not start your wallet session."), "error");
-      }
-    }
-  };
-
-  const onConnectClick = () => {
-    if (!walletBridgeState.login) {
-      showNotice("Wallet sign-in is not ready yet.", "error");
-      return;
-    }
-
-    pendingConnect = true;
-    showNotice("Waiting for wallet confirmation...", "info");
-    walletBridgeState.login();
   };
 
   const onTriggerClick = () => {
@@ -371,7 +527,7 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
   const onCopyClick = async () => {
     const address =
       normalizeWalletAddress(walletBridgeState.account) ??
-      serverAddress;
+      options.serverAddress;
 
     if (!address) {
       showNotice("No wallet address is available yet.", "error");
@@ -385,18 +541,35 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
         window.clearTimeout(copyResetTimer);
       }
 
-      if (copyCheck) {
-        copyCheck.style.opacity = "0";
-        copyCheck.style.transform = "scale(0.6)";
+      resetCopyFeedback(true);
 
+      if (copyIcon) {
+        animate(copyIcon, {
+          opacity: [1, 0],
+          scale: [1, 0.7],
+          duration: 160,
+          ease: "outQuad",
+        });
+      }
+
+      if (copyCheck) {
         animate(copyCheck, {
           opacity: [0, 1],
-          scale: [0.6, 1],
+          scale: [0.7, 1],
           duration: 180,
           ease: "outBack",
         });
 
         copyResetTimer = window.setTimeout(() => {
+          if (copyIcon) {
+            animate(copyIcon, {
+              opacity: [0, 1],
+              scale: [0.78, 1],
+              duration: 220,
+              ease: "outQuad",
+            });
+          }
+
           animate(copyCheck, {
             opacity: [1, 0],
             scale: [1, 0.8],
@@ -407,28 +580,6 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
       }
     } catch (error) {
       showNotice(getErrorMessage(error, "Could not copy this wallet address."), "error");
-    }
-  };
-
-  const onDisconnectClick = async () => {
-    try {
-      disconnecting = true;
-      pendingConnect = false;
-      closeDrawer(true);
-      renderWalletState();
-      showNotice("Signing out...", "info");
-
-      if (config?.privySession) {
-        await clearPrivySession(config.privySession);
-      }
-
-      await Promise.resolve(walletBridgeState.logout?.());
-      window.location.reload();
-    } catch (error) {
-      disconnecting = false;
-      walletReloadRequested = false;
-      renderWalletState();
-      showNotice(getErrorMessage(error, "Could not disconnect this wallet."), "error");
     }
   };
 
@@ -444,39 +595,276 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
     }
   };
 
-  window.addEventListener("dashboard:wallet-state", onState);
+  const onDisconnectButtonClick = () => {
+    void options.onDisconnectClick();
+  };
+
   window.addEventListener("click", onWindowClick);
   window.addEventListener("keydown", onWindowKeydown);
-  connectButton?.addEventListener("click", onConnectClick);
+  connectButton?.addEventListener("click", options.onConnectClick);
   triggerButton?.addEventListener("click", onTriggerClick);
   copyButton?.addEventListener("click", onCopyClick);
-  disconnectButton?.addEventListener("click", onDisconnectClick);
+  disconnectButton?.addEventListener("click", onDisconnectButtonClick);
+
+  return {
+    clearNotice,
+    cleanup: () => {
+      if (copyResetTimer) {
+        window.clearTimeout(copyResetTimer);
+      }
+
+      resetCopyFeedback(true);
+      window.removeEventListener("click", onWindowClick);
+      window.removeEventListener("keydown", onWindowKeydown);
+      connectButton?.removeEventListener("click", options.onConnectClick);
+      triggerButton?.removeEventListener("click", onTriggerClick);
+      copyButton?.removeEventListener("click", onCopyClick);
+      disconnectButton?.removeEventListener("click", onDisconnectButtonClick);
+    },
+    renderWalletState,
+    showNotice,
+  };
+}
+
+export function bindDashboardWallet(el: HTMLElement): Cleanup {
+  const config = parseConfig(el.dataset.dashboardConfig);
+  const serverSignedIn = el.dataset.walletSignedIn === "true";
+  const serverAddress = normalizeWalletAddress(el.dataset.walletAddress);
+  const layoutRoot = el.closest("#platform-layout-root") ?? document.body;
+  let pendingConnect = false;
+  let disconnecting = false;
+  let lastSessionSyncAttemptKey: string | null = null;
+  let sessionSyncCooldownUntilMs = 0;
+
+  const shellBindings = Array.from(
+    layoutRoot.querySelectorAll<HTMLElement>("[data-wallet-shell]"),
+  ).map((shell) =>
+    bindDashboardWalletShell(shell, {
+      getDisconnecting: () => disconnecting,
+      onConnectClick,
+      onDisconnectClick,
+      serverAddress,
+    }),
+  );
+
+  const showNotice = (message: string, tone: WalletNoticeTone = "info") => {
+    shellBindings.forEach((binding) => binding.showNotice(message, tone));
+  };
+
+  const clearNotices = () => {
+    shellBindings.forEach((binding) => binding.clearNotice());
+  };
+
+  const syncCooldownActive = (nowMs = Date.now()) => sessionSyncCooldownUntilMs > nowMs;
+
+  const startSessionSyncCooldown = (error: unknown) => {
+    sessionSyncCooldownUntilMs = Date.now() + WALLET_SESSION_SYNC_COOLDOWN_MS;
+    privyDebugLog("warn", "sync-cooldown:start", {
+      cooldownMs: WALLET_SESSION_SYNC_COOLDOWN_MS,
+      ...debugHttpError(error),
+    });
+  };
+
+  const showCooldownNotice = () => {
+    showNotice(
+      "Please wait a few seconds, then try again.\nIf it keeps happening, disconnect your wallet and connect it again.",
+      "info",
+    );
+  };
+
+  const renderWalletState = (detail?: Partial<BridgeEventDetail>) => {
+    const renderState = createWalletRenderState(detail, serverSignedIn, serverAddress);
+
+    privyDebugLog("info", "render-wallet-state", {
+      serverSignedIn,
+      privyReady: renderState.privyReady,
+      authenticated: renderState.authenticated,
+      connected: renderState.connected,
+      connectedAddress: redactWalletForDebug(renderState.connectedAddress),
+      linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+    });
+
+    shellBindings.forEach((binding) => binding.renderWalletState(renderState));
+  };
+
+  const syncAndReload = async (label: string) => {
+    if (!config?.privySession) return;
+
+    privyDebugLog("info", "sync-and-reload:start", {
+      label,
+      sessionEndpoint: config.privySession,
+      inFlight: Boolean(walletSessionSyncInFlight),
+      account: redactWalletForDebug(walletBridgeState.account),
+      hasIdentityToken: Boolean(walletBridgeState.identityToken),
+      linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+    });
+
+    if (!walletSessionSyncInFlight) {
+      walletSessionSyncInFlight = syncPrivySession(config.privySession).finally(() => {
+        walletSessionSyncInFlight = null;
+      });
+    }
+
+    showNotice(label, "info");
+    await walletSessionSyncInFlight;
+
+    if (!walletReloadRequested) {
+      walletReloadRequested = true;
+      privyDebugLog("info", "sync-and-reload:reload", {
+        label,
+        account: redactWalletForDebug(walletBridgeState.account),
+      });
+      window.location.reload();
+    }
+  };
+
+  const attemptSessionSync = async (label: string) => {
+    const decision = decideWalletSessionSync({
+      serverSignedIn,
+      pendingConnect,
+      lastAttemptKey: lastSessionSyncAttemptKey,
+      cooldownUntilMs: sessionSyncCooldownUntilMs,
+      state: walletBridgeState,
+    });
+
+    if (!decision.shouldSync || !decision.attemptKey) {
+      return;
+    }
+
+    lastSessionSyncAttemptKey = decision.attemptKey;
+    pendingConnect = false;
+    await syncAndReload(label);
+  };
+
+  async function onState(event: Event) {
+    const detail = (event as CustomEvent<BridgeEventDetail>).detail;
+
+    privyDebugLog("info", "wallet-state-event", {
+      detail: {
+        privyReady: detail.privyReady,
+        authenticated: detail.authenticated,
+        account: redactWalletForDebug(detail.account),
+        chainId: detail.chainId,
+      },
+      serverSignedIn,
+      pendingConnect,
+      linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+    });
+
+    renderWalletState(detail);
+
+    if (
+      detail.authenticated &&
+      walletBridgeState.account &&
+      walletReadyForSession(detail.account ?? walletBridgeState.account)
+    ) {
+      try {
+        await attemptSessionSync(
+          serverSignedIn ? "Restoring your sign in..." : "Finishing sign in...",
+        );
+      } catch (error) {
+        walletReloadRequested = false;
+        startSessionSyncCooldown(error);
+        privyDebugLog("error", "wallet-state-event:sync-failed", debugHttpError(error));
+        showNotice(formatPrivySessionErrorMessage(error), "error");
+      }
+    }
+  }
+
+  function onConnectClick() {
+    if (syncCooldownActive()) {
+      showCooldownNotice();
+      return;
+    }
+
+    clearNotices();
+    lastSessionSyncAttemptKey = null;
+
+    if (walletBridgeState.authenticated && !walletReadyForSession(walletBridgeState.account)) {
+      if (!walletBridgeState.linkWallet) {
+        privyDebugLog("warn", "connect-click:link-wallet-missing", {
+          account: redactWalletForDebug(walletBridgeState.account),
+          linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+        });
+        showNotice("Wallet sign-in is not ready yet.", "error");
+        return;
+      }
+
+      pendingConnect = true;
+      privyDebugLog("info", "connect-click:link-wallet", {
+        account: redactWalletForDebug(walletBridgeState.account),
+        linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+      });
+      showNotice("Confirm your wallet to finish sign in...", "info");
+      walletBridgeState.linkWallet();
+      return;
+    }
+
+    if (!walletBridgeState.login) {
+      privyDebugLog("warn", "connect-click:login-missing", {
+        account: redactWalletForDebug(walletBridgeState.account),
+      });
+      showNotice("Wallet sign-in is not ready yet.", "error");
+      return;
+    }
+
+    pendingConnect = true;
+    privyDebugLog("info", "connect-click:login", {
+      account: redactWalletForDebug(walletBridgeState.account),
+      linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+    });
+    showNotice("Waiting for wallet confirmation...", "info");
+    walletBridgeState.login();
+  }
+
+  async function onDisconnectClick() {
+    try {
+      disconnecting = true;
+      pendingConnect = false;
+      lastSessionSyncAttemptKey = null;
+      sessionSyncCooldownUntilMs = 0;
+      renderWalletState();
+      showNotice("Signing out...", "info");
+
+      if (config?.privySession) {
+        await clearPrivySession(config.privySession);
+      }
+
+      await Promise.resolve(walletBridgeState.logout?.());
+      window.location.reload();
+    } catch (error) {
+      disconnecting = false;
+      walletReloadRequested = false;
+      renderWalletState();
+      showNotice(getErrorMessage(error, "Could not disconnect this wallet."), "error");
+    }
+  }
+
+  window.addEventListener("dashboard:wallet-state", onState);
   renderWalletState();
 
   if (
     walletBridgeState.authenticated &&
     walletBridgeState.account &&
-    walletBridgeState.identityToken &&
+    walletReadyForSession(walletBridgeState.account) &&
     !serverSignedIn
   ) {
-    void syncAndReload("Restoring your sign in...").catch((error) => {
+    privyDebugLog("info", "initial-sync-trigger", {
+      account: redactWalletForDebug(walletBridgeState.account),
+      linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+      hasIdentityToken: Boolean(walletBridgeState.identityToken),
+    });
+    void attemptSessionSync("Restoring your sign in...").catch((error) => {
       walletReloadRequested = false;
-      showNotice(getErrorMessage(error, "Could not start your wallet session."), "error");
+      startSessionSyncCooldown(error);
+      privyDebugLog("error", "initial-sync-trigger:failed", debugHttpError(error));
+      showNotice(formatPrivySessionErrorMessage(error), "error");
     });
   }
 
   return () => {
-    if (copyResetTimer) {
-      window.clearTimeout(copyResetTimer);
-    }
-
     window.removeEventListener("dashboard:wallet-state", onState);
-    window.removeEventListener("click", onWindowClick);
-    window.removeEventListener("keydown", onWindowKeydown);
-    connectButton?.removeEventListener("click", onConnectClick);
-    triggerButton?.removeEventListener("click", onTriggerClick);
-    copyButton?.removeEventListener("click", onCopyClick);
-    disconnectButton?.removeEventListener("click", onDisconnectClick);
+    shellBindings.forEach((binding) => binding.cleanup());
   };
 }
 
@@ -876,20 +1264,102 @@ export function bindDashboardRedeem(el: HTMLElement): Cleanup {
 }
 
 async function syncPrivySession(endpoint: string) {
-  if (!walletBridgeState.account || !walletBridgeState.identityToken) {
+  privyDebugLog("info", "sync-privy-session:start", {
+    endpoint,
+    authenticated: walletBridgeState.authenticated,
+    account: redactWalletForDebug(walletBridgeState.account),
+    linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+    readyForBridgeSession: walletReadyForBridgeSession(),
+    hasCachedIdentityToken: Boolean(walletBridgeState.identityToken),
+  });
+
+  if (!walletBridgeState.account || !walletReadyForBridgeSession()) {
+    privyDebugLog("warn", "sync-privy-session:not-ready", {
+      authenticated: walletBridgeState.authenticated,
+      account: redactWalletForDebug(walletBridgeState.account),
+      linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+    });
     throw new Error("Wallet session is not ready.");
   }
+
+  let identityToken = await resolveIdentityToken();
+
+  if (!identityToken) {
+    privyDebugLog("warn", "sync-privy-session:missing-cached-identity-token", {
+      account: redactWalletForDebug(walletBridgeState.account),
+    });
+    identityToken = await refreshIdentityToken();
+  }
+
+  if (!identityToken) {
+    privyDebugLog("error", "sync-privy-session:no-identity-token-after-refresh", {
+      account: redactWalletForDebug(walletBridgeState.account),
+    });
+    throw new Error("Wallet session is not ready.");
+  }
+
+  try {
+    await postPrivySession(endpoint, identityToken);
+    privyDebugLog("info", "sync-privy-session:success", {
+      endpoint,
+      account: redactWalletForDebug(walletBridgeState.account),
+    });
+  } catch (error) {
+    privyDebugLog("error", "sync-privy-session:failed", {
+      endpoint,
+      account: redactWalletForDebug(walletBridgeState.account),
+      ...debugHttpError(error),
+    });
+    throw error;
+  }
+}
+
+function walletReadyForBridgeSession(): boolean {
+  return walletBridgeState.authenticated && walletBridgeState.account !== null &&
+    walletBridgeState.linkedWalletAddresses.some(
+      (candidate) =>
+        candidate.toLowerCase() === walletBridgeState.account?.toLowerCase(),
+    );
+}
+
+async function postPrivySession(endpoint: string, identityToken: string) {
+  privyDebugLog("info", "post-privy-session:request", {
+    endpoint,
+    account: redactWalletForDebug(walletBridgeState.account),
+    hasIdentityToken: identityToken.trim().length > 0,
+    displayNamePresent: Boolean(walletBridgeState.displayName),
+  });
 
   await fetchJson(endpoint, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${walletBridgeState.identityToken}`,
+      authorization: `Bearer ${identityToken}`,
     },
     body: JSON.stringify({
       display_name: walletBridgeState.displayName,
     }),
   });
+}
+
+async function refreshIdentityToken(): Promise<string | null> {
+  try {
+    await walletBridgeState.refreshUser?.();
+    walletBridgeState = {
+      ...walletBridgeState,
+      identityToken: null,
+    };
+    privyDebugLog("info", "refresh-identity-token:requested", {
+      account: redactWalletForDebug(walletBridgeState.account),
+    });
+  } catch {
+    privyDebugLog("error", "refresh-identity-token:failed", {
+      account: redactWalletForDebug(walletBridgeState.account),
+    });
+    return null;
+  }
+
+  return resolveIdentityToken();
 }
 
 async function clearPrivySession(endpoint: string) {
@@ -906,6 +1376,42 @@ function ensureWalletReady() {
     chainId: walletBridgeState.chainId ?? base.id,
     walletClient: walletBridgeState.walletClient,
   };
+}
+
+async function resolveIdentityToken(): Promise<string | null> {
+  const cachedIdentityToken = walletBridgeState.identityToken?.trim();
+
+  if (cachedIdentityToken) {
+    privyDebugLog("info", "resolve-identity-token:cached", {
+      account: redactWalletForDebug(walletBridgeState.account),
+    });
+    return cachedIdentityToken;
+  }
+
+  try {
+    const freshIdentityToken = await getIdentityToken();
+
+    if (typeof freshIdentityToken === "string" && freshIdentityToken.trim() !== "") {
+      walletBridgeState = {
+        ...walletBridgeState,
+        identityToken: freshIdentityToken,
+      };
+
+      privyDebugLog("info", "resolve-identity-token:fresh", {
+        account: redactWalletForDebug(walletBridgeState.account),
+      });
+      return freshIdentityToken;
+    }
+  } catch {
+    privyDebugLog("warn", "resolve-identity-token:fresh-read-failed", {
+      account: redactWalletForDebug(walletBridgeState.account),
+    });
+  }
+
+  privyDebugLog("warn", "resolve-identity-token:none", {
+    account: redactWalletForDebug(walletBridgeState.account),
+  });
+  return null;
 }
 
 function normalizeWalletAddress(value: string | null | undefined): `0x${string}` | null {
@@ -1028,7 +1534,14 @@ async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
             parsedPayload.message))) ||
       text ||
       `Request failed (${response.status})`;
-    throw new Error(message);
+
+    privyDebugLog("warn", "fetch-json:request-failed", {
+      input,
+      method,
+      status: response.status,
+      message,
+    });
+    throw new HttpRequestError(message, response.status);
   }
 
   return (payload ?? {}) as T;
@@ -1076,45 +1589,6 @@ function getErrorMessage(error: unknown, fallback: string) {
     if (typeof message === "string" && message) return message;
   }
   return fallback;
-}
-
-function getWalletAddressesFromPrivyUser(privyUser: unknown): `0x${string}`[] {
-  if (!privyUser || typeof privyUser !== "object") return [];
-
-  const candidateAddresses = new Set<string>();
-  const directWalletAddress =
-    "wallet" in privyUser &&
-    privyUser.wallet &&
-    typeof privyUser.wallet === "object" &&
-    "address" in privyUser.wallet
-      ? privyUser.wallet.address
-      : null;
-
-  if (typeof directWalletAddress === "string" && isAddress(directWalletAddress)) {
-    candidateAddresses.add(directWalletAddress);
-  }
-
-  const linkedAccounts =
-    "linkedAccounts" in privyUser && Array.isArray(privyUser.linkedAccounts)
-      ? privyUser.linkedAccounts
-      : [];
-
-  linkedAccounts.forEach((account) => {
-    if (
-      account &&
-      typeof account === "object" &&
-      typeof account.type === "string" &&
-      (account.type === "wallet" ||
-        account.type === "wallet_account" ||
-        account.type === "ethereum") &&
-      typeof account.address === "string" &&
-      isAddress(account.address)
-    ) {
-      candidateAddresses.add(account.address);
-    }
-  });
-
-  return Array.from(candidateAddresses) as `0x${string}`[];
 }
 
 function getPrivyDisplayName(privyUser: unknown): string | null {

@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: PlatformPhx API
   version: 0.1.0
-  description: HTTP contract for the web product APIs.
+  description: HTTP contract for the Platform web product APIs. Shared SIWA auth lives in the shared Regent services contract.
 servers:
   - url: /
 paths:
@@ -317,6 +317,7 @@ paths:
     post:
       operationId: createAgentBugReport
       security: [{ AgentSiwaHeaders: [] }]
+      description: Bug report stored from a signed agent request using a regents.sh SIWA receipt.
       requestBody:
         required: true
         content:
@@ -338,6 +339,7 @@ paths:
     post:
       operationId: createAgentSecurityReport
       security: [{ AgentSiwaHeaders: [] }]
+      description: Security report stored from a signed agent request using a regents.sh SIWA receipt.
       requestBody:
         required: true
         content:
@@ -355,64 +357,40 @@ paths:
           $ref: '#/components/responses/StatusMessage400'
         '401':
           $ref: '#/components/responses/StatusMessage401'
-  /v1/agent/siwa/nonce:
-    post:
-      operationId: issueAgentSiwaNonce
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SiwaNonceRequest'
+  /api/auth/agent/session:
+    get:
+      operationId: getPlatformAgentSession
+      security: [{ AgentSessionCookie: [] }]
       responses:
         '200':
-          description: Signed login nonce created
+          description: Current local platform agent session
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SiwaNonceResponse'
-        '400':
-          $ref: '#/components/responses/StatusMessage400'
-  /v1/agent/siwa/verify:
+                $ref: '#/components/schemas/AgentSessionResponse'
     post:
-      operationId: verifyAgentSiwaSession
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SiwaVerifyRequest'
+      operationId: createPlatformAgentSession
+      security: [{ AgentSiwaHeaders: [] }]
+      description: Local platform session created from a signed agent request using a platform SIWA receipt.
       responses:
         '200':
-          description: Signed login verified
+          description: Local platform session created from a shared SIWA receipt
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SiwaVerifyResponse'
-        '400':
-          $ref: '#/components/responses/StatusMessage400'
+                $ref: '#/components/schemas/AgentSessionResponse'
         '401':
           $ref: '#/components/responses/StatusMessage401'
-  /v1/agent/siwa/http-verify:
-    post:
-      operationId: verifyAgentSiwaHttpEnvelope
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SiwaHttpVerifyRequest'
+    delete:
+      operationId: deletePlatformAgentSession
+      security: [{ AgentSessionCookie: [] }]
       responses:
         '200':
-          description: Signed request verified
+          description: Local platform agent session cleared
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SiwaHttpVerifyResponse'
-        '400':
-          $ref: '#/components/responses/StatusMessage400'
-        '401':
-          $ref: '#/components/responses/StatusMessage401'
+                $ref: '#/components/schemas/OkEnvelope'
   /api/agent-platform/templates:
     get:
       operationId: agentPlatformTemplates
@@ -876,11 +854,15 @@ components:
       type: apiKey
       in: cookie
       name: _platform_phx_key
+    AgentSessionCookie:
+      type: apiKey
+      in: cookie
+      name: _platform_phx_key
     AgentSiwaHeaders:
       type: apiKey
       in: header
       name: x-siwa-receipt
-      description: Placeholder for the signed SIWA header bundle used by authenticated agent requests.
+      description: Placeholder for the signed SIWA header bundle used by authenticated agent requests. The required receipt audience depends on the operation description.
   schemas:
     StatusMessage:
       type: object
@@ -1164,96 +1146,31 @@ components:
       type: object
       properties:
         display_name: {type: [string, 'null']}
-    SiwaNonceRequest:
-      type: object
-      required: [wallet_address, chain_id, audience]
-      properties:
-        wallet_address: {type: string}
-        chain_id: {type: integer}
-        audience: {type: string}
-    SiwaNonceResponse:
-      type: object
-      required: [ok, code, data]
-      properties:
-        ok: {type: boolean}
-        code: {type: string}
-        data:
-          type: object
-          required: [nonce, walletAddress, chainId, expiresAt]
-          properties:
-            nonce: {type: string}
-            walletAddress: {type: string}
-            chainId: {type: integer}
-            expiresAt: {type: string, format: date-time}
-    SiwaVerifyRequest:
-      type: object
-      required: [wallet_address, chain_id, nonce, message, signature]
-      properties:
-        wallet_address: {type: string}
-        chain_id: {type: integer}
-        nonce: {type: string}
-        message: {type: string}
-        signature: {type: string}
-    SiwaVerifyResponse:
-      type: object
-      required: [ok, code, data]
-      properties:
-        ok: {type: boolean}
-        code: {type: string}
-        data:
-          type: object
-          required: [verified, walletAddress, chainId, nonce, keyId, signatureScheme, receipt, receiptExpiresAt]
-          properties:
-            verified: {type: boolean}
-            walletAddress: {type: string}
-            chainId: {type: integer}
-            nonce: {type: string}
-            keyId: {type: string}
-            signatureScheme: {type: string}
-            receipt: {type: string}
-            receiptExpiresAt: {type: string, format: date-time}
-    SiwaHttpVerifyRequest:
-      type: object
-      required: [method, path, headers]
-      properties:
-        method: {type: string}
-        path: {type: string}
-        headers:
-          type: object
-          additionalProperties: {type: string}
-        body: {type: [string, 'null']}
-    SiwaHttpVerifyResponse:
-      type: object
-      required: [ok, code, data]
-      properties:
-        ok: {type: boolean}
-        code: {type: string}
-        data:
-          type: object
-          required: [verified, walletAddress, chainId, keyId, agent_claims, receiptExpiresAt, requiredHeaders, requiredCoveredComponents, coveredComponents]
-          properties:
-            verified: {type: boolean}
-            walletAddress: {type: string}
-            chainId: {type: integer}
-            keyId: {type: string}
-            agent_claims:
-              $ref: '#/components/schemas/ReportingAgent'
-            receiptExpiresAt: {type: string, format: date-time}
-            requiredHeaders:
-              type: array
-              items: {type: string}
-            requiredCoveredComponents:
-              type: array
-              items: {type: string}
-            coveredComponents:
-              type: array
-              items: {type: string}
     PrivySessionCsrf:
       type: object
       required: [ok, csrf_token]
       properties:
         ok: {type: boolean}
         csrf_token: {type: string}
+    AgentSessionResponse:
+      type: object
+      required: [ok, session]
+      properties:
+        ok: {type: boolean}
+        session:
+          oneOf:
+            - type: object
+              required: [session_id, audience, wallet_address, chain_id, registry_address, token_id, issued_at, expires_at]
+              properties:
+                session_id: {type: string}
+                audience: {type: string, enum: [platform]}
+                wallet_address: {type: string}
+                chain_id: {type: integer}
+                registry_address: {type: string}
+                token_id: {type: string}
+                issued_at: {type: string, format: date-time}
+                expires_at: {type: string, format: date-time}
+            - type: 'null'
     ClaimedName:
       type: object
       required: [label, fqdn, claimed_at, in_use]

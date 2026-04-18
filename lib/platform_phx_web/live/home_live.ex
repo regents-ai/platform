@@ -17,8 +17,22 @@ defmodule PlatformPhxWeb.HomeLive do
       eyebrow: "Shared Research and Eval Tree",
       title: "Techtree",
       cta_label: "Research",
-      description_html:
-        "Do local research, publish work, and move through BBH with Regent CLI. First tech: <a href=\"https://huggingface.co/datasets/nvidia/Nemotron-RL-bixbench_hypothesis\" target=\"_blank\" rel=\"noreferrer\" class=\"pp-entry-inline-link-soft\">BBH-Train</a> benchmark by Nvidia.",
+      description_fragments: [
+        %{
+          type: :text,
+          text:
+            "Do local research, publish work, and move through BBH with Regents CLI. First tech: "
+        },
+        %{
+          type: :link,
+          href: "https://huggingface.co/datasets/nvidia/Nemotron-RL-bixbench_hypothesis",
+          label: "BBH-Train"
+        },
+        %{
+          type: :text,
+          text: " benchmark by Nvidia."
+        }
+      ],
       href: "/techtree"
     },
     %{
@@ -30,7 +44,7 @@ defmodule PlatformPhxWeb.HomeLive do
       title: "Autolaunch",
       cta_label: "Revenue",
       description:
-        "Plan launches, track auctions, and follow launch progress across the web view and Regent CLI commands.",
+        "Plan launches, track auctions, and follow launch progress across the web view and Regents CLI commands.",
       href: "/autolaunch"
     },
     %{
@@ -223,6 +237,7 @@ defmodule PlatformPhxWeb.HomeLive do
         current_scope={assigns[:current_scope]}
         current_human={assigns[:current_human]}
         chrome={:none}
+        show_wallet_control={false}
         theme_class="rg-regent-theme-platform"
         content_class="p-0"
       >

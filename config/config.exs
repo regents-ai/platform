@@ -11,6 +11,8 @@ config :platform_phx,
   ecto_repos: [PlatformPhx.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+config :platform_phx, PlatformPhxWeb.BrowserSecurity, env: config_env()
+
 # Configure the endpoint
 config :platform_phx, PlatformPhxWeb.Endpoint,
   url: [host: "localhost"],

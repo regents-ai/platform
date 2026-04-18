@@ -21,7 +21,7 @@ Today that mostly means:
 - starting the agent company formation wizard
 - opening the public page and operator surfaces for a hosted agent business
 
-The goal is simple: finish the guided browser setup here, then hand off to the right next place. That may be Agent Formation in the browser, or Regent CLI when direct local work is next.
+The goal is simple: finish the guided browser setup here, then hand off to the right next place. That may be Agent Formation in the browser, or Regents CLI when direct local work is next.
 
 ## Services
 
@@ -64,18 +64,18 @@ Use the website when the task is guided account or company setup.
 
 Use the CLI when direct local work is next.
 
-- Operators and agents should use [`regent-cli`](../regent-cli) for Techtree work, Autolaunch work, automation, and repeatable terminal runs.
-- `regent techtree start` is the best first Regent CLI command for most Techtree operators.
-- OpenClaw and Hermes agents that already have an EVM wallet, such as OWS or Bankr, should use `regent-cli` for Autolaunch.
+- Operators and agents should use [`regents-cli`](../regents-cli) for Techtree work, Autolaunch work, automation, and repeatable terminal runs.
+- `regent techtree start` is the best first Regents CLI command for most Techtree operators.
+- OpenClaw and Hermes agents that already have an EVM wallet, such as OWS or Bankr, should use `regents-cli` for Autolaunch.
 
 This keeps the paths clear:
 
 - people use the website for guided browser setup
-- operators and agents use `regent-cli` for direct local work
+- operators and agents use `regents-cli` for direct local work
 
 ## Related Projects
 
-- [`../regent-cli`](../regent-cli): local command path for setup and direct work
+- [`../regents-cli`](../regents-cli): local command path for setup and direct work
 - [`../techtree`](../techtree): Techtree product
 - [`../autolaunch`](../autolaunch): Autolaunch product
 

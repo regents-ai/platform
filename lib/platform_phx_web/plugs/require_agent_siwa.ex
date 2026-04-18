@@ -7,19 +7,24 @@ defmodule PlatformPhxWeb.Plugs.RequireAgentSiwa do
 
   def init(opts), do: opts
 
-  def call(conn, _opts) do
+  def call(conn, opts) do
+    audience = Keyword.get(opts, :audience, "platform")
+
     headers =
       conn.req_headers
       |> Enum.reduce(%{}, fn {key, value}, acc ->
         Map.put(acc, String.downcase(key), value)
       end)
 
-    case Siwa.verify_http_request(%{
-           "method" => conn.method,
-           "path" => conn.request_path,
-           "headers" => headers,
-           "body" => conn.assigns[:raw_body]
-         }) do
+    case Siwa.verify_http_request(
+           %{
+             "method" => conn.method,
+             "path" => conn.request_path,
+             "headers" => headers,
+             "body" => conn.assigns[:raw_body]
+           },
+           audience: audience
+         ) do
       {:ok, %{"data" => %{"agent_claims" => agent_claims}}} ->
         case Siwa.current_agent_claims(%{
                "sub" => agent_claims["wallet_address"],

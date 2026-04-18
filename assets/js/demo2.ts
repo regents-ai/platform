@@ -1,5 +1,6 @@
 import { animate } from "animejs";
 import type { HeerichInstance } from "../regent/js/heerich_types";
+import { mountSceneError, mountSvgMarkup } from "./svg_mount.ts";
 
 type MotionRefs = {
   sceneRoot: HTMLElement;
@@ -398,7 +399,7 @@ function applyVariantPresentation(root: HTMLElement, spec: TunnelVariantSpec): v
 
 function renderTunnelScene(root: HTMLElement, sceneRoot: HTMLElement): void {
   if (!window.Heerich) {
-    sceneRoot.innerHTML = `<div class="rg-scene-error"><strong>Heerich is unavailable.</strong></div>`;
+    mountSceneError(sceneRoot, "Heerich is unavailable.");
     return;
   }
 
@@ -440,10 +441,13 @@ function renderTunnelScene(root: HTMLElement, sceneRoot: HTMLElement): void {
     addTunnelChamber(engine, spec, "right", chamberWidth, height, depth, gap);
   }
 
-  sceneRoot.innerHTML = engine.toSVG({
-    padding: compact ? 16 : 24,
-    prepend: buildGlowDefs(),
-  });
+  mountSvgMarkup(
+    sceneRoot,
+    engine.toSVG({
+      padding: compact ? 16 : 24,
+      prepend: buildGlowDefs(),
+    }),
+  );
 }
 
 function addShellFrame(

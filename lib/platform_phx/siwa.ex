@@ -33,6 +33,8 @@ defmodule PlatformPhx.Siwa do
   def issue_nonce(params) when is_map(params) do
     with {:ok, wallet_address} <- required_address(params, "wallet_address"),
          {:ok, chain_id} <- required_positive_integer(params, "chain_id"),
+         {:ok, registry_address} <- required_address(params, "registry_address"),
+         {:ok, token_id} <- required_positive_integer(params, "token_id"),
          {:ok, audience} <- required_string(params, "audience") do
       nonce = "siwa-" <> Ecto.UUID.generate()
       expires_at_unix = now_unix_seconds() + nonce_ttl_seconds()
@@ -41,7 +43,13 @@ defmodule PlatformPhx.Siwa do
 
       :ets.insert(@nonce_table, {
         {wallet_address, chain_id, nonce},
-        %{audience: audience, expires_at_unix: expires_at_unix, consumed_at_unix: nil}
+        %{
+          audience: audience,
+          registry_address: registry_address,
+          token_id: Integer.to_string(token_id),
+          expires_at_unix: expires_at_unix,
+          consumed_at_unix: nil
+        }
       })
 
       {:ok,
@@ -52,6 +60,9 @@ defmodule PlatformPhx.Siwa do
            "nonce" => nonce,
            "walletAddress" => wallet_address,
            "chainId" => chain_id,
+           "registryAddress" => registry_address,
+           "tokenId" => Integer.to_string(token_id),
+           "audience" => audience,
            "expiresAt" => unix_to_iso8601(expires_at_unix)
          }
        }}
@@ -63,13 +74,17 @@ defmodule PlatformPhx.Siwa do
   def verify_session(params) when is_map(params) do
     with {:ok, wallet_address} <- required_address(params, "wallet_address"),
          {:ok, chain_id} <- required_positive_integer(params, "chain_id"),
+         {:ok, registry_address} <- required_address(params, "registry_address"),
+         {:ok, token_id} <- required_positive_integer(params, "token_id"),
          {:ok, nonce} <- required_string(params, "nonce"),
          {:ok, message} <- required_string(params, "message"),
          {:ok, signature} <- required_string(params, "signature"),
          :ok <- validate_siwa_message(message, wallet_address, chain_id, nonce),
          :ok <- verify_wallet_signature(wallet_address, message, signature),
-         {:ok, nonce_record} <- consume_nonce(wallet_address, chain_id, nonce) do
+         {:ok, nonce_record} <- consume_nonce(wallet_address, chain_id, nonce),
+         :ok <- ensure_nonce_identity(nonce_record, registry_address, token_id) do
       key_id = wallet_address
+      issued_at_unix = now_unix_seconds()
       receipt_expires_at_unix = now_unix_seconds() + receipt_ttl_seconds()
 
       claims =
@@ -78,11 +93,13 @@ defmodule PlatformPhx.Siwa do
           "jti" => Ecto.UUID.generate(),
           "sub" => wallet_address,
           "aud" => nonce_record.audience,
-          "iat" => now_unix_seconds(),
+          "iat" => issued_at_unix,
           "exp" => receipt_expires_at_unix,
           "chain_id" => chain_id,
           "nonce" => nonce,
-          "key_id" => key_id
+          "key_id" => key_id,
+          "registry_address" => nonce_record.registry_address,
+          "token_id" => nonce_record.token_id
         }
 
       receipt = issue_receipt(claims)
@@ -95,10 +112,14 @@ defmodule PlatformPhx.Siwa do
            "verified" => true,
            "walletAddress" => wallet_address,
            "chainId" => chain_id,
+           "registryAddress" => nonce_record.registry_address,
+           "tokenId" => nonce_record.token_id,
+           "audience" => nonce_record.audience,
            "nonce" => nonce,
            "keyId" => key_id,
            "signatureScheme" => "evm_personal_sign",
            "receipt" => receipt,
+           "receiptIssuedAt" => unix_to_iso8601(issued_at_unix),
            "receiptExpiresAt" => unix_to_iso8601(receipt_expires_at_unix)
          }
        }}
@@ -107,7 +128,7 @@ defmodule PlatformPhx.Siwa do
     end
   end
 
-  def verify_http_request(params) when is_map(params) do
+  def verify_http_request(params, opts \\ []) when is_map(params) do
     with {:ok, method} <- required_string(params, "method"),
          {:ok, request_path} <- required_path(params, "path"),
          {:ok, request_body} <- optional_body(params, "body"),
@@ -123,7 +144,8 @@ defmodule PlatformPhx.Siwa do
              normalized_headers,
              body_digest
            ),
-         {:ok, receipt_claims} <- verify_receipt(Map.fetch!(normalized_headers, "x-siwa-receipt")),
+         {:ok, receipt_claims} <-
+           verify_receipt(Map.fetch!(normalized_headers, "x-siwa-receipt"), opts),
          :ok <- ensure_body_binding(normalized_headers, body_digest),
          :ok <- ensure_header_binding(normalized_headers, receipt_claims),
          :ok <-
@@ -243,6 +265,20 @@ defmodule PlatformPhx.Siwa do
       :ok
     else
       {:error, {401, "http_headers_missing", "missing required signed agent headers"}}
+    end
+  end
+
+  defp ensure_nonce_identity(nonce_record, registry_address, token_id) do
+    cond do
+      nonce_record.registry_address != registry_address ->
+        {:error,
+         {401, "nonce_identity_mismatch", "registry_address does not match the issued nonce"}}
+
+      nonce_record.token_id != Integer.to_string(token_id) ->
+        {:error, {401, "nonce_identity_mismatch", "token_id does not match the issued nonce"}}
+
+      true ->
+        :ok
     end
   end
 
@@ -373,20 +409,36 @@ defmodule PlatformPhx.Siwa do
     end
   end
 
-  defp verify_receipt(receipt) when is_binary(receipt) do
+  defp verify_receipt(receipt, opts) when is_binary(receipt) do
     with [header_segment, payload_segment, signature_segment] <-
            String.split(receipt, ".", parts: 3),
          true <- signature_segment == sign_token("#{header_segment}.#{payload_segment}"),
          {:ok, claims} <- decode_claims(payload_segment),
          true <- claims["typ"] == "siwa_receipt",
-         true <- claims["exp"] > now_unix_seconds() do
+         true <- claims["exp"] > now_unix_seconds(),
+         :ok <- ensure_audience(claims, opts) do
       {:ok, claims}
     else
       _ -> {:error, {401, "receipt_invalid", "invalid SIWA receipt"}}
     end
   end
 
-  defp verify_receipt(_value), do: {:error, {401, "receipt_invalid", "invalid SIWA receipt"}}
+  defp verify_receipt(_value, _opts),
+    do: {:error, {401, "receipt_invalid", "invalid SIWA receipt"}}
+
+  defp ensure_audience(claims, opts) do
+    case Keyword.get(opts, :audience) do
+      nil ->
+        :ok
+
+      expected ->
+        if claims["aud"] == expected do
+          :ok
+        else
+          {:error, {401, "receipt_binding_mismatch", "receipt audience does not match this app"}}
+        end
+    end
+  end
 
   defp ensure_header_binding(headers, claims) do
     cond do

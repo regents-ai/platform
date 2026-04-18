@@ -1,5 +1,6 @@
 defmodule PlatformPhxWeb.Api.PrivySessionController do
   use PlatformPhxWeb, :controller
+  require Logger
 
   alias PlatformPhx.Accounts
   alias PlatformPhx.AgentPlatform
@@ -15,27 +16,49 @@ defmodule PlatformPhxWeb.Api.PrivySessionController do
   end
 
   def create(conn, params) when is_map(params) do
+    log_create_attempt(conn, params)
+
     with {:ok, token} <- fetch_bearer_token(conn),
          {:ok, verified_human} <- privy_module().verify_token(token),
          {:ok, human} <- upsert_human(verified_human, params),
          {:ok, payload} <- AgentPlatform.current_human_payload(human) do
+      Logger.info(
+        "privy session create succeeded #{inspect(%{privy_user_id: human.privy_user_id, wallet_address: redact_wallet(human.wallet_address), wallet_count: length(List.wrap(human.wallet_addresses)), display_name_present: present?(human.display_name)})}"
+      )
+
       conn
       |> put_session(:current_human_id, human.id)
       |> json(payload)
     else
       {:error, changeset} when is_map(changeset) ->
+        Logger.warning(
+          "privy session create rejected invalid human payload #{inspect(%{errors: changeset.errors})}"
+        )
+
         ApiErrors.error(conn, {:bad_request, inspect(changeset.errors)})
 
       {:error, :invalid_authorization_header} ->
+        Logger.warning(
+          "privy session create missing authorization #{inspect(%{authorization_header_present: authorization_header_present?(conn)})}"
+        )
+
         ApiErrors.error(conn, {:unauthorized, "Valid Privy identity token required"})
 
       {:error, :wallet_required} ->
+        Logger.warning(
+          "privy session create missing linked wallet #{inspect(%{authorization_header_present: authorization_header_present?(conn), display_name_present: present?(Map.get(params, "display_name"))})}"
+        )
+
         ApiErrors.error(
           conn,
           {:unauthorized, "Valid Privy identity token with a linked wallet required"}
         )
 
-      {:error, _reason} ->
+      {:error, reason} ->
+        Logger.warning(
+          "privy session create failed #{inspect(%{reason: reason, verification_failure: Privy.describe_verify_error(reason), authorization_header_present: authorization_header_present?(conn), display_name_present: present?(Map.get(params, "display_name"))})}"
+        )
+
         ApiErrors.error(conn, {:unauthorized, "Valid Privy identity token required"})
     end
   end
@@ -97,4 +120,31 @@ defmodule PlatformPhxWeb.Api.PrivySessionController do
     |> Application.get_env(:privy_session_controller, [])
     |> Keyword.get(:privy_module, Privy)
   end
+
+  defp log_create_attempt(conn, params) do
+    Logger.info(
+      "privy session create attempt #{inspect(%{authorization_header_present: authorization_header_present?(conn), display_name_present: present?(Map.get(params, "display_name"))})}"
+    )
+  end
+
+  defp authorization_header_present?(conn) do
+    conn
+    |> get_req_header("authorization")
+    |> Enum.any?(&(String.trim(&1) != ""))
+  end
+
+  defp redact_wallet(wallet_address) when is_binary(wallet_address) do
+    trimmed = String.trim(wallet_address)
+
+    if trimmed == "" do
+      nil
+    else
+      "#{String.slice(trimmed, 0, 6)}...#{String.slice(trimmed, -4, 4)}"
+    end
+  end
+
+  defp redact_wallet(_wallet_address), do: nil
+
+  defp present?(value) when is_binary(value), do: String.trim(value) != ""
+  defp present?(value), do: not is_nil(value)
 end

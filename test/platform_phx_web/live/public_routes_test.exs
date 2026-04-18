@@ -9,6 +9,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   alias PlatformPhx.AgentPlatform.Subdomain
   alias PlatformPhx.OperatorReports
   alias PlatformPhx.Repo
+  alias PlatformPhx.RuntimeConfig
 
   test "home route exposes social share metadata", %{conn: conn} do
     html =
@@ -17,7 +18,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
       |> html_response(200)
 
     share_description =
-      "The Regent website guides wallet setup, company launch, and public company pages, while Regent CLI handles local Techtree and Autolaunch work."
+      "The Regent website guides wallet setup, company launch, and public company pages, while Regents CLI handles local Techtree and Autolaunch work."
 
     share_image_url = PlatformPhxWeb.Endpoint.url() <> "/images/og-image.png"
 
@@ -64,6 +65,8 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "https://farcaster.xyz/regent"
     assert html =~ "https://discord.gg/regents"
     assert html =~ "https://github.com/orgs/regent-ai/repositories"
+    refute html =~ "layout-wallet-control-floating"
+    refute html =~ "Sign In"
 
     assert html =~
              "https://www.geckoterminal.com/base/pools/0x4ed3b69ac263ad86482f609b2c2105f64bcfd3a7e02e8e078ec9fec1f0324bed"
@@ -77,14 +80,14 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "platform-footer-voxel-classic"
 
     assert html =~
-             "Do local research, publish work, and move through BBH with Regent CLI. First tech:"
+             "Do local research, publish work, and move through BBH with Regents CLI. First tech:"
 
     assert html =~ "https://huggingface.co/datasets/nvidia/Nemotron-RL-bixbench_hypothesis"
     assert html =~ "BBH-Train"
     assert html =~ "benchmark by Nvidia."
 
     assert html =~
-             "Plan launches, track auctions, and follow launch progress across the web view and Regent CLI commands."
+             "Plan launches, track auctions, and follow launch progress across the web view and Regents CLI commands."
 
     refute html =~ "layout-wallet-control-desktop"
     refute html =~ "layout-wallet-control-mobile"
@@ -124,7 +127,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Agent Overview"
     assert html =~ "Using Regents as a human operator"
     assert html =~ "Regents is for a Claw/Hermes-type agent to flourish"
-    assert html =~ "pnpm add -g @regentlabs/cli"
+    assert html =~ "pnpm add -g @regentslabs/cli"
     assert html =~ "Start Techtree setup"
     assert html =~ "Open guided browser setup"
     assert html =~ "regent techtree start"
@@ -180,8 +183,15 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "services-wallet-console"
     assert html =~ "phx-hook=\"DashboardPrivyBridge\""
     assert html =~ "phx-hook=\"DashboardWallet\""
+    assert length(Regex.scan(~r/phx-hook="DashboardWallet"/, html)) == 1
     assert html =~ "layout-wallet-control-desktop"
     assert html =~ "data-wallet-signed-in=\"false\""
+    assert html =~ "data-wallet-shell"
+    assert html =~ "data-wallet-copy"
+    assert html =~ "data-wallet-copy-icon"
+    assert html =~ "data-wallet-copy-check"
+    assert html =~ "data-dashboard-wallet-notice"
+    assert html =~ "aria-live=\"polite\""
     assert html =~ "Sign In"
     assert html =~ "phx-hook=\"DashboardNameClaim\""
     assert html =~ "phx-hook=\"DashboardRedeem\""
@@ -204,8 +214,15 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "https://opensea.io/collection/regents-club"
     assert html =~ "phx-hook=\"DashboardPrivyBridge\""
     assert html =~ "phx-hook=\"DashboardWallet\""
+    assert length(Regex.scan(~r/phx-hook="DashboardWallet"/, html)) == 1
     assert html =~ "layout-wallet-control-desktop"
     assert html =~ "data-wallet-signed-in=\"false\""
+    assert html =~ "data-wallet-shell"
+    assert html =~ "data-wallet-copy"
+    assert html =~ "data-wallet-copy-icon"
+    assert html =~ "data-wallet-copy-check"
+    assert html =~ "data-dashboard-wallet-notice"
+    assert html =~ "aria-live=\"polite\""
     assert html =~ "Sign In"
 
     assert html =~
@@ -377,6 +394,40 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "platform-footer-voxel-classic"
   end
 
+  test "browser routes emit enforced csp and script nonce", %{conn: conn} do
+    conn = get(conn, "/")
+    html = html_response(conn, 200)
+    [csp] = get_resp_header(conn, "content-security-policy")
+    [_, header_nonce] = Regex.run(~r/script-src 'nonce-([^']+)'/, csp)
+    [_, html_nonce] = Regex.run(~r/<script nonce=\"([^\"]+)\">/, html)
+
+    assert csp =~ "default-src 'self';"
+    assert csp =~ "script-src 'nonce-"
+    assert csp =~ "https://challenges.cloudflare.com"
+    assert csp =~ "style-src 'self' 'unsafe-inline';"
+
+    assert csp =~
+             "img-src 'self' data: blob: https://pbs.twimg.com https://explorer-api.walletconnect.com;"
+
+    assert csp =~ "frame-ancestors 'none';"
+
+    assert csp =~
+             "child-src https://auth.privy.io https://verify.walletconnect.com https://verify.walletconnect.org;"
+
+    assert csp =~
+             "frame-src https://auth.privy.io https://verify.walletconnect.com https://verify.walletconnect.org https://oauth.telegram.org https://challenges.cloudflare.com;"
+
+    assert csp =~ "connect-src 'self'"
+    assert csp =~ "https://auth.privy.io"
+    assert csp =~ "https://oauth.telegram.org"
+    assert csp =~ "wss://relay.walletconnect.com"
+    assert csp =~ "wss://www.walletlink.org"
+    assert csp =~ connect_origin(RuntimeConfig.base_rpc_url())
+    refute csp =~ "http://localhost:4000"
+    refute csp =~ "connect-src *"
+    assert header_nonce == html_nonce
+  end
+
   test "token card route renders hosted card shell", %{conn: conn} do
     conn =
       conn
@@ -386,15 +437,20 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
 
     assert html =~ "regents-token-card-page"
     assert html =~ "data-token-card-root"
-    assert html =~ "\"tokenId\":1"
-    assert html =~ "\"shaderId\":"
+    assert html =~ "data-token-card-entry="
     assert html =~ "Regents Club #1"
+    refute html =~ "data-token-card-json"
+    refute html =~ "<script id=\"regents-token-card-json\""
 
     assert get_resp_header(conn, "x-frame-options") == []
 
-    assert get_resp_header(conn, "content-security-policy") == [
-             "frame-ancestors 'self' https://opensea.io https://*.opensea.io;"
-           ]
+    [csp] = get_resp_header(conn, "content-security-policy")
+    assert csp =~ "default-src 'self';"
+    assert csp =~ "script-src 'nonce-"
+    assert csp =~ "frame-ancestors 'self' https://opensea.io https://*.opensea.io;"
+    assert csp =~ "connect-src 'self'"
+    assert csp =~ "https://auth.privy.io"
+    assert csp =~ connect_origin(RuntimeConfig.base_rpc_url())
   end
 
   test "token card image is served from the hosted card path", %{conn: conn} do
@@ -466,7 +522,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Agent Skill"
 
     assert html =~
-             "Start with Regent CLI, then move into Techtree for research, review, and publishing."
+             "Start with Regents CLI, then move into Techtree for research, review, and publishing."
 
     assert html =~ "regent techtree start"
     assert html =~ "actual research and publishing work lives"
@@ -538,13 +594,13 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   end
 
   test "regent cli route renders", %{conn: conn} do
-    {:ok, _regent_cli, html} = live(conn, "/regent-cli")
+    {:ok, _regents_cli, html} = live(conn, "/regents-cli")
 
     assert html =~ "Local Operator Surface"
-    assert html =~ "Regent CLI"
+    assert html =~ "Regents CLI"
     assert html =~ "Copy page as markdown"
-    assert html =~ "Use Regent CLI when the work starts on your machine."
-    assert html =~ "@regentlabs/cli"
+    assert html =~ "Use Regents CLI when the work starts on your machine."
+    assert html =~ "@regentslabs/cli"
     assert html =~ "regent create init"
     assert html =~ "regent create wallet --write-env"
     assert html =~ "regent techtree start"
@@ -703,5 +759,26 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     |> Repo.insert!()
 
     agent
+  end
+
+  defp connect_origin(nil), do: nil
+
+  defp connect_origin(url) do
+    uri = URI.parse(url)
+
+    default_port =
+      case uri.scheme do
+        "https" -> 443
+        _ -> 80
+      end
+
+    suffix =
+      if is_nil(uri.port) or uri.port == default_port do
+        ""
+      else
+        ":#{uri.port}"
+      end
+
+    "#{uri.scheme}://#{uri.host}#{suffix}"
   end
 end

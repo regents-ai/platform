@@ -7,6 +7,8 @@ defmodule PlatformPhx.SiwaTest do
 
   @wallet_address "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
   @chain_id 84_532
+  @registry_address "0x3333333333333333333333333333333333333333"
+  @token_id "77"
 
   test "signed requests reject expired signature windows" do
     receipt = verified_receipt()
@@ -100,10 +102,30 @@ defmodule PlatformPhx.SiwaTest do
                "body" => body
              })
 
-    assert message =~ "not verified"
+    assert message =~ "does not match"
   end
 
-  test "verified agent claims only expose the wallet-backed identity" do
+  test "signed requests reject a receipt for the wrong audience" do
+    receipt = verified_receipt("techtree")
+    body = Jason.encode!(%{"summary" => "Audience mismatch", "details" => "blocked"})
+    created = System.os_time(:second)
+    expires = created + 120
+
+    assert {:error, {401, "receipt_invalid", message}} =
+             Siwa.verify_http_request(
+               %{
+                 "method" => "POST",
+                 "path" => "/v1/agent/bug-report",
+                 "headers" => signed_headers(receipt, body, created, expires),
+                 "body" => body
+               },
+               audience: "platform"
+             )
+
+    assert message =~ "invalid SIWA receipt"
+  end
+
+  test "verified agent claims expose the verified ERC-8004 identity" do
     receipt = verified_receipt()
     body = Jason.encode!(%{"summary" => "Signed request", "details" => "accepted"})
     created = System.os_time(:second)
@@ -119,8 +141,8 @@ defmodule PlatformPhx.SiwaTest do
 
     assert claims["wallet_address"] == @wallet_address
     assert claims["chain_id"] == @chain_id
-    assert claims["registry_address"] == nil
-    assert claims["token_id"] == nil
+    assert claims["registry_address"] == @registry_address
+    assert claims["token_id"] == @token_id
   end
 
   test "signed requests keep replay protection for the full signature window" do
@@ -152,12 +174,14 @@ defmodule PlatformPhx.SiwaTest do
              })
   end
 
-  defp verified_receipt do
+  defp verified_receipt(audience \\ "regents.sh") do
     assert {:ok, %{"data" => %{"nonce" => nonce}}} =
              Siwa.issue_nonce(%{
                "wallet_address" => @wallet_address,
                "chain_id" => @chain_id,
-               "audience" => "regents.sh"
+               "registry_address" => @registry_address,
+               "token_id" => @token_id,
+               "audience" => audience
              })
 
     message = siwa_message(nonce)
@@ -167,11 +191,11 @@ defmodule PlatformPhx.SiwaTest do
              Siwa.verify_session(%{
                "wallet_address" => @wallet_address,
                "chain_id" => @chain_id,
+               "registry_address" => @registry_address,
+               "token_id" => @token_id,
                "nonce" => nonce,
                "message" => message,
-               "signature" => signature,
-               "registry_address" => "0x3333333333333333333333333333333333333333",
-               "token_id" => "77"
+               "signature" => signature
              })
 
     receipt
@@ -198,6 +222,8 @@ defmodule PlatformPhx.SiwaTest do
       "x-timestamp" => Integer.to_string(created),
       "x-agent-wallet-address" => @wallet_address,
       "x-agent-chain-id" => Integer.to_string(@chain_id),
+      "x-agent-registry-address" => @registry_address,
+      "x-agent-token-id" => @token_id,
       "content-digest" => Siwa.content_digest_for_body(body)
     }
 
@@ -212,9 +238,10 @@ defmodule PlatformPhx.SiwaTest do
         "x-timestamp",
         "x-agent-wallet-address",
         "x-agent-chain-id",
+        "x-agent-registry-address",
+        "x-agent-token-id",
         "content-digest"
-      ] ++
-        Enum.filter(["x-agent-registry-address", "x-agent-token-id"], &Map.has_key?(headers, &1))
+      ]
 
     signature_params =
       "(#{Enum.map_join(components, " ", &~s("#{&1}"))})" <>

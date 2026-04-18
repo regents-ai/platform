@@ -1,3 +1,5 @@
+import { clearChildren, mountSceneError, mountSvgMarkup } from "./svg_mount.ts";
+
 type ProceduralDemoKind = "fill" | "style" | "scale";
 
 type HeerichWithProcedural = {
@@ -78,12 +80,12 @@ function renderScaleDemo(engine: HeerichWithProcedural): void {
 export function mountProceduralHeerichDemo(root: HTMLElement): void {
   const engine = proceduralEngine();
   if (!engine) {
-    root.innerHTML = `<div class="rg-scene-error"><strong>Heerich engine unavailable.</strong></div>`;
+    mountSceneError(root, "Heerich engine unavailable.");
     return;
   }
 
   const kind = (root.dataset.demoKind ?? "fill") as ProceduralDemoKind;
-  root.innerHTML = "";
+  clearChildren(root);
 
   switch (kind) {
     case "fill":
@@ -97,5 +99,5 @@ export function mountProceduralHeerichDemo(root: HTMLElement): void {
       break;
   }
 
-  root.innerHTML = engine.toSVG({ padding: 24 });
+  mountSvgMarkup(root, engine.toSVG({ padding: 24 }));
 }

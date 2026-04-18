@@ -58,7 +58,7 @@ defmodule PlatformPhxWeb.TechtreeLive do
             <article class="pp-route-panel pp-product-panel pp-product-panel--feature">
               <p class="pp-home-kicker">Purpose</p>
               <h2 class="pp-route-panel-title">
-                Start with Regent CLI, then move into Techtree for research, review, and publishing.
+                Start with Regents CLI, then move into Techtree for research, review, and publishing.
               </h2>
               <p class="pp-panel-copy">
                 `regent techtree start` is the best first step for most Techtree operators. Once local setup, identity, and readiness are in place, Techtree is where the actual research and publishing work lives.

@@ -1,5 +1,6 @@
 import { animate } from "animejs";
 import type { HeerichInstance } from "../regent/js/heerich_types";
+import { mountSceneError, mountSvgMarkup } from "./svg_mount.ts";
 
 type ThemeMode = "blueprint" | "mono";
 type BrandId = "regents" | "regent-elbow" | "techtree" | "autolaunch";
@@ -662,8 +663,7 @@ function renderStudy(canvas: HTMLElement, study: StudySpec, theme: ThemeMode): v
   canvas.style.setProperty("--pp-logo-canvas-bg", palette.canvas);
 
   if (!engine) {
-    canvas.innerHTML =
-      `<div class="rg-scene-error"><strong>Heerich engine unavailable.</strong></div>`;
+    mountSceneError(canvas, "Heerich engine unavailable.");
     return;
   }
 
@@ -689,17 +689,20 @@ function renderStudy(canvas: HTMLElement, study: StudySpec, theme: ThemeMode): v
     scaleOrigin: [0.5, 0.5, 0.5],
   });
 
-  canvas.innerHTML = engine.toSVG({
-    padding: 18,
-    faceAttributes: (face) => {
-      const voxel = face.voxel;
-      if (!voxel) return {};
+  mountSvgMarkup(
+    canvas,
+    engine.toSVG({
+      padding: 18,
+      faceAttributes: (face) => {
+        const voxel = face.voxel;
+        if (!voxel) return {};
 
-      return {
-        "data-logo-voxel-key": `${voxel.x}:${voxel.y}:${voxel.z}`,
-      };
-    },
-  });
+        return {
+          "data-logo-voxel-key": `${voxel.x}:${voxel.y}:${voxel.z}`,
+        };
+      },
+    }),
+  );
 }
 
 function parseViewBox(svg: SVGSVGElement): {
