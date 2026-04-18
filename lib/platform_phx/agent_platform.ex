@@ -9,6 +9,7 @@ defmodule PlatformPhx.AgentPlatform do
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.Connection
   alias PlatformPhx.AgentPlatform.FormationRun
+  alias PlatformPhx.AgentPlatform.PaperclipBootstrap
   alias PlatformPhx.AgentPlatform.Service
   alias PlatformPhx.AgentPlatform.Subdomain
   alias PlatformPhx.AgentPlatform.TemplateCatalog
@@ -143,7 +144,7 @@ defmodule PlatformPhx.AgentPlatform do
              slug: agent.slug,
              name: agent.name
            },
-           feed: Enum.map(agent.artifacts, &serialize_artifact/1)
+           feed: public_feed(agent.artifacts)
          }}
 
       nil ->
@@ -249,11 +250,7 @@ defmodule PlatformPhx.AgentPlatform do
         ),
       services: Enum.map(agent.services || [], &serialize_service/1),
       connections: Enum.map(agent.connections || [], &serialize_connection/1),
-      feed:
-        agent.artifacts
-        |> List.wrap()
-        |> Enum.filter(&(&1.visibility == "public"))
-        |> Enum.map(&serialize_artifact/1)
+      feed: public_feed(agent.artifacts)
     }
 
     case scope do
@@ -295,6 +292,7 @@ defmodule PlatformPhx.AgentPlatform do
 
   def runtime_payload_map(%Agent{} = agent, billing_account) do
     runtime_defaults = runtime_defaults(agent)
+    workspace = company_workspace(agent)
 
     billing_account =
       billing_account ||
@@ -304,8 +302,8 @@ defmodule PlatformPhx.AgentPlatform do
 
     %{
       sprite: runtime_sprite_payload(agent, billing_account),
-      paperclip: runtime_paperclip_payload(agent, runtime_defaults),
-      hermes: runtime_hermes_payload(agent, runtime_defaults),
+      paperclip: runtime_paperclip_payload(agent, runtime_defaults, workspace),
+      hermes: runtime_hermes_payload(agent, runtime_defaults, workspace),
       checkpoint: runtime_checkpoint_payload(agent)
     }
   end
@@ -527,11 +525,24 @@ defmodule PlatformPhx.AgentPlatform do
     %{
       title: artifact.title,
       summary: artifact.summary,
-      url: artifact.url,
+      url: public_artifact_url(artifact.url),
       visibility: artifact.visibility,
       published_at: iso(artifact.published_at || artifact.created_at)
     }
   end
+
+  defp public_feed(artifacts) do
+    artifacts
+    |> List.wrap()
+    |> Enum.filter(&(&1.visibility == "public"))
+    |> Enum.map(&serialize_artifact/1)
+  end
+
+  defp public_artifact_url(url) when is_binary(url) do
+    if Artifact.public_url?(url), do: url, else: nil
+  end
+
+  defp public_artifact_url(_url), do: nil
 
   defp serialize_formation_run(nil), do: nil
 
@@ -567,8 +578,8 @@ defmodule PlatformPhx.AgentPlatform do
     }
   end
 
-  defp runtime_paperclip_payload(%Agent{} = agent, runtime_defaults) do
-    %{
+  defp runtime_paperclip_payload(%Agent{} = agent, runtime_defaults, workspace) do
+    base = %{
       company_id: agent.paperclip_company_id,
       status: effective_runtime_status(agent),
       deployment_mode:
@@ -576,10 +587,12 @@ defmodule PlatformPhx.AgentPlatform do
           "authenticated",
       http_port: agent.paperclip_http_port || runtime_defaults[:paperclip_http_port] || 3100
     }
+
+    maybe_put_workspace(base, workspace)
   end
 
-  defp runtime_hermes_payload(%Agent{} = agent, runtime_defaults) do
-    %{
+  defp runtime_hermes_payload(%Agent{} = agent, runtime_defaults, workspace) do
+    base = %{
       agent_id: agent.paperclip_agent_id,
       status: effective_runtime_status(agent),
       adapter_type:
@@ -606,6 +619,10 @@ defmodule PlatformPhx.AgentPlatform do
           else: agent.hermes_shared_skills
         )
     }
+
+    base
+    |> maybe_put_hermes_command(workspace)
+    |> maybe_put_prompt_template_version(workspace)
   end
 
   defp runtime_checkpoint_payload(%Agent{} = agent) do
@@ -622,6 +639,55 @@ defmodule PlatformPhx.AgentPlatform do
 
   defp formation_from_agent(%Agent{formation_run: %FormationRun{} = formation}), do: formation
   defp formation_from_agent(_agent), do: nil
+
+  defp company_workspace(%Agent{formation_run: %FormationRun{} = formation}) do
+    metadata = formation.metadata || %{}
+
+    workspace_path = metadata["workspace_path"]
+    workspace_seed_version = metadata["workspace_seed_version"]
+    hermes_command = metadata["hermes_command"]
+    prompt_template_version = metadata["prompt_template_version"]
+
+    if Enum.any?([
+         workspace_path,
+         workspace_seed_version,
+         hermes_command,
+         prompt_template_version
+       ]) do
+      %{
+        workspace_path: workspace_path || PaperclipBootstrap.workspace_path(),
+        workspace_seed_version:
+          workspace_seed_version || PaperclipBootstrap.workspace_seed_version(),
+        hermes_command: hermes_command || PaperclipBootstrap.hermes_command(),
+        prompt_template_version:
+          prompt_template_version || PaperclipBootstrap.prompt_template_version()
+      }
+    else
+      nil
+    end
+  end
+
+  defp company_workspace(_agent), do: nil
+
+  defp maybe_put_workspace(payload, nil), do: payload
+
+  defp maybe_put_workspace(payload, workspace) do
+    Map.merge(payload, %{
+      workspace_path: workspace.workspace_path,
+      workspace_seed_version: workspace.workspace_seed_version
+    })
+  end
+
+  defp maybe_put_hermes_command(payload, nil), do: payload
+
+  defp maybe_put_hermes_command(payload, workspace),
+    do: Map.put(payload, :command, workspace.hermes_command)
+
+  defp maybe_put_prompt_template_version(payload, nil), do: payload
+
+  defp maybe_put_prompt_template_version(payload, workspace) do
+    Map.put(payload, :prompt_template_version, workspace.prompt_template_version)
+  end
 
   defp subdomain_from_agent(%Agent{subdomain: %Subdomain{} = subdomain}), do: subdomain
   defp subdomain_from_agent(_agent), do: nil

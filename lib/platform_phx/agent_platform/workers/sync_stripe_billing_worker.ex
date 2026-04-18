@@ -118,6 +118,15 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
             })
             |> Repo.update!()
 
+          from(agent in Agent, where: agent.owner_human_id == ^updated.human_user_id)
+          |> Repo.update_all(
+            set: [
+              stripe_llm_billing_status: updated.billing_status,
+              stripe_customer_id: updated.stripe_customer_id,
+              stripe_pricing_plan_subscription_id: updated.stripe_pricing_plan_subscription_id
+            ]
+          )
+
           %{"billing_ledger_entry_id" => ledger_entry.id}
           |> SyncTopupCreditGrantWorker.new()
           |> Oban.insert!()

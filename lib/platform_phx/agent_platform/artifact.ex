@@ -25,5 +25,24 @@ defmodule PlatformPhx.AgentPlatform.Artifact do
     |> cast(attrs, [:agent_id, :job_id, :title, :summary, :url, :visibility, :published_at])
     |> validate_required([:agent_id, :title, :summary, :visibility])
     |> validate_inclusion(:visibility, ["public", "private"])
+    |> validate_change(:url, fn :url, url ->
+      if public_url?(url), do: [], else: [url: "must be an http or https URL"]
+    end)
   end
+
+  def public_url?(nil), do: true
+  def public_url?(""), do: true
+
+  def public_url?(url) when is_binary(url) do
+    case URI.parse(url) do
+      %URI{scheme: scheme, host: host}
+      when scheme in ["http", "https"] and is_binary(host) and host != "" ->
+        true
+
+      _other ->
+        false
+    end
+  end
+
+  def public_url?(_url), do: false
 end

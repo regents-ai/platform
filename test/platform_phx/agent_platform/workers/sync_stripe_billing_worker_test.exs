@@ -5,6 +5,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorkerTest do
   import Ecto.Query
 
   alias PlatformPhx.Accounts.HumanUser
+  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
@@ -120,6 +121,14 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorkerTest do
              :count,
              :id
            ) == 1
+
+    serialized_healthy_agent =
+      Repo.get!(Agent, healthy_agent.id)
+      |> Repo.preload([:subdomain, :services, :connections, :artifacts, formation_run: :events])
+      |> AgentPlatform.serialize_agent(:private)
+
+    assert serialized_healthy_agent.runtime_status == "ready"
+    assert serialized_healthy_agent.sprite_metering_status == "paid"
 
     assert Repo.get!(Agent, healthy_agent.id).runtime_status == "ready"
     assert Repo.get!(Agent, failing_agent.id).runtime_status == "failed"

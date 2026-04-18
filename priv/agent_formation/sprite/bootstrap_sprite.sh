@@ -54,11 +54,11 @@ FORMATION_TEMPLATE_CHECKPOINT_MOMENTS=${FORMATION_TEMPLATE_CHECKPOINT_MOMENTS:-[
 FORMATION_STRIPE_CUSTOMER_ID=${FORMATION_STRIPE_CUSTOMER_ID:-}
 FORMATION_STRIPE_SUBSCRIPTION_ID=${FORMATION_STRIPE_SUBSCRIPTION_ID:-}
 EOF"
-run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "cd /app/paperclip-regents && node seed_company_workspace.mjs"
-run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "cd /app/paperclip-regents && nohup node server.mjs >/tmp/paperclip-regents.log 2>&1 &"
+run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "cd /app/paperclip-regents && node --env-file=.env seed_company_workspace.mjs"
+run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "cd /app/paperclip-regents && nohup node --env-file=.env server.mjs >/tmp/paperclip-regents.log 2>&1 &"
 run "$SPRITE_CLI" services create "$SPRITE_NAME" paperclip --http-port "$PAPERCLIP_PORT"
 run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "until curl -fsS http://127.0.0.1:$PAPERCLIP_PORT/health >/dev/null; do sleep 2; done"
-BOOTSTRAP_JSON="$(run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "cd /app/paperclip-regents && node bootstrap_company.mjs")"
+BOOTSTRAP_JSON="$(run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "cd /app/paperclip-regents && node --env-file=.env bootstrap_company.mjs")"
 CHECKPOINT_REF="$("$SPRITE_CLI" checkpoint create "$SPRITE_NAME" --comment "agent formation bootstrap" | tail -n 1)"
 
 cat <<EOF

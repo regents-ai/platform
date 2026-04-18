@@ -1,4 +1,4 @@
-import { mkdir, writeFile, chmod } from "node:fs/promises";
+import { access, chmod, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 function readJsonEnv(name, fallback) {
@@ -211,8 +211,22 @@ Use this folder for repeatable operator procedures that are worth keeping.
   ],
 ]);
 
+async function writeFileIfMissing(filePath, content) {
+  try {
+    await access(filePath);
+    return false;
+  } catch (_error) {
+    await writeFile(filePath, content, "utf8");
+    return true;
+  }
+}
+
+const createdFiles = [];
+
 for (const [filePath, content] of files.entries()) {
-  await writeFile(filePath, content, "utf8");
+  if (await writeFileIfMissing(filePath, content)) {
+    createdFiles.push(filePath);
+  }
 }
 
 await writeFile(
@@ -234,5 +248,6 @@ console.log(
     workspace_seed_version: workspaceSeedVersion,
     hermes_command: hermesCommand,
     files: Array.from(files.keys()),
+    created_files: createdFiles,
   }),
 );

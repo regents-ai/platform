@@ -4,6 +4,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
   import Ecto.Query
 
   alias PlatformPhx.Accounts.HumanUser
+  alias PlatformPhx.AgentPlatform.Artifact
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
   alias PlatformPhx.AgentPlatform.FormationEvent
@@ -259,8 +260,18 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert runtime_response["agent"]["status"] == "published"
     assert runtime_response["agent"]["subdomain"]["active"] == true
     assert runtime_response["runtime"]["sprite"]["owner"] == "regents"
+    assert runtime_response["runtime"]["paperclip"]["workspace_path"] == "/app/company"
+
+    assert runtime_response["runtime"]["paperclip"]["workspace_seed_version"] ==
+             "company-workspace-v1"
+
     assert runtime_response["runtime"]["hermes"]["adapter_type"] == "hermes_local"
     assert runtime_response["runtime"]["hermes"]["model"] == "glm-5.1"
+    assert runtime_response["runtime"]["hermes"]["command"] == "/app/bin/hermes-company"
+
+    assert runtime_response["runtime"]["hermes"]["prompt_template_version"] ==
+             "company-workspace-prompt-v1"
+
     assert runtime_response["billing_account"]["connected"] == true
     assert runtime_response["formation"]["status"] == "succeeded"
 
@@ -324,6 +335,99 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert billing_account.stripe_customer_id == "cus_test_agent_formation"
   end
 
+  test "workspace seed reads the env file and preserves an existing workspace" do
+    tmp_dir = unique_tmp_dir!("company-workspace-seed")
+    workspace_path = Path.join(tmp_dir, "company")
+    hermes_command = Path.join([tmp_dir, "bin", "hermes-company"])
+    env_file_path = Path.join(tmp_dir, ".env")
+
+    script_path =
+      "/Users/sean/Documents/regent/platform/priv/agent_formation/paperclip-regents/seed_company_workspace.mjs"
+
+    File.mkdir_p!(tmp_dir)
+
+    File.write!(
+      env_file_path,
+      """
+      FORMATION_SLUG=seeded-company
+      FORMATION_WORKSPACE_PATH=#{workspace_path}
+      FORMATION_HERMES_COMMAND=#{hermes_command}
+      FORMATION_TEMPLATE_KEY=start
+      FORMATION_TEMPLATE_PUBLIC_NAME=Start Regent
+      FORMATION_TEMPLATE_SUMMARY=Start template summary
+      FORMATION_TEMPLATE_COMPANY_PURPOSE=Run one company workspace.
+      FORMATION_TEMPLATE_WORKER_ROLE=Primary worker role.
+      FORMATION_TEMPLATE_SERVICES=[{"name":"Start plan","summary":"Turn an idea into a plan.","price_label":"$1.05 / call"}]
+      FORMATION_TEMPLATE_CONNECTION_DEFAULTS=[{"display_name":"X account","status":"action_required"}]
+      FORMATION_TEMPLATE_RECOMMENDED_NETWORK_DOMAINS=["github.com","x.com"]
+      FORMATION_TEMPLATE_CHECKPOINT_MOMENTS=["After Paperclip is reachable"]
+      """
+    )
+
+    {first_output, 0} = System.cmd("node", ["--env-file=.env", script_path], cd: tmp_dir)
+    first_payload = Jason.decode!(String.trim(first_output))
+
+    assert first_payload["workspace_path"] == workspace_path
+    assert first_payload["hermes_command"] == hermes_command
+
+    assert File.read!(Path.join(workspace_path, "HOME.md")) =~
+             "# seeded-company company workspace"
+
+    assert File.read!(Path.join(workspace_path, "PLATFORM_CONTEXT.md")) =~ "Start Regent"
+
+    File.write!(Path.join(workspace_path, "HOME.md"), "# preserved workspace\n")
+
+    {second_output, 0} = System.cmd("node", ["--env-file=.env", script_path], cd: tmp_dir)
+    second_payload = Jason.decode!(String.trim(second_output))
+
+    assert second_payload["created_files"] == []
+    assert File.read!(Path.join(workspace_path, "HOME.md")) == "# preserved workspace\n"
+  end
+
+  test "public feed only returns public artifacts and strips unsafe urls", %{conn: conn} do
+    human = insert_human!()
+    agent = insert_agent!(human, "feedline", %{})
+
+    insert_artifact!(agent, %{
+      title: "Public safe artifact",
+      summary: "Safe output",
+      url: "https://example.com/safe-output",
+      visibility: "public"
+    })
+
+    insert_legacy_artifact!(agent, %{
+      title: "Public unsafe artifact",
+      summary: "Unsafe output",
+      url: "javascript:alert('xss')",
+      visibility: "public"
+    })
+
+    insert_artifact!(agent, %{
+      title: "Private artifact",
+      summary: "Private output",
+      url: "https://example.com/private-output",
+      visibility: "private"
+    })
+
+    response =
+      conn
+      |> get("/api/agent-platform/agents/feedline/feed")
+      |> json_response(200)
+
+    assert response["ok"] == true
+    assert response["agent"]["slug"] == "feedline"
+
+    assert response["feed"]
+           |> Enum.map(& &1["title"])
+           |> Enum.sort() == ["Public safe artifact", "Public unsafe artifact"]
+
+    safe_artifact = Enum.find(response["feed"], &(&1["title"] == "Public safe artifact"))
+    unsafe_artifact = Enum.find(response["feed"], &(&1["title"] == "Public unsafe artifact"))
+
+    assert safe_artifact["url"] == "https://example.com/safe-output"
+    assert unsafe_artifact["url"] == nil
+  end
+
   test "company creation rolls back the claimed name when the launch job cannot be queued", %{
     conn: conn
   } do
@@ -370,7 +474,10 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     })
 
     insert_billing_account!(human)
-    Application.put_env(:platform_phx, :formation, oban_module: PlatformPhx.ObanInsertConflictFake)
+
+    Application.put_env(:platform_phx, :formation,
+      oban_module: PlatformPhx.ObanInsertConflictFake
+    )
 
     response =
       conn
@@ -852,6 +959,34 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     |> Repo.insert!()
   end
 
+  defp insert_artifact!(agent, attrs) do
+    defaults = %{
+      agent_id: agent.id,
+      title: "Artifact",
+      summary: "Artifact summary",
+      visibility: "public",
+      published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+    }
+
+    %Artifact{}
+    |> Artifact.changeset(Map.merge(defaults, attrs))
+    |> Repo.insert!()
+  end
+
+  defp insert_legacy_artifact!(agent, attrs) do
+    defaults = %{
+      agent_id: agent.id,
+      title: "Artifact",
+      summary: "Artifact summary",
+      visibility: "public",
+      published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+    }
+
+    %Artifact{}
+    |> struct!(Map.merge(defaults, attrs))
+    |> Repo.insert!()
+  end
+
   defp request_url(address, collection) do
     "https://api.opensea.io/api/v2/chain/base/account/#{address}/nfts?collection=#{collection}&limit=100"
   end
@@ -869,6 +1004,10 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
   end
 
   defp unique_external_id(prefix), do: "#{prefix}_#{System.unique_integer([:positive])}"
+
+  defp unique_tmp_dir!(prefix) do
+    Path.join(System.tmp_dir!(), "#{prefix}-#{System.unique_integer([:positive])}")
+  end
 
   defp stripe_setup_event_body(human_user_id) do
     Jason.encode!(%{
