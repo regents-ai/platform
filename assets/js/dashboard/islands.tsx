@@ -13,7 +13,6 @@ import {
   createPublicClient,
   http,
   isAddress,
-  type WalletClient,
 } from "viem";
 import { base, mainnet } from "viem/chains";
 
@@ -30,8 +29,18 @@ import {
   formatPrivySessionErrorMessage,
   getLinkedWalletAddressesFromPrivyUser,
   usePrivyWalletClient,
-  type PrivyEthereumWalletLike,
 } from "./privy";
+import {
+  disconnectFailureNotice,
+  emptyWalletBridgeState,
+  type WalletBridgeState,
+  type WalletNoticeTone,
+} from "./wallet_bridge_state";
+import {
+  createWalletRenderState,
+  walletReadyForSession,
+  type WalletRenderState,
+} from "./wallet_render_state";
 import { decideWalletSessionSync } from "./wallet_session_sync";
 
 type DashboardConfig = {
@@ -43,37 +52,11 @@ type DashboardConfig = {
   redeemerAddress?: string | null;
 };
 
-type WalletBridgeState = {
-  privyReady: boolean;
-  authenticated: boolean;
-  account: `0x${string}` | null;
-  chainId: number | null;
-  privyId: string | null;
-  wallet: PrivyEthereumWalletLike | null;
-  walletClient: WalletClient | null;
-  displayName: string | null;
-  identityToken: string | null;
-  linkedWalletAddresses: readonly `0x${string}`[];
-  login: (() => void) | null;
-  linkWallet: (() => void) | null;
-  logout: (() => void) | null;
-  refreshUser: (() => Promise<unknown>) | null;
-};
-
 type BridgeEventDetail = {
   privyReady: boolean;
   authenticated: boolean;
   account: `0x${string}` | null;
   chainId: number | null;
-};
-
-type WalletNoticeTone = "error" | "info";
-
-type WalletRenderState = {
-  privyReady: boolean;
-  authenticated: boolean;
-  connected: boolean;
-  connectedAddress: `0x${string}` | null;
 };
 
 type Cleanup = () => void;
@@ -87,22 +70,7 @@ const DASHBOARD_PRIVY_CONFIG: PrivyClientConfig = {
   },
 };
 
-let walletBridgeState: WalletBridgeState = {
-  privyReady: false,
-  authenticated: false,
-  account: null,
-  chainId: null,
-  privyId: null,
-  wallet: null,
-  walletClient: null,
-  displayName: null,
-  identityToken: null,
-  linkedWalletAddresses: [],
-  login: null,
-  linkWallet: null,
-  logout: null,
-  refreshUser: null,
-};
+let walletBridgeState: WalletBridgeState = emptyWalletBridgeState();
 
 let walletSessionSyncInFlight: Promise<void> | null = null;
 let walletReloadRequested = false;
@@ -286,15 +254,8 @@ export function mountDashboardPrivyBridge(el: Element): void {
   const config = parseConfig(el.getAttribute("data-dashboard-config"));
 
   if (!config?.privyAppId || !config?.privyClientId) {
-    walletBridgeState = {
-      ...walletBridgeState,
-      privyReady: false,
-      linkedWalletAddresses: [],
-      login: null,
-      linkWallet: null,
-      logout: null,
-      refreshUser: null,
-    };
+    walletBridgeState = emptyWalletBridgeState();
+    lastWalletBridgeDispatchKey = null;
     emitWalletBridgeState();
     return;
   }
@@ -321,38 +282,6 @@ export function unmountDashboardPrivyBridge(el: Element): void {
 
   root.unmount();
   bridgeRoots.delete(el);
-}
-
-function walletReadyForSession(address: string | null | undefined): boolean {
-  const normalizedAddress = normalizeWalletAddress(address);
-  const linkedWalletAddresses = walletBridgeState.linkedWalletAddresses;
-
-  if (linkedWalletAddresses.length === 0) return false;
-  if (!normalizedAddress) return false;
-
-  return linkedWalletAddresses.some(
-    (candidate) => candidate.toLowerCase() === normalizedAddress.toLowerCase(),
-  );
-}
-
-function createWalletRenderState(
-  detail: Partial<BridgeEventDetail> | undefined,
-  serverSignedIn: boolean,
-  serverAddress: `0x${string}` | null,
-): WalletRenderState {
-  const privyReady = detail?.privyReady ?? walletBridgeState.privyReady;
-  const authenticated = detail?.authenticated ?? walletBridgeState.authenticated;
-  const connectedAddress =
-    normalizeWalletAddress(detail?.account) ??
-    normalizeWalletAddress(walletBridgeState.account) ??
-    serverAddress;
-
-  return {
-    privyReady,
-    authenticated,
-    connected: serverSignedIn || (authenticated && walletReadyForSession(connectedAddress)),
-    connectedAddress,
-  };
 }
 
 type WalletShellBinding = {
@@ -387,6 +316,12 @@ function bindDashboardWalletShell(
   const notice = el.querySelector<HTMLElement>("[data-dashboard-wallet-notice]");
   let drawerOpen = false;
   let copyResetTimer: number | undefined;
+  let currentRenderState: WalletRenderState = {
+    privyReady: false,
+    authenticated: false,
+    connected: false,
+    connectedAddress: options.serverAddress,
+  };
 
   const showNotice = (message: string, tone: WalletNoticeTone = "info") => {
     if (!notice) return;
@@ -487,6 +422,8 @@ function bindDashboardWalletShell(
   };
 
   const renderWalletState = (state: WalletRenderState) => {
+    currentRenderState = state;
+
     if (connectButton) {
       connectButton.disabled = state.connected || !state.privyReady || options.getDisconnecting();
     }
@@ -525,9 +462,7 @@ function bindDashboardWalletShell(
   };
 
   const onCopyClick = async () => {
-    const address =
-      normalizeWalletAddress(walletBridgeState.account) ??
-      options.serverAddress;
+    const address = currentRenderState.connectedAddress;
 
     if (!address) {
       showNotice("No wallet address is available yet.", "error");
@@ -631,6 +566,7 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
   const serverSignedIn = el.dataset.walletSignedIn === "true";
   const serverAddress = normalizeWalletAddress(el.dataset.walletAddress);
   const layoutRoot = el.closest("#platform-layout-root") ?? document.body;
+  let serverSessionActive = serverSignedIn;
   let pendingConnect = false;
   let disconnecting = false;
   let lastSessionSyncAttemptKey: string | null = null;
@@ -673,10 +609,18 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
   };
 
   const renderWalletState = (detail?: Partial<BridgeEventDetail>) => {
-    const renderState = createWalletRenderState(detail, serverSignedIn, serverAddress);
+    const renderState = createWalletRenderState({
+      privyReady: detail?.privyReady ?? walletBridgeState.privyReady,
+      authenticated: detail?.authenticated ?? walletBridgeState.authenticated,
+      detailAccount: normalizeWalletAddress(detail?.account),
+      bridgeAccount: normalizeWalletAddress(walletBridgeState.account),
+      linkedWalletAddresses: walletBridgeState.linkedWalletAddresses,
+      serverSignedIn: serverSessionActive,
+      serverAddress,
+    });
 
     privyDebugLog("info", "render-wallet-state", {
-      serverSignedIn,
+      serverSignedIn: serverSessionActive,
       privyReady: renderState.privyReady,
       authenticated: renderState.authenticated,
       connected: renderState.connected,
@@ -720,7 +664,7 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
 
   const attemptSessionSync = async (label: string) => {
     const decision = decideWalletSessionSync({
-      serverSignedIn,
+      serverSignedIn: serverSessionActive,
       pendingConnect,
       lastAttemptKey: lastSessionSyncAttemptKey,
       cooldownUntilMs: sessionSyncCooldownUntilMs,
@@ -746,7 +690,7 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
         account: redactWalletForDebug(detail.account),
         chainId: detail.chainId,
       },
-      serverSignedIn,
+      serverSignedIn: serverSessionActive,
       pendingConnect,
       linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
     });
@@ -756,11 +700,14 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
     if (
       detail.authenticated &&
       walletBridgeState.account &&
-      walletReadyForSession(detail.account ?? walletBridgeState.account)
+          walletReadyForSession(
+            walletBridgeState.linkedWalletAddresses,
+            normalizeWalletAddress(detail.account) ?? normalizeWalletAddress(walletBridgeState.account),
+          )
     ) {
       try {
         await attemptSessionSync(
-          serverSignedIn ? "Restoring your sign in..." : "Finishing sign in...",
+          serverSessionActive ? "Restoring your sign in..." : "Finishing sign in...",
         );
       } catch (error) {
         walletReloadRequested = false;
@@ -780,7 +727,13 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
     clearNotices();
     lastSessionSyncAttemptKey = null;
 
-    if (walletBridgeState.authenticated && !walletReadyForSession(walletBridgeState.account)) {
+    if (
+      walletBridgeState.authenticated &&
+      !walletReadyForSession(
+        walletBridgeState.linkedWalletAddresses,
+        normalizeWalletAddress(walletBridgeState.account),
+      )
+    ) {
       if (!walletBridgeState.linkWallet) {
         privyDebugLog("warn", "connect-click:link-wallet-missing", {
           account: redactWalletForDebug(walletBridgeState.account),
@@ -818,6 +771,8 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
   }
 
   async function onDisconnectClick() {
+    let clearedServerSession = false;
+
     try {
       disconnecting = true;
       pendingConnect = false;
@@ -828,6 +783,8 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
 
       if (config?.privySession) {
         await clearPrivySession(config.privySession);
+        serverSessionActive = false;
+        clearedServerSession = true;
       }
 
       await Promise.resolve(walletBridgeState.logout?.());
@@ -836,7 +793,17 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
       disconnecting = false;
       walletReloadRequested = false;
       renderWalletState();
-      showNotice(getErrorMessage(error, "Could not disconnect this wallet."), "error");
+
+      const notice = disconnectFailureNotice({
+        clearedServerSession,
+        fallbackMessage: getErrorMessage(error, "Could not disconnect this wallet."),
+      });
+
+      if (clearedServerSession) {
+        sessionSyncCooldownUntilMs = Date.now() + WALLET_SESSION_SYNC_COOLDOWN_MS;
+      }
+
+      showNotice(notice.message, notice.tone);
     }
   }
 
@@ -846,8 +813,11 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
   if (
     walletBridgeState.authenticated &&
     walletBridgeState.account &&
-    walletReadyForSession(walletBridgeState.account) &&
-    !serverSignedIn
+    walletReadyForSession(
+      walletBridgeState.linkedWalletAddresses,
+      normalizeWalletAddress(walletBridgeState.account),
+    ) &&
+    !serverSessionActive
   ) {
     privyDebugLog("info", "initial-sync-trigger", {
       account: redactWalletForDebug(walletBridgeState.account),
