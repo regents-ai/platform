@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { access, mkdtemp, readFile, rm } from "node:fs/promises";
-import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import type { AddressInfo } from "node:net";
 
 import { executeRegentCommand, parseRegentCommand, usageText } from "./regents_cli.ts";
+import {
+  executePlatformCommand,
+  type PlatformCommand,
+} from "./platform_cli.ts";
 
 test("usage text mentions shader and platform commands", () => {
   const help = usageText();
@@ -61,41 +63,49 @@ test("platform CLI signs in, reuses the saved session, performs a write action, 
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "regents-cli-"));
   const sessionFile = path.join(tempDir, "platform-session.json");
   const requests: Array<{ method: string; url: string; cookie: string | null; csrf: string | null; body: string }> = [];
+  const origin = "http://127.0.0.1:40111";
 
   t.after(async () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  const server = http.createServer(async (req, res) => {
-    const body = await readRequestBody(req);
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const requestUrl = new URL(
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url,
+    );
+    const method = init?.method ?? "GET";
+    const headers = new Headers(init?.headers);
+    const body = typeof init?.body === "string" ? init.body : "";
 
     requests.push({
-      method: req.method ?? "",
-      url: req.url ?? "",
-      cookie: req.headers.cookie ?? null,
-      csrf: firstHeader(req.headers["x-csrf-token"]),
+      method,
+      url: requestUrl.pathname,
+      cookie: headers.get("cookie"),
+      csrf: headers.get("x-csrf-token"),
       body,
     });
 
-    if (req.method === "GET" && req.url === "/api/auth/privy/csrf") {
-      res.statusCode = 200;
-      res.setHeader("content-type", "application/json");
-      res.setHeader("set-cookie", "_platform_phx_key=bootstrap; path=/; HttpOnly");
-      res.end(JSON.stringify({ ok: true, csrf_token: "csrf-123" }));
-      return;
+    if (method === "GET" && requestUrl.pathname === "/api/auth/privy/csrf") {
+      return jsonResponse(
+        200,
+        { ok: true, csrf_token: "csrf-123" },
+        { "set-cookie": "_platform_phx_key=bootstrap; path=/; HttpOnly" },
+      );
     }
 
-    if (req.method === "POST" && req.url === "/api/auth/privy/session") {
-      assert.equal(req.headers.authorization, "Bearer good-token");
-      assert.equal(req.headers.cookie, "_platform_phx_key=bootstrap");
-      assert.equal(firstHeader(req.headers["x-csrf-token"]), "csrf-123");
+    if (method === "POST" && requestUrl.pathname === "/api/auth/privy/session") {
+      assert.equal(headers.get("authorization"), "Bearer good-token");
+      assert.equal(headers.get("cookie"), "_platform_phx_key=bootstrap");
+      assert.equal(headers.get("x-csrf-token"), "csrf-123");
       assert.deepEqual(JSON.parse(body), { display_name: "Regent Operator" });
 
-      res.statusCode = 200;
-      res.setHeader("content-type", "application/json");
-      res.setHeader("set-cookie", "_platform_phx_key=signed-in; path=/; HttpOnly");
-      res.end(
-        JSON.stringify({
+      return jsonResponse(
+        200,
+        {
           ok: true,
           authenticated: true,
           human: {
@@ -121,18 +131,17 @@ test("platform CLI signs in, reuses the saved session, performs a write action, 
           },
           claimed_names: [],
           agents: [],
-        }),
+        },
+        { "set-cookie": "_platform_phx_key=signed-in; path=/; HttpOnly" },
       );
-      return;
     }
 
-    if (req.method === "GET" && req.url === "/api/auth/privy/profile") {
-      assert.equal(req.headers.cookie, "_platform_phx_key=signed-in");
+    if (method === "GET" && requestUrl.pathname === "/api/auth/privy/profile") {
+      assert.equal(headers.get("cookie"), "_platform_phx_key=signed-in");
 
-      res.statusCode = 200;
-      res.setHeader("content-type", "application/json");
-      res.end(
-        JSON.stringify({
+      return jsonResponse(
+        200,
+        {
           ok: true,
           authenticated: true,
           human: {
@@ -158,76 +167,51 @@ test("platform CLI signs in, reuses the saved session, performs a write action, 
           },
           claimed_names: [],
           agents: [],
-        }),
+        },
       );
-      return;
     }
 
-    if (req.method === "POST" && req.url === "/api/agent-platform/formation/companies") {
-      assert.equal(req.headers.cookie, "_platform_phx_key=signed-in");
-      assert.equal(firstHeader(req.headers["x-csrf-token"]), "csrf-123");
+    if (method === "POST" && requestUrl.pathname === "/api/agent-platform/formation/companies") {
+      assert.equal(headers.get("cookie"), "_platform_phx_key=signed-in");
+      assert.equal(headers.get("x-csrf-token"), "csrf-123");
       assert.deepEqual(JSON.parse(body), { claimedLabel: "startline" });
 
-      res.statusCode = 202;
-      res.setHeader("content-type", "application/json");
-      res.end(
-        JSON.stringify({
+      return jsonResponse(
+        202,
+        {
           ok: true,
           agent: { slug: "startline", status: "forming" },
           formation: { id: 11, status: "queued", current_step: "reserve_claim", attempt_count: 0 },
-        }),
+        },
       );
-      return;
     }
 
-    if (req.method === "DELETE" && req.url === "/api/auth/privy/session") {
-      assert.equal(req.headers.cookie, "_platform_phx_key=signed-in");
-      assert.equal(firstHeader(req.headers["x-csrf-token"]), "csrf-123");
+    if (method === "DELETE" && requestUrl.pathname === "/api/auth/privy/session") {
+      assert.equal(headers.get("cookie"), "_platform_phx_key=signed-in");
+      assert.equal(headers.get("x-csrf-token"), "csrf-123");
 
-      res.statusCode = 200;
-      res.setHeader("content-type", "application/json");
-      res.end(JSON.stringify({ ok: true }));
-      return;
+      return jsonResponse(200, { ok: true });
     }
 
-    res.statusCode = 404;
-    res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify({ error: `Unexpected route ${req.method} ${req.url}` }));
-  });
+    return jsonResponse(404, { error: `Unexpected route ${method} ${requestUrl.pathname}` });
+  };
 
-  await new Promise<void>((resolve) => {
-    server.listen(0, "127.0.0.1", () => resolve());
-  });
-
-  t.after(async () => {
-    await new Promise<void>((resolve, reject) => {
-      server.close((error) => {
-        if (error) reject(error);
-        else resolve();
-      });
-    });
-  });
-
-  const { port } = server.address() as AddressInfo;
-  const origin = `http://127.0.0.1:${port}`;
-
-  const login = await executeRegentCommand(
-    parseRegentCommand(
-      [
-        "platform",
-        "auth",
-        "login",
-        "--origin",
-        origin,
-        "--identity-token",
-        "good-token",
-        "--display-name",
-        "Regent Operator",
-        "--session-file",
-        "./platform-session.json",
-      ],
-      tempDir,
-    ),
+  const login = await executeParsedPlatformCommand(
+    [
+      "platform",
+      "auth",
+      "login",
+      "--origin",
+      origin,
+      "--identity-token",
+      "good-token",
+      "--display-name",
+      "Regent Operator",
+      "--session-file",
+      "./platform-session.json",
+    ],
+    tempDir,
+    fetchImpl,
   ) as {
     ok: boolean;
     command: string;
@@ -243,8 +227,10 @@ test("platform CLI signs in, reuses the saved session, performs a write action, 
   assert.equal(savedSession.cookie, "_platform_phx_key=signed-in");
   assert.equal(savedSession.csrfToken, "csrf-123");
 
-  const status = await executeRegentCommand(
-    parseRegentCommand(["platform", "auth", "status", "--session-file", "./platform-session.json"], tempDir),
+  const status = await executeParsedPlatformCommand(
+    ["platform", "auth", "status", "--session-file", "./platform-session.json"],
+    tempDir,
+    fetchImpl,
   ) as {
     ok: boolean;
     command: string;
@@ -257,19 +243,18 @@ test("platform CLI signs in, reuses the saved session, performs a write action, 
   assert.equal(status.origin, origin);
   assert.equal(status.profile.authenticated, true);
 
-  const company = await executeRegentCommand(
-    parseRegentCommand(
-      [
-        "platform",
-        "company",
-        "create",
-        "--claimed-label",
-        "startline",
-        "--session-file",
-        "./platform-session.json",
-      ],
-      tempDir,
-    ),
+  const company = await executeParsedPlatformCommand(
+    [
+      "platform",
+      "company",
+      "create",
+      "--claimed-label",
+      "startline",
+      "--session-file",
+      "./platform-session.json",
+    ],
+    tempDir,
+    fetchImpl,
   ) as {
     ok: boolean;
     command: string;
@@ -280,8 +265,10 @@ test("platform CLI signs in, reuses the saved session, performs a write action, 
   assert.equal(company.command, "regent platform company create");
   assert.equal(company.company.agent.slug, "startline");
 
-  const logout = await executeRegentCommand(
-    parseRegentCommand(["platform", "auth", "logout", "--session-file", "./platform-session.json"], tempDir),
+  const logout = await executeParsedPlatformCommand(
+    ["platform", "auth", "logout", "--session-file", "./platform-session.json"],
+    tempDir,
+    fetchImpl,
   );
 
   assert.equal(logout.ok, true);
@@ -300,16 +287,29 @@ test("platform CLI signs in, reuses the saved session, performs a write action, 
   );
 });
 
-async function readRequestBody(req: http.IncomingMessage) {
-  const chunks: Buffer[] = [];
+async function executeParsedPlatformCommand(
+  argv: readonly string[],
+  cwd: string,
+  fetchImpl: typeof fetch,
+) {
+  const command = parseRegentCommand(argv, cwd);
 
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
+  assert.notEqual(command.kind, "help");
+  assert.match(command.kind, /^platform-/);
 
-  return Buffer.concat(chunks).toString("utf8");
+  return executePlatformCommand(command as PlatformCommand, fetchImpl);
 }
 
-function firstHeader(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] ?? null : value ?? null;
+function jsonResponse(
+  status: number,
+  payload: unknown,
+  extraHeaders: Record<string, string> = {},
+) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      "content-type": "application/json",
+      ...extraHeaders,
+    },
+  });
 }
