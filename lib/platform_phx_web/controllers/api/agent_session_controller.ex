@@ -61,21 +61,39 @@ defmodule PlatformPhxWeb.Api.AgentSessionController do
 
   defp current_session(conn) do
     case get_session(conn, @session_key) do
-      %{"expires_at" => expires_at} = session when is_binary(expires_at) ->
-        if DateTime.compare(DateTime.utc_now(), DateTime.from_iso8601(expires_at) |> elem(1)) ==
-             :lt do
-          {:ok, session}
-        else
-          :expired
-        end
-
       %{} = session ->
-        {:ok, session}
+        case session_expires_at(session) do
+          {:ok, expires_at} ->
+            if DateTime.compare(DateTime.utc_now(), expires_at) == :lt do
+              {:ok, session}
+            else
+              :expired
+            end
+
+          :missing ->
+            :expired
+
+          :invalid ->
+            :expired
+        end
 
       _ ->
         :missing
     end
   rescue
     _ -> :expired
+  end
+
+  defp session_expires_at(session) when is_map(session) do
+    case Map.get(session, :expires_at) || Map.get(session, "expires_at") do
+      expires_at when is_binary(expires_at) ->
+        case DateTime.from_iso8601(expires_at) do
+          {:ok, value, _offset} -> {:ok, value}
+          _ -> :invalid
+        end
+
+      _ ->
+        :missing
+    end
   end
 end

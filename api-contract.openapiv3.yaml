@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: PlatformPhx API
   version: 0.1.0
-  description: HTTP contract for the Platform web product APIs. Shared SIWA auth lives in the shared Regent services contract.
+  description: HTTP contract for the Platform web product APIs, including the SIWA routes this app currently serves.
 servers:
   - url: /
 paths:
@@ -313,6 +313,89 @@ paths:
                 $ref: '#/components/schemas/SecurityReportResponse'
         '400':
           $ref: '#/components/responses/StatusMessage400'
+  /v1/agent/siwa/nonce:
+    post:
+      operationId: issueAgentSiwaNonce
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentSiwaNonceRequest'
+      responses:
+        '200':
+          description: SIWA nonce issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSiwaNonceResponse'
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiwaErrorResponse'
+  /v1/agent/siwa/verify:
+    post:
+      operationId: verifyAgentSiwaSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentSiwaVerifyRequest'
+      responses:
+        '200':
+          description: SIWA session verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSiwaVerifyResponse'
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiwaErrorResponse'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiwaErrorResponse'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiwaErrorResponse'
+  /v1/agent/siwa/http-verify:
+    post:
+      operationId: verifyAgentSiwaHttpEnvelope
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentSiwaHttpVerifyRequest'
+      responses:
+        '200':
+          description: SIWA HTTP envelope verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSiwaHttpVerifyResponse'
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiwaErrorResponse'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiwaErrorResponse'
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiwaErrorResponse'
   /v1/agent/bug-report:
     post:
       operationId: createAgentBugReport
@@ -872,13 +955,147 @@ components:
           type: string
     ReportingAgent:
       type: object
-      required: [wallet_address, chain_id]
+      required: [wallet_address, chain_id, registry_address, token_id]
       properties:
         wallet_address: {type: string}
         chain_id: {type: integer}
-        registry_address: {type: [string, 'null']}
-        token_id: {type: [string, 'null']}
+        registry_address: {type: string}
+        token_id: {type: string}
         label: {type: [string, 'null']}
+    SiwaErrorResponse:
+      type: object
+      required: [ok, error]
+      properties:
+        ok: {type: boolean}
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: {type: string}
+            message: {type: string}
+    AgentSiwaNonceRequest:
+      type: object
+      required: [wallet_address, chain_id, registry_address, token_id, audience]
+      properties:
+        wallet_address: {type: string}
+        chain_id: {type: integer}
+        registry_address: {type: string}
+        token_id: {type: string}
+        audience: {type: string}
+    AgentSiwaNonceResponse:
+      type: object
+      required: [ok, code, data]
+      properties:
+        ok: {type: boolean}
+        code: {type: string}
+        data:
+          type: object
+          required:
+            - nonce
+            - walletAddress
+            - chainId
+            - registryAddress
+            - tokenId
+            - audience
+            - expiresAt
+          properties:
+            nonce: {type: string}
+            walletAddress: {type: string}
+            chainId: {type: integer}
+            registryAddress: {type: string}
+            tokenId: {type: string}
+            audience: {type: string}
+            expiresAt: {type: string, format: date-time}
+    AgentSiwaVerifyRequest:
+      type: object
+      required: [wallet_address, chain_id, registry_address, token_id, nonce, message, signature]
+      properties:
+        wallet_address: {type: string}
+        chain_id: {type: integer}
+        registry_address: {type: string}
+        token_id: {type: string}
+        nonce: {type: string}
+        message: {type: string}
+        signature: {type: string}
+    AgentSiwaVerifyResponse:
+      type: object
+      required: [ok, code, data]
+      properties:
+        ok: {type: boolean}
+        code: {type: string}
+        data:
+          type: object
+          required:
+            - verified
+            - walletAddress
+            - chainId
+            - registryAddress
+            - tokenId
+            - audience
+            - nonce
+            - keyId
+            - signatureScheme
+            - receipt
+            - receiptIssuedAt
+            - receiptExpiresAt
+          properties:
+            verified: {type: boolean}
+            walletAddress: {type: string}
+            chainId: {type: integer}
+            registryAddress: {type: string}
+            tokenId: {type: string}
+            audience: {type: string}
+            nonce: {type: string}
+            keyId: {type: string}
+            signatureScheme: {type: string}
+            receipt: {type: string}
+            receiptIssuedAt: {type: string, format: date-time}
+            receiptExpiresAt: {type: string, format: date-time}
+    AgentSiwaHttpVerifyRequest:
+      type: object
+      required: [method, path, headers]
+      properties:
+        method: {type: string}
+        path: {type: string}
+        headers:
+          type: object
+          additionalProperties: {type: string}
+        body: {type: string}
+    AgentSiwaHttpVerifyResponse:
+      type: object
+      required: [ok, code, data]
+      properties:
+        ok: {type: boolean}
+        code: {type: string}
+        data:
+          type: object
+          required:
+            - verified
+            - walletAddress
+            - chainId
+            - keyId
+            - agent_claims
+            - receiptExpiresAt
+            - requiredHeaders
+            - requiredCoveredComponents
+            - coveredComponents
+          properties:
+            verified: {type: boolean}
+            walletAddress: {type: string}
+            chainId: {type: integer}
+            keyId: {type: string}
+            agent_claims:
+              $ref: '#/components/schemas/ReportingAgent'
+            receiptExpiresAt: {type: string, format: date-time}
+            requiredHeaders:
+              type: array
+              items: {type: string}
+            requiredCoveredComponents:
+              type: array
+              items: {type: string}
+            coveredComponents:
+              type: array
+              items: {type: string}
     ReportStatus:
       type: string
       enum: [pending, fixed, won't fix, duplicate]

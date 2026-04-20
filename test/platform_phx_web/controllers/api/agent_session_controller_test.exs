@@ -82,6 +82,46 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
     assert %{"ok" => true, "session" => nil} = json_response(expired_conn, 200)
   end
 
+  test "show clears an expired local agent session created with atom keys", %{conn: conn} do
+    expired_conn =
+      conn
+      |> init_test_session(%{
+        agent_session: %{
+          session_id: "expired-platform-session",
+          audience: "platform",
+          wallet_address: @wallet_address,
+          chain_id: @chain_id,
+          registry_address: @registry_address,
+          token_id: @token_id,
+          issued_at: "2026-04-17T00:00:00Z",
+          expires_at: "2026-04-17T00:00:01Z"
+        }
+      })
+      |> get("/api/auth/agent/session")
+
+    assert %{"ok" => true, "session" => nil} = json_response(expired_conn, 200)
+  end
+
+  test "show clears a malformed local agent session instead of keeping it", %{conn: conn} do
+    malformed_conn =
+      conn
+      |> init_test_session(%{
+        agent_session: %{
+          session_id: "broken-platform-session",
+          audience: "platform",
+          wallet_address: @wallet_address,
+          chain_id: @chain_id,
+          registry_address: @registry_address,
+          token_id: @token_id,
+          issued_at: "2026-04-17T00:00:00Z",
+          expires_at: "not-a-real-time"
+        }
+      })
+      |> get("/api/auth/agent/session")
+
+    assert %{"ok" => true, "session" => nil} = json_response(malformed_conn, 200)
+  end
+
   test "shared SIWA login can exchange into a local platform session", %{conn: conn} do
     nonce_conn =
       conn
