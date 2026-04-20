@@ -229,15 +229,18 @@ for (const [filePath, content] of files.entries()) {
   }
 }
 
-await writeFile(
+const createdWrapper = await writeFileIfMissing(
   wrapperPath,
   `#!/usr/bin/env sh
 set -eu
 cd ${workspacePath}
 exec hermes "$@"
 `,
-  "utf8",
 );
+
+if (createdWrapper) {
+  createdFiles.push(wrapperPath);
+}
 
 await chmod(wrapperPath, 0o755);
 

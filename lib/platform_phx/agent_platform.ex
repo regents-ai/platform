@@ -643,28 +643,14 @@ defmodule PlatformPhx.AgentPlatform do
   defp company_workspace(%Agent{formation_run: %FormationRun{} = formation}) do
     metadata = formation.metadata || %{}
 
-    workspace_path = metadata["workspace_path"]
-    workspace_seed_version = metadata["workspace_seed_version"]
-    hermes_command = metadata["hermes_command"]
-    prompt_template_version = metadata["prompt_template_version"]
-
-    if Enum.any?([
-         workspace_path,
-         workspace_seed_version,
-         hermes_command,
-         prompt_template_version
-       ]) do
-      %{
-        workspace_path: workspace_path || PaperclipBootstrap.workspace_path(),
-        workspace_seed_version:
-          workspace_seed_version || PaperclipBootstrap.workspace_seed_version(),
-        hermes_command: hermes_command || PaperclipBootstrap.hermes_command(),
-        prompt_template_version:
-          prompt_template_version || PaperclipBootstrap.prompt_template_version()
-      }
-    else
-      nil
-    end
+    %{
+      workspace_path: metadata["workspace_path"] || PaperclipBootstrap.workspace_path(),
+      workspace_seed_version:
+        metadata["workspace_seed_version"] || PaperclipBootstrap.workspace_seed_version(),
+      hermes_command: metadata["hermes_command"] || PaperclipBootstrap.hermes_command(),
+      prompt_template_version:
+        metadata["prompt_template_version"] || PaperclipBootstrap.prompt_template_version()
+    }
   end
 
   defp company_workspace(_agent), do: nil

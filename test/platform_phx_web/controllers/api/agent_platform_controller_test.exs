@@ -369,6 +369,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     assert first_payload["workspace_path"] == workspace_path
     assert first_payload["hermes_command"] == hermes_command
+    assert hermes_command in first_payload["created_files"]
 
     assert File.read!(Path.join(workspace_path, "HOME.md")) =~
              "# seeded-company company workspace"
@@ -376,12 +377,14 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert File.read!(Path.join(workspace_path, "PLATFORM_CONTEXT.md")) =~ "Start Regent"
 
     File.write!(Path.join(workspace_path, "HOME.md"), "# preserved workspace\n")
+    File.write!(hermes_command, "#!/usr/bin/env sh\necho custom-wrapper\n")
 
     {second_output, 0} = System.cmd("node", ["--env-file=.env", script_path], cd: tmp_dir)
     second_payload = Jason.decode!(String.trim(second_output))
 
     assert second_payload["created_files"] == []
     assert File.read!(Path.join(workspace_path, "HOME.md")) == "# preserved workspace\n"
+    assert File.read!(hermes_command) == "#!/usr/bin/env sh\necho custom-wrapper\n"
   end
 
   test "public feed only returns public artifacts and strips unsafe urls", %{conn: conn} do
