@@ -64,7 +64,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "https://x.com/regents_sh"
     assert html =~ "https://farcaster.xyz/regent"
     assert html =~ "https://discord.gg/regents"
-    assert html =~ "https://github.com/orgs/regent-ai/repositories"
+    assert html =~ "https://github.com/orgs/regents-ai/repositories"
     refute html =~ "layout-wallet-control-floating"
     refute html =~ "Sign In"
 
@@ -171,7 +171,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "https://x.com/regents_sh"
     assert html =~ "https://farcaster.xyz/regent"
     assert html =~ "https://discord.gg/regents"
-    assert html =~ "https://github.com/orgs/regent-ai/repositories"
+    assert html =~ "https://github.com/orgs/regents-ai/repositories"
 
     assert html =~
              "https://www.geckoterminal.com/base/pools/0x4ed3b69ac263ad86482f609b2c2105f64bcfd3a7e02e8e078ec9fec1f0324bed"
@@ -549,7 +549,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "regent techtree autoskill publish skill"
     assert html =~ "regent techtree bbh capsules list"
     assert html =~ "Open techtree.sh"
-    assert html =~ "https://github.com/regent-ai/techtree"
+    assert html =~ "https://github.com/regents-ai/techtree"
     assert html =~ "https://techtree.sh"
     assert html =~ "[Techtree skill.md coming soon]"
     assert html =~ "Open the live Techtree site, or inspect the repo that runs it."
@@ -578,7 +578,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "regent autolaunch launch finalize"
     assert html =~ "regent autolaunch trust x-link --agent &lt;id&gt;"
     assert html =~ "Open autolaunch.sh"
-    assert html =~ "https://github.com/regent-ai/autolaunch"
+    assert html =~ "https://github.com/regents-ai/autolaunch"
     assert html =~ "https://autolaunch.sh"
     assert html =~ "[Autolaunch skill.md coming soon]"
     refute html =~ "Copy prompt"

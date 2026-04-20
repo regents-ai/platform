@@ -129,7 +129,7 @@ defmodule PlatformPhxWeb.TechtreeLive do
                   Open techtree.sh <span aria-hidden="true">↗</span>
                 </.preview_link>
                 <a
-                  href="https://github.com/regent-ai/techtree"
+                  href="https://github.com/regents-ai/techtree"
                   target="_blank"
                   rel="noreferrer"
                   class="pp-link-button pp-link-button-ghost pp-link-button-slim"

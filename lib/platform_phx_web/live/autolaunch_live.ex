@@ -147,7 +147,7 @@ defmodule PlatformPhxWeb.AutolaunchLive do
                   Open autolaunch.sh <span aria-hidden="true">↗</span>
                 </.preview_link>
                 <a
-                  href="https://github.com/regent-ai/autolaunch"
+                  href="https://github.com/regents-ai/autolaunch"
                   target="_blank"
                   rel="noreferrer"
                   class="pp-link-button pp-link-button-ghost pp-link-button-slim"

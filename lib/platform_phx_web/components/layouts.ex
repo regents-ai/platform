@@ -449,7 +449,7 @@ defmodule PlatformPhxWeb.Layouts do
     </a>
 
     <a
-      href="https://github.com/orgs/regent-ai/repositories"
+      href="https://github.com/orgs/regents-ai/repositories"
       target="_blank"
       rel="noreferrer"
       class="pp-sidebar-community-link"
@@ -515,7 +515,7 @@ defmodule PlatformPhxWeb.Layouts do
       </a>
 
       <a
-        href="https://github.com/orgs/regent-ai/repositories"
+        href="https://github.com/orgs/regents-ai/repositories"
         target="_blank"
         rel="noreferrer"
         class="pp-home-footer-link"
@@ -604,7 +604,7 @@ defmodule PlatformPhxWeb.Layouts do
       %{kind: :internal, key: "regents-cli", href: "/regents-cli", label: "Regents CLI"},
       %{kind: :internal, key: "bug-report", href: "/bug-report", label: "Bug Report"},
       %{kind: :external, href: "https://news.regents.sh", label: "News"},
-      %{kind: :external, href: "https://github.com/orgs/regent-ai/repositories", label: "GitHub"}
+      %{kind: :external, href: "https://github.com/orgs/regents-ai/repositories", label: "GitHub"}
     ]
   end
 
