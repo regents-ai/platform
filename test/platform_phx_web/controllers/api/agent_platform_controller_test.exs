@@ -370,6 +370,8 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert first_payload["workspace_path"] == workspace_path
     assert first_payload["hermes_command"] == hermes_command
     assert hermes_command in first_payload["created_files"]
+    assert File.read!(hermes_command) =~ "export PATH=\"$HOME/.local/bin:$PATH\""
+    assert File.read!(hermes_command) =~ "exec hermes \"$@\""
 
     assert File.read!(Path.join(workspace_path, "HOME.md")) =~
              "# seeded-company company workspace"

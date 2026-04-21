@@ -12,6 +12,7 @@ PAPERCLIP_MODE="${FORMATION_PAPERCLIP_MODE:-authenticated}"
 HERMES_MODEL="${FORMATION_HERMES_MODEL:-glm-5.1}"
 BUNDLE_DIR="${FORMATION_BUNDLE_DIR:?missing FORMATION_BUNDLE_DIR}"
 LOG_PATH="${FORMATION_LOG_PATH:-}"
+HERMES_PACKAGE_SPEC="hermes-agent[all] @ git+https://github.com/NousResearch/hermes-agent.git@v2026.4.16"
 
 run() {
   echo "+ $*"
@@ -23,7 +24,8 @@ run "$SPRITE_CLI" exec "$SPRITE_NAME" -- mkdir -p /app/bin /app/company
 run "$SPRITE_CLI" exec "$SPRITE_NAME" -- mkdir -p /app/paperclip-regents
 run "$SPRITE_CLI" cp "$BUNDLE_DIR/paperclip-regents/." "$SPRITE_NAME:/app/paperclip-regents"
 run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "cd /app/paperclip-regents && npm ci"
-run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "cd /app/paperclip-regents && npm install hermes-paperclip-adapter"
+run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "cd /app/paperclip-regents/node_modules/hermes-paperclip-adapter && npm ci && npm run build"
+run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "export PATH=\"\$HOME/.local/bin:\$PATH\"; if ! command -v uv >/dev/null 2>&1; then curl -LsSf https://astral.sh/uv/install.sh | sh; export PATH=\"\$HOME/.local/bin:\$PATH\"; fi; uv tool install '$HERMES_PACKAGE_SPEC' --force --python 3.11"
 run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "cat >/app/paperclip-regents/.env <<EOF
 PAPERCLIP_DEPLOYMENT_MODE=$PAPERCLIP_MODE
 PAPERCLIP_BIND_HOST=0.0.0.0

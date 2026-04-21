@@ -9,8 +9,8 @@
     "bootstrap": "node bootstrap_company.mjs"
   },
   "dependencies": {
-    "@paperclipai/adapter-utils": "latest",
-    "express": "^4.21.2",
-    "hermes-paperclip-adapter": "latest"
+    "@paperclipai/adapter-utils": "2026.416.0",
+    "express": "4.22.1",
+    "hermes-paperclip-adapter": "https://codeload.github.com/NousResearch/hermes-paperclip-adapter/tar.gz/937ea71a34f5efcaa3834b11fdd08cfc1c99cb2c"
   }
 }

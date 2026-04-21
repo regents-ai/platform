@@ -233,6 +233,7 @@ const createdWrapper = await writeFileIfMissing(
   wrapperPath,
   `#!/usr/bin/env sh
 set -eu
+export PATH="$HOME/.local/bin:$PATH"
 cd ${workspacePath}
 exec hermes "$@"
 `,
