@@ -11,6 +11,7 @@ describe("emptyWalletBridgeState", () => {
     assert.deepEqual(emptyWalletBridgeState(), {
       privyReady: false,
       authenticated: false,
+      isModalOpen: false,
       account: null,
       chainId: null,
       privyId: null,

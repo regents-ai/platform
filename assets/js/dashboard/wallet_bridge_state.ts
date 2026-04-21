@@ -7,6 +7,7 @@ export type WalletNoticeTone = "error" | "info";
 export type WalletBridgeState = {
   privyReady: boolean;
   authenticated: boolean;
+  isModalOpen: boolean;
   account: `0x${string}` | null;
   chainId: number | null;
   privyId: string | null;
@@ -25,6 +26,7 @@ export function emptyWalletBridgeState(): WalletBridgeState {
   return {
     privyReady: false,
     authenticated: false,
+    isModalOpen: false,
     account: null,
     chainId: null,
     privyId: null,

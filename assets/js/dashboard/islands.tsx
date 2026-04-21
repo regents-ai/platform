@@ -9,11 +9,7 @@ import {
 import { animate } from "animejs";
 import React from "react";
 import { createRoot, type Root } from "react-dom/client";
-import {
-  createPublicClient,
-  http,
-  isAddress,
-} from "viem";
+import { createPublicClient, http, isAddress } from "viem";
 import { base, mainnet } from "viem/chains";
 
 import {
@@ -55,6 +51,7 @@ type DashboardConfig = {
 type BridgeEventDetail = {
   privyReady: boolean;
   authenticated: boolean;
+  isModalOpen: boolean;
   account: `0x${string}` | null;
   chainId: number | null;
 };
@@ -91,8 +88,10 @@ function privyDebugEnabled(): boolean {
   if (typeof window === "undefined") return false;
 
   const params = new URLSearchParams(window.location.search);
-  return params.get("debug_privy") === "1" ||
-    window.localStorage.getItem("debug:privy") === "1";
+  return (
+    params.get("debug_privy") === "1" ||
+    window.localStorage.getItem("debug:privy") === "1"
+  );
 }
 
 function redactWalletForDebug(value: string | null | undefined): string | null {
@@ -158,6 +157,7 @@ function createWalletBridgeDispatchKey(state: WalletBridgeState): string {
   return JSON.stringify({
     privyReady: state.privyReady,
     authenticated: state.authenticated,
+    isModalOpen: state.isModalOpen,
     account: state.account,
     chainId: state.chainId,
     privyId: state.privyId,
@@ -172,6 +172,7 @@ function emitWalletBridgeState() {
       detail: {
         privyReady: walletBridgeState.privyReady,
         authenticated: walletBridgeState.authenticated,
+        isModalOpen: walletBridgeState.isModalOpen,
         account: walletBridgeState.account,
         chainId: walletBridgeState.chainId,
       },
@@ -180,7 +181,8 @@ function emitWalletBridgeState() {
 }
 
 function DashboardPrivyBridge() {
-  const { ready, authenticated, login, linkWallet, logout, user } = usePrivy();
+  const { ready, authenticated, isModalOpen, login, linkWallet, logout, user } =
+    usePrivy();
   const { identityToken } = useIdentityToken();
   const { refreshUser } = useUser();
   const { account, chainId, privyId, wallet, walletClient } =
@@ -194,6 +196,7 @@ function DashboardPrivyBridge() {
     const nextWalletBridgeState: WalletBridgeState = {
       privyReady: ready,
       authenticated,
+      isModalOpen,
       account,
       chainId,
       privyId,
@@ -210,7 +213,9 @@ function DashboardPrivyBridge() {
 
     walletBridgeState = nextWalletBridgeState;
 
-    const nextDispatchKey = createWalletBridgeDispatchKey(nextWalletBridgeState);
+    const nextDispatchKey = createWalletBridgeDispatchKey(
+      nextWalletBridgeState,
+    );
 
     if (nextDispatchKey === lastWalletBridgeDispatchKey) {
       return;
@@ -221,6 +226,7 @@ function DashboardPrivyBridge() {
     privyDebugLog("info", "bridge-state", {
       ready,
       authenticated,
+      isModalOpen,
       account: redactWalletForDebug(account),
       chainId,
       privyId,
@@ -233,6 +239,7 @@ function DashboardPrivyBridge() {
   }, [
     account,
     authenticated,
+    isModalOpen,
     chainId,
     identityToken,
     linkedWalletAddresses,
@@ -302,18 +309,32 @@ function bindDashboardWalletShell(
   el: HTMLElement,
   options: WalletShellBindingOptions,
 ): WalletShellBinding {
-  const connectButton = el.querySelector<HTMLButtonElement>("[data-wallet-sign-in]");
-  const connectedShell = el.querySelector<HTMLElement>("[data-wallet-connected]");
-  const triggerButton = el.querySelector<HTMLButtonElement>("[data-wallet-trigger]");
+  const connectButton = el.querySelector<HTMLButtonElement>(
+    "[data-wallet-sign-in]",
+  );
+  const connectedShell = el.querySelector<HTMLElement>(
+    "[data-wallet-connected]",
+  );
+  const triggerButton = el.querySelector<HTMLButtonElement>(
+    "[data-wallet-trigger]",
+  );
   const caret = el.querySelector<HTMLElement>("[data-wallet-caret]");
   const drawer = el.querySelector<HTMLElement>("[data-wallet-drawer]");
-  const drawerInner = el.querySelector<HTMLElement>("[data-wallet-drawer-inner]");
-  const addressText = el.querySelector<HTMLElement>("[data-wallet-address-text]");
+  const drawerInner = el.querySelector<HTMLElement>(
+    "[data-wallet-drawer-inner]",
+  );
+  const addressText = el.querySelector<HTMLElement>(
+    "[data-wallet-address-text]",
+  );
   const copyButton = el.querySelector<HTMLButtonElement>("[data-wallet-copy]");
   const copyIcon = el.querySelector<HTMLElement>("[data-wallet-copy-icon]");
   const copyCheck = el.querySelector<HTMLElement>("[data-wallet-copy-check]");
-  const disconnectButton = el.querySelector<HTMLButtonElement>("[data-wallet-disconnect]");
-  const notice = el.querySelector<HTMLElement>("[data-dashboard-wallet-notice]");
+  const disconnectButton = el.querySelector<HTMLButtonElement>(
+    "[data-wallet-disconnect]",
+  );
+  const notice = el.querySelector<HTMLElement>(
+    "[data-dashboard-wallet-notice]",
+  );
   let drawerOpen = false;
   let copyResetTimer: number | undefined;
   let currentRenderState: WalletRenderState = {
@@ -425,7 +446,8 @@ function bindDashboardWalletShell(
     currentRenderState = state;
 
     if (connectButton) {
-      connectButton.disabled = state.connected || !state.privyReady || options.getDisconnecting();
+      connectButton.disabled =
+        state.connected || !state.privyReady || options.getDisconnecting();
     }
 
     if (triggerButton) {
@@ -514,7 +536,10 @@ function bindDashboardWalletShell(
         }, 900);
       }
     } catch (error) {
-      showNotice(getErrorMessage(error, "Could not copy this wallet address."), "error");
+      showNotice(
+        getErrorMessage(error, "Could not copy this wallet address."),
+        "error",
+      );
     }
   };
 
@@ -569,6 +594,7 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
   let serverSessionActive = serverSignedIn;
   let pendingConnect = false;
   let disconnecting = false;
+  let privyModalOpen = walletBridgeState.isModalOpen;
   let lastSessionSyncAttemptKey: string | null = null;
   let sessionSyncCooldownUntilMs = 0;
 
@@ -591,7 +617,8 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
     shellBindings.forEach((binding) => binding.clearNotice());
   };
 
-  const syncCooldownActive = (nowMs = Date.now()) => sessionSyncCooldownUntilMs > nowMs;
+  const syncCooldownActive = (nowMs = Date.now()) =>
+    sessionSyncCooldownUntilMs > nowMs;
 
   const startSessionSyncCooldown = (error: unknown) => {
     sessionSyncCooldownUntilMs = Date.now() + WALLET_SESSION_SYNC_COOLDOWN_MS;
@@ -625,7 +652,8 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
       authenticated: renderState.authenticated,
       connected: renderState.connected,
       connectedAddress: redactWalletForDebug(renderState.connectedAddress),
-      linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+      linkedWalletAddresses:
+        walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
     });
 
     shellBindings.forEach((binding) => binding.renderWalletState(renderState));
@@ -640,13 +668,16 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
       inFlight: Boolean(walletSessionSyncInFlight),
       account: redactWalletForDebug(walletBridgeState.account),
       hasIdentityToken: Boolean(walletBridgeState.identityToken),
-      linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+      linkedWalletAddresses:
+        walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
     });
 
     if (!walletSessionSyncInFlight) {
-      walletSessionSyncInFlight = syncPrivySession(config.privySession).finally(() => {
-        walletSessionSyncInFlight = null;
-      });
+      walletSessionSyncInFlight = syncPrivySession(config.privySession).finally(
+        () => {
+          walletSessionSyncInFlight = null;
+        },
+      );
     }
 
     showNotice(label, "info");
@@ -682,37 +713,54 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
 
   async function onState(event: Event) {
     const detail = (event as CustomEvent<BridgeEventDetail>).detail;
+    const modalJustClosed = privyModalOpen && !detail.isModalOpen;
+    privyModalOpen = detail.isModalOpen;
 
     privyDebugLog("info", "wallet-state-event", {
       detail: {
         privyReady: detail.privyReady,
         authenticated: detail.authenticated,
+        isModalOpen: detail.isModalOpen,
         account: redactWalletForDebug(detail.account),
         chainId: detail.chainId,
       },
       serverSignedIn: serverSessionActive,
       pendingConnect,
-      linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+      linkedWalletAddresses:
+        walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
     });
 
     renderWalletState(detail);
 
+    if (modalJustClosed && pendingConnect && !detail.authenticated) {
+      pendingConnect = false;
+      clearNotices();
+      return;
+    }
+
     if (
       detail.authenticated &&
       walletBridgeState.account &&
-          walletReadyForSession(
-            walletBridgeState.linkedWalletAddresses,
-            normalizeWalletAddress(detail.account) ?? normalizeWalletAddress(walletBridgeState.account),
-          )
+      walletReadyForSession(
+        walletBridgeState.linkedWalletAddresses,
+        normalizeWalletAddress(detail.account) ??
+          normalizeWalletAddress(walletBridgeState.account),
+      )
     ) {
       try {
         await attemptSessionSync(
-          serverSessionActive ? "Restoring your sign in..." : "Finishing sign in...",
+          serverSessionActive
+            ? "Restoring your sign in..."
+            : "Finishing sign in...",
         );
       } catch (error) {
         walletReloadRequested = false;
         startSessionSyncCooldown(error);
-        privyDebugLog("error", "wallet-state-event:sync-failed", debugHttpError(error));
+        privyDebugLog(
+          "error",
+          "wallet-state-event:sync-failed",
+          debugHttpError(error),
+        );
         showNotice(formatPrivySessionErrorMessage(error), "error");
       }
     }
@@ -737,7 +785,8 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
       if (!walletBridgeState.linkWallet) {
         privyDebugLog("warn", "connect-click:link-wallet-missing", {
           account: redactWalletForDebug(walletBridgeState.account),
-          linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+          linkedWalletAddresses:
+            walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
         });
         showNotice("Wallet sign-in is not ready yet.", "error");
         return;
@@ -746,7 +795,8 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
       pendingConnect = true;
       privyDebugLog("info", "connect-click:link-wallet", {
         account: redactWalletForDebug(walletBridgeState.account),
-        linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+        linkedWalletAddresses:
+          walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
       });
       showNotice("Confirm your wallet to finish sign in...", "info");
       walletBridgeState.linkWallet();
@@ -764,7 +814,8 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
     pendingConnect = true;
     privyDebugLog("info", "connect-click:login", {
       account: redactWalletForDebug(walletBridgeState.account),
-      linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+      linkedWalletAddresses:
+        walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
     });
     showNotice("Waiting for wallet confirmation...", "info");
     walletBridgeState.login();
@@ -796,11 +847,15 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
 
       const notice = disconnectFailureNotice({
         clearedServerSession,
-        fallbackMessage: getErrorMessage(error, "Could not disconnect this wallet."),
+        fallbackMessage: getErrorMessage(
+          error,
+          "Could not disconnect this wallet.",
+        ),
       });
 
       if (clearedServerSession) {
-        sessionSyncCooldownUntilMs = Date.now() + WALLET_SESSION_SYNC_COOLDOWN_MS;
+        sessionSyncCooldownUntilMs =
+          Date.now() + WALLET_SESSION_SYNC_COOLDOWN_MS;
       }
 
       showNotice(notice.message, notice.tone);
@@ -821,13 +876,18 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
   ) {
     privyDebugLog("info", "initial-sync-trigger", {
       account: redactWalletForDebug(walletBridgeState.account),
-      linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+      linkedWalletAddresses:
+        walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
       hasIdentityToken: Boolean(walletBridgeState.identityToken),
     });
     void attemptSessionSync("Restoring your sign in...").catch((error) => {
       walletReloadRequested = false;
       startSessionSyncCooldown(error);
-      privyDebugLog("error", "initial-sync-trigger:failed", debugHttpError(error));
+      privyDebugLog(
+        "error",
+        "initial-sync-trigger:failed",
+        debugHttpError(error),
+      );
       showNotice(formatPrivySessionErrorMessage(error), "error");
     });
   }
@@ -840,17 +900,36 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
 
 export function bindDashboardNameClaim(el: HTMLElement): Cleanup {
   const config = parseConfig(el.dataset.dashboardConfig);
-  const freeButton = el.querySelector<HTMLButtonElement>("[data-dashboard-claim-free]");
-  const paidButton = el.querySelector<HTMLButtonElement>("[data-dashboard-claim-paid]");
+  const freeButton = el.querySelector<HTMLButtonElement>(
+    "[data-dashboard-claim-free]",
+  );
+  const paidButton = el.querySelector<HTMLButtonElement>(
+    "[data-dashboard-claim-paid]",
+  );
   const notice = el.querySelector<HTMLElement>("[data-dashboard-claim-notice]");
+  const phase1Input = el.querySelector<HTMLInputElement>(
+    "#app-identity-phase1-name",
+  );
+  const phase2Input = el.querySelector<HTMLInputElement>(
+    "#app-identity-phase2-name",
+  );
+  const syncTimers = new Set<number>();
   let busy = false;
 
-  const showNotice = (message: string, tone: "error" | "info" | "success" = "info") => {
+  const showNotice = (
+    message: string,
+    tone: "error" | "info" | "success" = "info",
+  ) => {
     if (!notice) return;
     setNoticeState(notice, message, tone);
   };
 
-  const setBusy = (button: HTMLButtonElement | null, nextBusy: boolean, busyLabel: string, idleLabel: string) => {
+  const setBusy = (
+    button: HTMLButtonElement | null,
+    nextBusy: boolean,
+    busyLabel: string,
+    idleLabel: string,
+  ) => {
     busy = nextBusy;
     if (!button) return;
     button.disabled = nextBusy;
@@ -858,12 +937,54 @@ export function bindDashboardNameClaim(el: HTMLElement): Cleanup {
   };
 
   const claimSuccessRedirect = (label: string) => {
-    const params = new URLSearchParams({
-      claimedLabel: label,
-      stage: "setup",
-    });
-    window.location.assign(`/agent-formation?${params.toString()}`);
+    const params = new URLSearchParams({ claimedLabel: label });
+    window.location.assign(`/app/billing?${params.toString()}`);
   };
+
+  const syncAutofilledField = (
+    input: HTMLInputElement | null,
+    normalizedSelector: string,
+  ) => {
+    if (!input) return;
+
+    const currentValue = input.value.trim();
+
+    if (!currentValue) return;
+
+    const normalizedValue =
+      el
+        .querySelector<HTMLInputElement>(normalizedSelector)
+        ?.value.trim()
+        .toLowerCase() ?? "";
+
+    if (normalizedValue === currentValue.toLowerCase()) return;
+
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+
+  const queueAutofillSync = () => {
+    [
+      window.setTimeout(
+        () => syncAutofilledField(phase1Input, "#phase1-normalized-label"),
+        0,
+      ),
+      window.setTimeout(
+        () => syncAutofilledField(phase2Input, "#phase2-normalized-label"),
+        0,
+      ),
+      window.setTimeout(
+        () => syncAutofilledField(phase1Input, "#phase1-normalized-label"),
+        180,
+      ),
+      window.setTimeout(
+        () => syncAutofilledField(phase2Input, "#phase2-normalized-label"),
+        180,
+      ),
+    ].forEach((timer) => syncTimers.add(timer));
+  };
+
+  queueAutofillSync();
 
   const performFreeClaim = async () => {
     if (!config?.basenamesMint) {
@@ -872,7 +993,11 @@ export function bindDashboardNameClaim(el: HTMLElement): Cleanup {
     }
 
     const wallet = ensureWalletReady();
-    const normalizedLabel = readRequiredValue(el, "#phase1-normalized-label", "Enter a valid name.");
+    const normalizedLabel = readRequiredValue(
+      el,
+      "#phase1-normalized-label",
+      "Enter a valid name.",
+    );
     const fqdn = readRequiredValue(el, "#phase1-fqdn", "Enter a valid name.");
 
     setBusy(freeButton, true, "Claiming...", "Claim from snapshot");
@@ -897,7 +1022,7 @@ export function bindDashboardNameClaim(el: HTMLElement): Cleanup {
         }),
       });
 
-      showNotice(`Claimed ${fqdn}. Opening Agent Formation...`, "success");
+      showNotice(`Claimed ${fqdn}. Opening the next step...`, "success");
       window.setTimeout(() => claimSuccessRedirect(normalizedLabel), 240);
     } catch (error) {
       showNotice(getErrorMessage(error, "Free claim failed."), "error");
@@ -913,14 +1038,27 @@ export function bindDashboardNameClaim(el: HTMLElement): Cleanup {
     }
 
     const wallet = ensureWalletReady();
-    const normalizedLabel = readRequiredValue(el, "#phase2-normalized-label", "Enter a valid name.");
+    const normalizedLabel = readRequiredValue(
+      el,
+      "#phase2-normalized-label",
+      "Enter a valid name.",
+    );
     const fqdn = readRequiredValue(el, "#phase2-fqdn", "Enter a valid name.");
-    const paymentRecipient = requiredAddress(paidButton?.dataset.paymentRecipient, "Paid claims are unavailable right now.");
-    const priceWei = requiredBigInt(paidButton?.dataset.priceWei, "Paid claims are unavailable right now.");
+    const paymentRecipient = requiredAddress(
+      paidButton?.dataset.paymentRecipient,
+      "Paid claims are unavailable right now.",
+    );
+    const priceWei = requiredBigInt(
+      paidButton?.dataset.priceWei,
+      "Paid claims are unavailable right now.",
+    );
     const paymentChain = wallet.chainId === mainnet.id ? mainnet : base;
 
     if (wallet.chainId !== base.id && wallet.chainId !== mainnet.id) {
-      showNotice("Switch to Base or Ethereum before paying for this name.", "error");
+      showNotice(
+        "Switch to Base or Ethereum before paying for this name.",
+        "error",
+      );
       return;
     }
 
@@ -948,7 +1086,10 @@ export function bindDashboardNameClaim(el: HTMLElement): Cleanup {
             : http(),
       });
 
-      const receipt = await paymentClient.waitForTransactionReceipt({ hash: txHash, timeout: 120_000 });
+      const receipt = await paymentClient.waitForTransactionReceipt({
+        hash: txHash,
+        timeout: 120_000,
+      });
       if (receipt.status !== "success") {
         throw new Error("Payment did not complete.");
       }
@@ -968,7 +1109,7 @@ export function bindDashboardNameClaim(el: HTMLElement): Cleanup {
         }),
       });
 
-      showNotice(`Claimed ${fqdn}. Opening Agent Formation...`, "success");
+      showNotice(`Claimed ${fqdn}. Opening the next step...`, "success");
       window.setTimeout(() => claimSuccessRedirect(normalizedLabel), 240);
     } catch (error) {
       showNotice(getErrorMessage(error, "Paid claim failed."), "error");
@@ -991,6 +1132,8 @@ export function bindDashboardNameClaim(el: HTMLElement): Cleanup {
   paidButton?.addEventListener("click", onPaidClick);
 
   return () => {
+    syncTimers.forEach((timer) => window.clearTimeout(timer));
+    syncTimers.clear();
     freeButton?.removeEventListener("click", onFreeClick);
     paidButton?.removeEventListener("click", onPaidClick);
   };
@@ -998,23 +1141,49 @@ export function bindDashboardNameClaim(el: HTMLElement): Cleanup {
 
 export function bindDashboardRedeem(el: HTMLElement): Cleanup {
   const config = parseConfig(el.dataset.dashboardConfig);
-  const sourceSelect = el.querySelector<HTMLSelectElement>("[data-dashboard-redeem-source]");
-  const tokenIdInput = el.querySelector<HTMLInputElement>("[data-dashboard-redeem-token-id]");
-  const approveNftButton = el.querySelector<HTMLButtonElement>("[data-dashboard-redeem-approve-nft]");
-  const approveUsdcButton = el.querySelector<HTMLButtonElement>("[data-dashboard-redeem-approve-usdc]");
-  const redeemButton = el.querySelector<HTMLButtonElement>("[data-dashboard-redeem-start]");
-  const claimButton = el.querySelector<HTMLButtonElement>("[data-dashboard-redeem-claim]");
-  const claimableEl = el.querySelector<HTMLElement>("[data-dashboard-redeem-claimable]");
-  const remainingEl = el.querySelector<HTMLElement>("[data-dashboard-redeem-remaining]");
-  const notice = el.querySelector<HTMLElement>("[data-dashboard-redeem-notice]");
+  const sourceSelect = el.querySelector<HTMLSelectElement>(
+    "[data-dashboard-redeem-source]",
+  );
+  const tokenIdInput = el.querySelector<HTMLInputElement>(
+    "[data-dashboard-redeem-token-id]",
+  );
+  const approveNftButton = el.querySelector<HTMLButtonElement>(
+    "[data-dashboard-redeem-approve-nft]",
+  );
+  const approveUsdcButton = el.querySelector<HTMLButtonElement>(
+    "[data-dashboard-redeem-approve-usdc]",
+  );
+  const redeemButton = el.querySelector<HTMLButtonElement>(
+    "[data-dashboard-redeem-start]",
+  );
+  const claimButton = el.querySelector<HTMLButtonElement>(
+    "[data-dashboard-redeem-claim]",
+  );
+  const claimableEl = el.querySelector<HTMLElement>(
+    "[data-dashboard-redeem-claimable]",
+  );
+  const remainingEl = el.querySelector<HTMLElement>(
+    "[data-dashboard-redeem-remaining]",
+  );
+  const notice = el.querySelector<HTMLElement>(
+    "[data-dashboard-redeem-notice]",
+  );
   let busy = false;
 
-  const showNotice = (message: string, tone: "error" | "info" | "success" = "info") => {
+  const showNotice = (
+    message: string,
+    tone: "error" | "info" | "success" = "info",
+  ) => {
     if (!notice) return;
     setNoticeState(notice, message, tone);
   };
 
-  const setButtonBusy = (button: HTMLButtonElement | null, nextBusy: boolean, busyLabel: string, idleLabel: string) => {
+  const setButtonBusy = (
+    button: HTMLButtonElement | null,
+    nextBusy: boolean,
+    busyLabel: string,
+    idleLabel: string,
+  ) => {
     busy = nextBusy;
     if (!button) return;
     button.disabled = nextBusy;
@@ -1030,7 +1199,10 @@ export function bindDashboardRedeem(el: HTMLElement): Cleanup {
     }
 
     try {
-      const address = requiredAddress(config.redeemerAddress, "Redeemer address is missing.");
+      const address = requiredAddress(
+        config.redeemerAddress,
+        "Redeemer address is missing.",
+      );
       const client = createPublicClient({
         chain: base,
         transport: http(config.baseRpcUrl ?? undefined),
@@ -1068,7 +1240,10 @@ export function bindDashboardRedeem(el: HTMLElement): Cleanup {
 
   const approveNft = async () => {
     const wallet = ensureBaseWallet();
-    const redeemerAddress = requiredAddress(config?.redeemerAddress, "Redeemer address is missing.");
+    const redeemerAddress = requiredAddress(
+      config?.redeemerAddress,
+      "Redeemer address is missing.",
+    );
     const source = sourceSelect?.value === "ANIMATA2" ? ANIMATA2 : ANIMATA1;
     const client = createPublicClient({
       chain: base,
@@ -1098,7 +1273,10 @@ export function bindDashboardRedeem(el: HTMLElement): Cleanup {
 
   const approveUsdc = async () => {
     const wallet = ensureBaseWallet();
-    const redeemerAddress = requiredAddress(config?.redeemerAddress, "Redeemer address is missing.");
+    const redeemerAddress = requiredAddress(
+      config?.redeemerAddress,
+      "Redeemer address is missing.",
+    );
     const client = createPublicClient({
       chain: base,
       transport: http(config?.baseRpcUrl ?? undefined),
@@ -1121,15 +1299,26 @@ export function bindDashboardRedeem(el: HTMLElement): Cleanup {
     } catch (error) {
       showNotice(getErrorMessage(error, "USDC approval failed."), "error");
     } finally {
-      setButtonBusy(approveUsdcButton, false, "Approving...", "Approve 80 USDC");
+      setButtonBusy(
+        approveUsdcButton,
+        false,
+        "Approving...",
+        "Approve 80 USDC",
+      );
     }
   };
 
   const redeem = async () => {
     const wallet = ensureBaseWallet();
-    const redeemerAddress = requiredAddress(config?.redeemerAddress, "Redeemer address is missing.");
+    const redeemerAddress = requiredAddress(
+      config?.redeemerAddress,
+      "Redeemer address is missing.",
+    );
     const source = sourceSelect?.value === "ANIMATA2" ? ANIMATA2 : ANIMATA1;
-    const tokenId = requiredBigInt(tokenIdInput?.value, "Enter a token ID from 1 to 999.");
+    const tokenId = requiredBigInt(
+      tokenIdInput?.value,
+      "Enter a token ID from 1 to 999.",
+    );
     const client = createPublicClient({
       chain: base,
       transport: http(config?.baseRpcUrl ?? undefined),
@@ -1164,7 +1353,10 @@ export function bindDashboardRedeem(el: HTMLElement): Cleanup {
 
   const claimUnlocked = async () => {
     const wallet = ensureBaseWallet();
-    const redeemerAddress = requiredAddress(config?.redeemerAddress, "Redeemer address is missing.");
+    const redeemerAddress = requiredAddress(
+      config?.redeemerAddress,
+      "Redeemer address is missing.",
+    );
     const client = createPublicClient({
       chain: base,
       transport: http(config?.baseRpcUrl ?? undefined),
@@ -1205,7 +1397,9 @@ export function bindDashboardRedeem(el: HTMLElement): Cleanup {
 
   const onRedeem = () => {
     if (busy) return;
-    void redeem().catch((error) => showNotice(getErrorMessage(error, "Redeem failed."), "error"));
+    void redeem().catch((error) =>
+      showNotice(getErrorMessage(error, "Redeem failed."), "error"),
+    );
   };
 
   const onClaim = () => {
@@ -1238,7 +1432,8 @@ async function syncPrivySession(endpoint: string) {
     endpoint,
     authenticated: walletBridgeState.authenticated,
     account: redactWalletForDebug(walletBridgeState.account),
-    linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+    linkedWalletAddresses:
+      walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
     readyForBridgeSession: walletReadyForBridgeSession(),
     hasCachedIdentityToken: Boolean(walletBridgeState.identityToken),
   });
@@ -1247,7 +1442,8 @@ async function syncPrivySession(endpoint: string) {
     privyDebugLog("warn", "sync-privy-session:not-ready", {
       authenticated: walletBridgeState.authenticated,
       account: redactWalletForDebug(walletBridgeState.account),
-      linkedWalletAddresses: walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
+      linkedWalletAddresses:
+        walletBridgeState.linkedWalletAddresses.map(redactWalletForDebug),
     });
     throw new Error("Wallet session is not ready.");
   }
@@ -1262,9 +1458,13 @@ async function syncPrivySession(endpoint: string) {
   }
 
   if (!identityToken) {
-    privyDebugLog("error", "sync-privy-session:no-identity-token-after-refresh", {
-      account: redactWalletForDebug(walletBridgeState.account),
-    });
+    privyDebugLog(
+      "error",
+      "sync-privy-session:no-identity-token-after-refresh",
+      {
+        account: redactWalletForDebug(walletBridgeState.account),
+      },
+    );
     throw new Error("Wallet session is not ready.");
   }
 
@@ -1285,11 +1485,14 @@ async function syncPrivySession(endpoint: string) {
 }
 
 function walletReadyForBridgeSession(): boolean {
-  return walletBridgeState.authenticated && walletBridgeState.account !== null &&
+  return (
+    walletBridgeState.authenticated &&
+    walletBridgeState.account !== null &&
     walletBridgeState.linkedWalletAddresses.some(
       (candidate) =>
         candidate.toLowerCase() === walletBridgeState.account?.toLowerCase(),
-    );
+    )
+  );
 }
 
 async function postPrivySession(endpoint: string, identityToken: string) {
@@ -1337,7 +1540,11 @@ async function clearPrivySession(endpoint: string) {
 }
 
 function ensureWalletReady() {
-  if (!walletBridgeState.authenticated || !walletBridgeState.account || !walletBridgeState.walletClient) {
+  if (
+    !walletBridgeState.authenticated ||
+    !walletBridgeState.account ||
+    !walletBridgeState.walletClient
+  ) {
     throw new Error("Sign in with your wallet first.");
   }
 
@@ -1361,7 +1568,10 @@ async function resolveIdentityToken(): Promise<string | null> {
   try {
     const freshIdentityToken = await getIdentityToken();
 
-    if (typeof freshIdentityToken === "string" && freshIdentityToken.trim() !== "") {
+    if (
+      typeof freshIdentityToken === "string" &&
+      freshIdentityToken.trim() !== ""
+    ) {
       walletBridgeState = {
         ...walletBridgeState,
         identityToken: freshIdentityToken,
@@ -1384,7 +1594,9 @@ async function resolveIdentityToken(): Promise<string | null> {
   return null;
 }
 
-function normalizeWalletAddress(value: string | null | undefined): `0x${string}` | null {
+function normalizeWalletAddress(
+  value: string | null | undefined,
+): `0x${string}` | null {
   if (!value) return null;
 
   const trimmed = value.trim();
@@ -1447,14 +1659,21 @@ function setNoticeState(
   });
 }
 
-function readRequiredValue(root: HTMLElement, selector: string, message: string) {
+function readRequiredValue(
+  root: HTMLElement,
+  selector: string,
+  message: string,
+) {
   const el = root.querySelector<HTMLInputElement>(selector);
   const value = el?.value?.trim();
   if (!value) throw new Error(message);
   return value;
 }
 
-function requiredAddress(value: string | null | undefined, message: string): `0x${string}` {
+function requiredAddress(
+  value: string | null | undefined,
+  message: string,
+): `0x${string}` {
   const trimmed = value?.trim();
   if (!trimmed || !isAddress(trimmed)) throw new Error(message);
   return trimmed as `0x${string}`;
@@ -1492,9 +1711,10 @@ async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
   const payload = tryParseJson(text);
 
   if (!response.ok) {
-    const parsedPayload = payload as
-      | { statusMessage?: unknown; message?: unknown }
-      | null;
+    const parsedPayload = payload as {
+      statusMessage?: unknown;
+      message?: unknown;
+    } | null;
 
     const message =
       (parsedPayload &&
@@ -1536,10 +1756,14 @@ function hasHeader(headers: HeadersInit | undefined, name: string): boolean {
   }
 
   if (Array.isArray(headers)) {
-    return headers.some(([headerName]) => headerName.toLowerCase() === normalizedName);
+    return headers.some(
+      ([headerName]) => headerName.toLowerCase() === normalizedName,
+    );
   }
 
-  return Object.keys(headers).some((headerName) => headerName.toLowerCase() === normalizedName);
+  return Object.keys(headers).some(
+    (headerName) => headerName.toLowerCase() === normalizedName,
+  );
 }
 
 function tryParseJson(value: string): unknown {

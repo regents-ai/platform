@@ -4,20 +4,22 @@
     <% share_title = assigns[:page_title] || "Regents Labs" %>
     <% share_description =
       "The Regent website guides wallet setup, company launch, and public company pages, while Regents CLI handles local Techtree and Autolaunch work." %>
-    <% site_url = PlatformPhxWeb.Endpoint.url() %>
-    <% share_image_url = site_url <> ~p"/images/og-image.png" %>
+    <% canonical_url = assigns[:canonical_url] || PlatformPhxWeb.Endpoint.url() %>
+    <% share_origin = PlatformPhxWeb.SiteUrl.origin_from_url(canonical_url) %>
+    <% share_image_url = share_origin <> ~p"/images/og-image.png" %>
 
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
     <meta name="description" content={share_description} />
     <meta name="theme-color" content="#1D557C" />
-    <link rel="canonical" href={site_url} />
+    <meta :if={assigns[:base_app_id]} name="base:app_id" content={assigns[:base_app_id]} />
+    <link rel="canonical" href={canonical_url} />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Regents Labs" />
     <meta property="og:title" content={share_title} />
     <meta property="og:description" content={share_description} />
-    <meta property="og:url" content={site_url} />
+    <meta property="og:url" content={canonical_url} />
     <meta property="og:image" content={share_image_url} />
     <meta property="og:image:secure_url" content={share_image_url} />
     <meta property="og:image:width" content="1200" />

@@ -1390,7 +1390,7 @@ defmodule PlatformPhxWeb.DashboardLive do
           %{}
       end
 
-    ~p"/agent-formation?#{params}"
+    ~p"/app/formation?#{params}"
   end
 
   defp maybe_put_claimed_label(params, nil), do: params

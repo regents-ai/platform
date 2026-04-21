@@ -264,7 +264,7 @@ defmodule PlatformPhxWeb.RegentScenes do
                 "translate" => 10,
                 "shadow" => "drop-shadow(0 0 14px rgba(212, 167, 86, 0.34))"
               },
-              "meta" => %{"navigate" => "/services"}
+              "meta" => %{"navigate" => "/app/access"}
             },
             %{
               "id" => "platform:inspect",
@@ -275,7 +275,7 @@ defmodule PlatformPhxWeb.RegentScenes do
               "status" => "active",
               "position" => [-1, 4, 0],
               "size" => [2, 2, 2],
-              "meta" => %{"navigate" => "/services"}
+              "meta" => %{"navigate" => "/app/access"}
             },
             %{
               "id" => "platform:seal",
@@ -286,7 +286,7 @@ defmodule PlatformPhxWeb.RegentScenes do
               "status" => "complete",
               "position" => [5, 1, 2],
               "size" => [2, 2, 2],
-              "meta" => %{"navigate" => "/services"}
+              "meta" => %{"navigate" => "/app/access"}
             },
             %{
               "id" => "platform:guardrail",
@@ -298,7 +298,7 @@ defmodule PlatformPhxWeb.RegentScenes do
               "position" => [10, -2, 0],
               "size" => [2, 2, 2],
               "opaque" => false,
-              "meta" => %{"navigate" => "/services"}
+              "meta" => %{"navigate" => "/app/access"}
             }
           ],
           "conduits" => [
@@ -445,7 +445,7 @@ defmodule PlatformPhxWeb.RegentScenes do
         "The dashboard keeps the operator shell quieter than the product twins. It shows the session, the retained onchain flows, and the guardrails, but the actual work stays in readable panels and the React mount below.",
       tags: ["Operator-grade", "Quiet shell", "Phoenix-owned"],
       table: [
-        {"Current route", "/services"},
+        {"Current route", "/app/access"},
         {"Primary flows", "Redeem and name claim"},
         {"Interaction rule", "Readable first"}
       ]
@@ -517,7 +517,7 @@ defmodule PlatformPhxWeb.RegentScenes do
         target_id: "platform:home-logo",
         label: "Canonical Regent mark",
         action_label: "Open dashboard",
-        path: "/services",
+        path: "/app/access",
         commands: regent_split_home_commands("platform:home-logo"),
         distance: 20
       )

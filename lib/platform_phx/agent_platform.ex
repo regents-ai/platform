@@ -144,7 +144,7 @@ defmodule PlatformPhx.AgentPlatform do
              slug: agent.slug,
              name: agent.name
            },
-           feed: public_feed(agent.artifacts)
+           feed: public_feed(agent, agent.artifacts)
          }}
 
       nil ->
@@ -250,7 +250,7 @@ defmodule PlatformPhx.AgentPlatform do
         ),
       services: Enum.map(agent.services || [], &serialize_service/1),
       connections: Enum.map(agent.connections || [], &serialize_connection/1),
-      feed: public_feed(agent.artifacts)
+      feed: public_feed(agent, agent.artifacts)
     }
 
     case scope do
@@ -521,28 +521,40 @@ defmodule PlatformPhx.AgentPlatform do
     }
   end
 
-  defp serialize_artifact(%Artifact{} = artifact) do
+  defp serialize_artifact(%Agent{} = agent, %Artifact{} = artifact) do
     %{
       title: artifact.title,
       summary: artifact.summary,
-      url: public_artifact_url(artifact.url),
+      url: public_artifact_url(agent, artifact.url),
       visibility: artifact.visibility,
       published_at: iso(artifact.published_at || artifact.created_at)
     }
   end
 
-  defp public_feed(artifacts) do
+  defp public_feed(agent, artifacts) do
     artifacts
     |> List.wrap()
     |> Enum.filter(&(&1.visibility == "public"))
-    |> Enum.map(&serialize_artifact/1)
+    |> Enum.map(&serialize_artifact(agent, &1))
   end
 
-  defp public_artifact_url(url) when is_binary(url) do
-    if Artifact.public_url?(url), do: url, else: nil
+  defp public_artifact_url(%Agent{slug: slug}, url) when is_binary(url) do
+    if Artifact.public_url?(url) do
+      expected_host = "#{slug}.regents.sh"
+
+      case URI.parse(url) do
+        %URI{host: ^expected_host} ->
+          "/agents/#{slug}"
+
+        _ ->
+          url
+      end
+    else
+      nil
+    end
   end
 
-  defp public_artifact_url(_url), do: nil
+  defp public_artifact_url(_agent, _url), do: nil
 
   defp serialize_formation_run(nil), do: nil
 

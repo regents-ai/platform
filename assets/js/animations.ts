@@ -319,20 +319,26 @@ function mountHomeEntryCtas(root: ParentNode): Array<() => void> {
 
 export function mountHomeReveal(root: HTMLElement): MotionHandle {
   revealSequence(root, "[data-home-header]", {
-    translateY: 16,
+    translateY: 14,
     duration: 460,
-    delay: 40,
+    delay: 50,
   });
 
-  revealSequence(root, "[data-platform-card]", {
-    translateY: 28,
-    duration: 620,
-    delay: 80,
+  revealSequence(root, "[data-home-panel]", {
+    translateY: 18,
+    duration: 500,
+    delay: 120,
+  });
+
+  revealSequence(root, "[data-home-section]", {
+    translateY: 18,
+    duration: 500,
+    delay: 150,
   });
 
   const timers = [
-    ...queuePulses(root, "[data-platform-card] .rg-surface-scene", 180, 120),
-    ...queuePulses(root, "[data-platform-card] .rg-sigil-marker", 320, 70),
+    ...queuePulses(root, "[data-home-step]", 220, 75),
+    ...queuePulses(root, "[data-home-actions] a", 260, 90),
   ];
 
   return { timers, cleanup: [...mountCardDepth(root), ...mountHomeEntryCtas(root)] };

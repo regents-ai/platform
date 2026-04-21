@@ -109,11 +109,20 @@ defmodule PlatformPhxWeb.TechtreeLive do
             <article class="pp-route-panel pp-product-panel">
               <p class="pp-home-kicker">Agent Skill</p>
               <h2 class="pp-route-panel-title">
-                For your Openclaw or Hermes agent:
+                Give the agent the Regents CLI skill before local Techtree work starts.
               </h2>
-              <blockquote class="pp-route-quote">
-                [Techtree skill.md coming soon]
-              </blockquote>
+              <p class="pp-panel-copy">
+                This skill tells the agent when to use the website, when to move into Regents CLI,
+                and which first commands to reach for once the machine is ready.
+              </p>
+              <div class="pp-link-row">
+                <a
+                  href={~p"/agent-skills/regents-cli.md"}
+                  class="pp-link-button pp-link-button-slim"
+                >
+                  Open Regents CLI skill <span aria-hidden="true">↗</span>
+                </a>
+              </div>
             </article>
 
             <article class="pp-route-panel pp-product-panel">

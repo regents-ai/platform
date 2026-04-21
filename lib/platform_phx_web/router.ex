@@ -2,12 +2,16 @@ defmodule PlatformPhxWeb.Router do
   use PlatformPhxWeb, :router
 
   pipeline :browser do
+    plug PlatformPhxWeb.PublicEntryPlug
     plug :accepts, ["html"]
     plug :fetch_session
     plug :fetch_live_flash
     plug :put_root_layout, html: {PlatformPhxWeb.Layouts, :root}
     plug :protect_from_forgery
     plug PlatformPhxWeb.BrowserSecurity
+  end
+
+  pipeline :public_discovery do
   end
 
   pipeline :api do
@@ -31,26 +35,49 @@ defmodule PlatformPhxWeb.Router do
   end
 
   scope "/", PlatformPhxWeb do
+    pipe_through :public_discovery
+
+    get "/robots.txt", DiscoveryController, :robots
+    get "/sitemap.xml", DiscoveryController, :sitemap
+    get "/.well-known/api-catalog", DiscoveryController, :api_catalog
+    get "/.well-known/agent-card.json", DiscoveryController, :agent_card
+    get "/.well-known/agent-skills/index.json", DiscoveryController, :agent_skills_index
+    get "/.well-known/mcp/server-card.json", DiscoveryController, :mcp_server_card
+    get "/healthz", DiscoveryController, :healthz
+    get "/api-contract.openapiv3.yaml", DiscoveryController, :api_contract
+    get "/cli-contract.yaml", DiscoveryController, :cli_contract
+    get "/agent-skills/regents-cli.md", DiscoveryController, :regents_cli_skill
+  end
+
+  scope "/", PlatformPhxWeb do
     pipe_through :browser
 
     get "/cards/regents-club/:token_id", TokenCardController, :show
 
     live_session :platform_app,
       session: {PlatformPhxWeb.LiveSessionData, :session, []},
-      on_mount: [{PlatformPhxWeb.LiveCurrentHuman, :default}] do
+      on_mount: [
+        {PlatformPhxWeb.LiveCurrentHuman, :default},
+        {PlatformPhxWeb.LivePageMetadata, :default}
+      ] do
       live "/demo", DemoLive
       live "/heerich-demo", HeerichDemoLive
       live "/", HomeLive
+      live "/app", AppEntryLive
+      live "/app/access", App.AccessLive
+      live "/app/identity", App.IdentityLive
+      live "/app/billing", App.BillingLive
+      live "/app/formation", App.FormationLive
+      live "/app/provisioning/:id", App.ProvisioningLive
+      live "/app/dashboard", App.DashboardLive
+      live "/cli", RegentCliLive
+      live "/docs", DocsLive
       live "/agents/:slug", AgentSiteLive
-      live "/overview", OverviewLive
       live "/logos", LogosLive
-      live "/services", DashboardLive, :services
-      live "/agent-formation", DashboardLive, :agent_formation
       live "/shader", ShaderLive
       live "/bug-report", BugReportLive
       live "/techtree", TechtreeLive
       live "/autolaunch", AutolaunchLive
-      live "/regents-cli", RegentCliLive
       live "/token-info", TokenInfoLive
     end
   end

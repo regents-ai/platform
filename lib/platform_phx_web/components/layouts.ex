@@ -13,6 +13,8 @@ defmodule PlatformPhxWeb.Layouts do
 
   attr :chrome, :atom, default: :app
   attr :active_nav, :string, default: nil
+  attr :header_eyebrow, :string, default: nil
+  attr :header_title, :string, default: nil
   attr :content_class, :string, default: ""
   attr :theme_class, :string, default: "rg-regent-theme-platform"
   attr :current_human, :map, default: nil
@@ -82,7 +84,7 @@ defmodule PlatformPhxWeb.Layouts do
                     />
                   </div>
                   <div>
-                    <p class="font-display text-[1.7rem] font-black leading-none">Regents Home</p>
+                    <p class="font-display text-[1.7rem] font-black leading-none">Regents</p>
                   </div>
                 </.link>
               </div>
@@ -126,6 +128,10 @@ defmodule PlatformPhxWeb.Layouts do
                   </div>
                 </div>
               </nav>
+
+              <div class="mt-6">
+                <.app_resume_link current_human={@current_human} class="w-full justify-center" />
+              </div>
             </aside>
           </div>
 
@@ -147,8 +153,10 @@ defmodule PlatformPhxWeb.Layouts do
                     />
                   </span>
                   <span class="pp-mobile-home-copy">
-                    <span class="pp-mobile-home-eyebrow">{chrome_eyebrow(@active_nav)}</span>
-                    <span class="pp-mobile-home-title">Regents Home</span>
+                    <span class="pp-mobile-home-eyebrow">
+                      {header_eyebrow(@header_eyebrow, @active_nav)}
+                    </span>
+                    <span class="pp-mobile-home-title">Regents</span>
                   </span>
                 </.link>
 
@@ -175,6 +183,7 @@ defmodule PlatformPhxWeb.Layouts do
                   <% end %>
                 <% end %>
               </nav>
+              <.app_resume_link current_human={@current_human} class="justify-center" />
             </div>
 
             <header
@@ -183,19 +192,22 @@ defmodule PlatformPhxWeb.Layouts do
             >
               <div>
                 <p class="pp-chrome-eyebrow">
-                  {chrome_eyebrow(@active_nav)}
+                  {header_eyebrow(@header_eyebrow, @active_nav)}
                 </p>
-                <h1 class="pp-chrome-title">{chrome_title(@active_nav)}</h1>
+                <h1 class="pp-chrome-title">{header_title(@header_title, @active_nav)}</h1>
               </div>
 
-              <%= if @show_wallet_control do %>
-                <.layout_wallet_control
-                  current_human={@current_human}
-                  wallet_ready?={@wallet_ready?}
-                  config={@wallet_bridge_config}
-                  mode={:desktop}
-                />
-              <% end %>
+              <div class="flex flex-wrap items-center gap-3">
+                <.app_resume_link current_human={@current_human} />
+                <%= if @show_wallet_control do %>
+                  <.layout_wallet_control
+                    current_human={@current_human}
+                    wallet_ready?={@wallet_ready?}
+                    config={@wallet_bridge_config}
+                    mode={:desktop}
+                  />
+                <% end %>
+              </div>
             </header>
 
             <main
@@ -209,9 +221,12 @@ defmodule PlatformPhxWeb.Layouts do
 
             <footer
               data-background-suppress
-              class="flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--border)] px-5 py-4 text-sm text-[color:var(--muted-foreground)]"
+              class="space-y-3 border-t border-[color:var(--border)] px-5 py-4 text-sm text-[color:var(--muted-foreground)]"
             >
-              <p>&copy; Regents Labs 2026</p>
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p>&copy; Regents Labs 2026</p>
+                <.footer_resource_links />
+              </div>
               <.footer_social_links />
             </footer>
           </div>
@@ -335,6 +350,30 @@ defmodule PlatformPhxWeb.Layouts do
       >
       </p>
     </div>
+    """
+  end
+
+  attr :current_human, :map, default: nil
+  attr :class, :string, default: nil
+
+  defp app_resume_link(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :label,
+        if(assigns.current_human, do: "Resume formation", else: "App setup")
+      )
+
+    ~H"""
+    <.link
+      navigate={~p"/app"}
+      class={[
+        "inline-flex items-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]",
+        @class
+      ]}
+    >
+      {@label}
+    </.link>
     """
   end
 
@@ -541,27 +580,55 @@ defmodule PlatformPhxWeb.Layouts do
     """
   end
 
-  defp chrome_eyebrow("overview"), do: "Regents Overview"
-  defp chrome_eyebrow("services"), do: "Services and Docs"
-  defp chrome_eyebrow("agent-formation"), do: "Launch a Regent company"
+  def footer_resource_links(assigns) do
+    ~H"""
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <.link navigate={~p"/docs"} class="hover:text-[color:var(--foreground)]">
+        Docs
+      </.link>
+      <.link navigate={~p"/token-info"} class="hover:text-[color:var(--foreground)]">
+        Token info
+      </.link>
+      <.link navigate={~p"/bug-report"} class="hover:text-[color:var(--foreground)]">
+        Bug report
+      </.link>
+      <a
+        href="https://news.regents.sh"
+        target="_blank"
+        rel="noreferrer"
+        class="hover:text-[color:var(--foreground)]"
+      >
+        News
+      </a>
+    </div>
+    """
+  end
+
+  defp chrome_eyebrow("regents"), do: "Regents"
   defp chrome_eyebrow("bug-report"), do: "Public Operator Ledger"
   defp chrome_eyebrow("techtree"), do: "Shared Research and Eval Tree"
   defp chrome_eyebrow("autolaunch"), do: "Raise agent capital"
-  defp chrome_eyebrow("regents-cli"), do: "Local Operator Surface"
+  defp chrome_eyebrow("cli"), do: "Local Operator Surface"
+  defp chrome_eyebrow("docs"), do: "Docs"
   defp chrome_eyebrow("token-info"), do: "Platform revenue token"
   defp chrome_eyebrow("shader"), do: "Shader Registry"
   defp chrome_eyebrow(_), do: "Regents Labs"
 
-  defp chrome_title("overview"), do: "Overview"
-  defp chrome_title("services"), do: "Services"
-  defp chrome_title("agent-formation"), do: "Agent Formation"
+  defp chrome_title("regents"), do: "Regents"
   defp chrome_title("bug-report"), do: "Bug Report Ledger"
   defp chrome_title("techtree"), do: "Techtree"
   defp chrome_title("autolaunch"), do: "Autolaunch"
-  defp chrome_title("regents-cli"), do: "Regents CLI"
+  defp chrome_title("cli"), do: "CLI"
+  defp chrome_title("docs"), do: "Docs"
   defp chrome_title("token-info"), do: "Agent economies"
   defp chrome_title("shader"), do: "Shader"
-  defp chrome_title(_), do: "Regents Home"
+  defp chrome_title(_), do: "Regents"
+
+  defp header_eyebrow(nil, active_nav), do: chrome_eyebrow(active_nav)
+  defp header_eyebrow(value, _active_nav), do: value
+
+  defp header_title(nil, active_nav), do: chrome_title(active_nav)
+  defp header_title(value, _active_nav), do: value
 
   defp wallet_bridge_config do
     %{
@@ -590,21 +657,11 @@ defmodule PlatformPhxWeb.Layouts do
 
   defp nav_items do
     [
-      %{kind: :internal, key: "overview", href: "/overview", label: "Overview"},
-      %{kind: :internal, key: "token-info", href: "/token-info", label: "Platform Token"},
-      %{kind: :internal, key: "services", href: "/services", label: "Services"},
-      %{
-        kind: :internal,
-        key: "agent-formation",
-        href: "/agent-formation",
-        label: "Agent Formation"
-      },
+      %{kind: :internal, key: "regents", href: "/", label: "Regents"},
       %{kind: :internal, key: "techtree", href: "/techtree", label: "Techtree"},
       %{kind: :internal, key: "autolaunch", href: "/autolaunch", label: "Autolaunch"},
-      %{kind: :internal, key: "regents-cli", href: "/regents-cli", label: "Regents CLI"},
-      %{kind: :internal, key: "bug-report", href: "/bug-report", label: "Bug Report"},
-      %{kind: :external, href: "https://news.regents.sh", label: "News"},
-      %{kind: :external, href: "https://github.com/orgs/regents-ai/repositories", label: "GitHub"}
+      %{kind: :internal, key: "cli", href: "/cli", label: "CLI"},
+      %{kind: :internal, key: "docs", href: "/docs", label: "Docs"}
     ]
   end
 

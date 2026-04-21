@@ -16,6 +16,106 @@ paths:
             text/plain:
               schema:
                 type: string
+  /healthz:
+    get:
+      operationId: healthz
+      responses:
+        '200':
+          description: Simple health check response for public discovery
+          content:
+            text/plain:
+              schema:
+                type: string
+  /robots.txt:
+    get:
+      operationId: robotsTxt
+      responses:
+        '200':
+          description: Crawl rules and AI usage preferences for public pages
+          content:
+            text/plain:
+              schema:
+                type: string
+  /sitemap.xml:
+    get:
+      operationId: sitemapXml
+      responses:
+        '200':
+          description: Sitemap for the public entry pages and live company home pages
+          content:
+            application/xml:
+              schema:
+                type: string
+  /.well-known/api-catalog:
+    get:
+      operationId: apiCatalog
+      responses:
+        '200':
+          description: API discovery catalog for the Regent public APIs
+          content:
+            application/linkset+json:
+              schema:
+                type: object
+  /.well-known/agent-card.json:
+    get:
+      operationId: agentCard
+      responses:
+        '200':
+          description: A2A-style discovery card for the Regents site agent surface
+          content:
+            application/json:
+              schema:
+                type: object
+  /.well-known/agent-skills/index.json:
+    get:
+      operationId: agentSkillsIndex
+      responses:
+        '200':
+          description: Skills discovery index for site-hosted Regent agent skills
+          content:
+            application/json:
+              schema:
+                type: object
+  /.well-known/mcp/server-card.json:
+    get:
+      operationId: mcpServerCard
+      responses:
+        '200':
+          description: Discovery card for the Regents MCP-related public resources
+          content:
+            application/json:
+              schema:
+                type: object
+  /api-contract.openapiv3.yaml:
+    get:
+      operationId: apiContractSource
+      responses:
+        '200':
+          description: Source-of-truth OpenAPI contract for this product
+          content:
+            application/yaml:
+              schema:
+                type: string
+  /cli-contract.yaml:
+    get:
+      operationId: cliContractSource
+      responses:
+        '200':
+          description: Source-of-truth CLI contract for Regents CLI
+          content:
+            application/yaml:
+              schema:
+                type: string
+  /agent-skills/regents-cli.md:
+    get:
+      operationId: regentsCliSkillDocument
+      responses:
+        '200':
+          description: Published Regents CLI skill document for operators and agents
+          content:
+            text/markdown:
+              schema:
+                type: string
   /api/basenames/config:
     get:
       operationId: basenamesConfig

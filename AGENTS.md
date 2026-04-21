@@ -11,25 +11,35 @@ Keep the main explanation surfaces aligned. The canonical story lives in:
 
 - `README.md`
 - `AGENTS.md`
-- `/services`
-- `/agent-formation`
-- `/regents-cli`
+- `/app`
+- `/docs`
+- `/cli`
 - adjacent CLI docs and help in `../regents-cli`
 
 Use these names consistently:
 
-- `Services`: guided browser tasks for wallet access, pass redemption, and name claims
-- `Agent Formation`: guided browser flow for choosing a claimed name, adding billing, and launching a company
+- `App`: the guided website flow for access, identity, billing, company opening, and the hosted dashboard
+- `Docs`: the short reference page for when to stay in the website and when to move into the CLI
 - Public company page: the live `slug.regents.sh` page after launch
 - `Regents CLI`: local tool for Techtree, Autolaunch, automation, and repeatable terminal work
 
 Use this process consistently:
 
-1. Sign in and check wallet access in `Services`.
+1. Open `/app` and check access.
 2. Redeem passes and claim names when needed.
-3. Open Agent Formation, choose a claimed name, add billing, and launch a company.
+3. Add billing, open the company, and follow launch progress.
 4. Use the public company page and company controls after launch.
 5. Use Regents CLI when the work starts on a machine or inside an agent.
+
+## Public Discovery Files
+
+Keep the live discovery surface aligned with the docs and contracts:
+
+- `/robots.txt` publishes crawl rules, AI usage preferences, and the sitemap location.
+- `/sitemap.xml` covers the public entry pages and live company home pages.
+- `/.well-known/api-catalog`, `/.well-known/agent-card.json`, `/.well-known/agent-skills/index.json`, and `/.well-known/mcp/server-card.json` are the public discovery files for agents.
+- `/agent-skills/regents-cli.md` is the published Regents CLI skill document.
+- `/api-contract.openapiv3.yaml` and `/cli-contract.yaml` are served from the app and must stay in sync with the actual public behavior.
 
 ## TODO
 

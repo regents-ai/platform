@@ -1,6 +1,10 @@
 import { animate } from "animejs";
 import { RegentSceneRenderer } from "../regent/js/regent_scene_renderer";
-import type { ScaleVector, SceneSpec, StyleSpec } from "../regent/js/regent_scene_protocol";
+import type {
+  ScaleVector,
+  SceneSpec,
+  StyleSpec,
+} from "../regent/js/regent_scene_protocol";
 import { COLOR_MODE_CHANGE_EVENT, type ColorMode } from "./color_mode";
 
 type FooterVoxelCleanup = {
@@ -47,9 +51,13 @@ function clampChannel(value: number): number {
 
 function hexToRgb(hex: string): [number, number, number] {
   const normalized = hex.replace("#", "");
-  const value = normalized.length === 3
-    ? normalized.split("").map((part) => `${part}${part}`).join("")
-    : normalized;
+  const value =
+    normalized.length === 3
+      ? normalized
+          .split("")
+          .map((part) => `${part}${part}`)
+          .join("")
+      : normalized;
 
   return [
     parseInt(value.slice(0, 2), 16),
@@ -88,10 +96,30 @@ function voxelScale(): ScaleVector {
 
 function sceneStyle(palette: FooterVoxelPalette): StyleSpec {
   return {
-    default: { fill: palette.right, stroke: palette.stroke, strokeWidth: 0.9, opacity: 1 },
-    top: { fill: palette.top, stroke: palette.stroke, strokeWidth: 0.9, opacity: 1 },
-    left: { fill: palette.left, stroke: palette.stroke, strokeWidth: 0.9, opacity: 1 },
-    right: { fill: palette.right, stroke: palette.stroke, strokeWidth: 0.9, opacity: 1 },
+    default: {
+      fill: palette.right,
+      stroke: palette.stroke,
+      strokeWidth: 0.9,
+      opacity: 1,
+    },
+    top: {
+      fill: palette.top,
+      stroke: palette.stroke,
+      strokeWidth: 0.9,
+      opacity: 1,
+    },
+    left: {
+      fill: palette.left,
+      stroke: palette.stroke,
+      strokeWidth: 0.9,
+      opacity: 1,
+    },
+    right: {
+      fill: palette.right,
+      stroke: palette.stroke,
+      strokeWidth: 0.9,
+      opacity: 1,
+    },
   };
 }
 
@@ -145,7 +173,10 @@ function setButtonState(button: HTMLButtonElement, mode: ColorMode): void {
 
   button.dataset.voxelMode = mode;
   button.setAttribute("aria-pressed", dark ? "true" : "false");
-  button.setAttribute("title", dark ? "Switch to light mode" : "Switch to dark mode");
+  button.setAttribute(
+    "title",
+    dark ? "Switch to light mode" : "Switch to dark mode",
+  );
 }
 
 function mountFooterVoxel(button: FooterVoxelButton): FooterVoxelCleanup {
@@ -168,6 +199,9 @@ function mountFooterVoxel(button: FooterVoxelButton): FooterVoxelCleanup {
 
   const renderVoxel = () => {
     renderer.render(footerVoxelScene(mixPalette(colorProgress)));
+    scene.dataset.sceneFailed = scene.querySelector(".rg-scene-error")
+      ? "true"
+      : "false";
   };
 
   const applyRotation = () => {
@@ -230,9 +264,10 @@ function mountFooterVoxel(button: FooterVoxelButton): FooterVoxelCleanup {
   };
 
   const onColorModeChange = (event: Event) => {
-    const nextMode = (event as CustomEvent<{ mode: ColorMode }>).detail?.mode === "dark"
-      ? "dark"
-      : "light";
+    const nextMode =
+      (event as CustomEvent<{ mode: ColorMode }>).detail?.mode === "dark"
+        ? "dark"
+        : "light";
 
     applyMode(nextMode);
   };
@@ -240,11 +275,17 @@ function mountFooterVoxel(button: FooterVoxelButton): FooterVoxelCleanup {
   setButtonState(button, mode);
   renderVoxel();
   startSpin();
-  doc.addEventListener(COLOR_MODE_CHANGE_EVENT, onColorModeChange as EventListener);
+  doc.addEventListener(
+    COLOR_MODE_CHANGE_EVENT,
+    onColorModeChange as EventListener,
+  );
 
   return {
     destroy() {
-      doc.removeEventListener(COLOR_MODE_CHANGE_EVENT, onColorModeChange as EventListener);
+      doc.removeEventListener(
+        COLOR_MODE_CHANGE_EVENT,
+        onColorModeChange as EventListener,
+      );
       spinAnimation?.cancel();
       colorAnimation?.cancel();
       renderer.destroy();

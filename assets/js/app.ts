@@ -35,6 +35,7 @@ import { LogoStudiesHook } from "./logos";
 import { mountOverviewMode } from "./overview";
 import { mountColorModeToggle } from "./color_mode";
 import { VoxelBackgroundHook } from "./voxel_background";
+import { registerWebMCP } from "./webmcp";
 
 type HookContext = {
   el: Element;
@@ -690,6 +691,7 @@ const csrfToken =
   document.querySelector("meta[name='csrf-token']")?.getAttribute("content") ?? "";
 
 installHeerich(Heerich);
+registerWebMCP(window);
 
 const hooks: HooksOptions = {
   ...regentHooks,

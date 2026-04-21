@@ -42,12 +42,10 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
   def mental_model do
     [
       [
-        code("regents.sh/services"),
+        code("regents.sh/app"),
         text(" and "),
-        code("regents.sh/agent-formation"),
-        text(
-          " handle the guided website path for setup, claimed names, billing, and company launch."
-        )
+        code("regents.sh/app/dashboard"),
+        text(" handle guided setup, billing, company opening, and hosted company control.")
       ],
       [
         code("regent create ..."),

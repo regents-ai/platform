@@ -134,7 +134,7 @@ defmodule PlatformPhxWeb.AgentSiteLive do
                 agent={AgentPlatform.serialize_agent(@agent, :public)}
                 owner_company={@owner_company}
                 billing_account={@billing_account}
-                launch_home_path={~p"/agent-formation?stage=setup&claimedLabel=#{@slug}"}
+                launch_home_path={~p"/app/formation?claimedLabel=#{@slug}"}
               />
               <CompanyRoomComponents.company_room
                 :if={@xmtp_room}

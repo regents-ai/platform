@@ -2,11 +2,11 @@
 
 This app is the Regent website for guided account setup, company launch, and public company pages.
 
-It covers the browser path in one place:
+It covers the guided website path in one place:
 
-1. Sign in and check wallet access in `Services`.
+1. Open `/app` and check access.
 2. Redeem passes and claim names when needed.
-3. Open Agent Formation, choose a claimed name, add billing, and launch a company.
+3. Add billing, open the company, and follow launch progress.
 4. Manage the live company and public page after launch.
 
 ## What The Site Is For
@@ -18,49 +18,31 @@ Today that mostly means:
 - connecting a wallet
 - redeeming eligible Animata passes
 - claiming an agent name
-- starting the agent company formation wizard
+- adding billing and opening the company
 - opening the public page and operator surfaces for a hosted agent business
 
-The goal is simple: finish the guided browser setup here, then hand off to the right next place. That may be Agent Formation in the browser, or Regents CLI when direct local work is next.
+The goal is simple: finish the guided website setup here, then move to the right next place. That may be the hosted company dashboard in the app, or Regents CLI when local work is next.
 
-## Services
+## App
 
-`/services` is the main setup page.
+`/app` is the main guided entry.
 
-The work there is straightforward:
+It routes people into the next step:
 
-- sign in
-- connect an eligible wallet
-- redeem Animata passes
-- claim an agent name
-- start the formation wizard for a hosted company
+- `/app/access` for wallet access and pass checks
+- `/app/identity` for name claims
+- `/app/billing` for billing setup
+- `/app/formation` for opening the company
+- `/app/dashboard` for the hosted company after launch
 
-The goal is simple: finish setup in one place, then move into a live business with a clear public identity.
-
-## Agent Formation
-
-Humans should use the formation wizard in this platform app when they want to launch a Regent company from a claimed name.
-
-That wizard is the right path when you want:
-
-- a claimed name
-- a public `slug.regents.sh` page
-- billing in place
-- a live company you can manage after launch
-
-The short launch order is:
-
-1. choose a claimed name
-2. add billing
-3. launch the company
-4. return to the public page and company controls later
+The goal is simple: keep the full company-opening path in one place, then come back to the hosted dashboard once the company is live.
 
 ## Which Path To Use
 
-Use the website when the task is guided account or company setup.
+Use the website when the task is guided company setup or hosted company control.
 
-- `Services` is where a person checks wallet access, redeems passes, and claims names.
-- `Agent Formation` is where a person adds billing, launches a company, and comes back to company controls later.
+- `/app` is where a person checks access, redeems passes, claims names, adds billing, opens the company, and comes back to the dashboard later.
+- `/docs` is the short reference page for the website path and the CLI path.
 
 Use the CLI when direct local work is next.
 
@@ -70,7 +52,7 @@ Use the CLI when direct local work is next.
 
 This keeps the paths clear:
 
-- people use the website for guided browser setup
+- people use the website for guided company setup and hosted company control
 - operators and agents use `regents-cli` for direct local work
 
 ## Related Projects
@@ -78,6 +60,19 @@ This keeps the paths clear:
 - [`../regents-cli`](../regents-cli): local command path for setup and direct work
 - [`../techtree`](../techtree): Techtree product
 - [`../autolaunch`](../autolaunch): Autolaunch product
+
+## Public Discovery Files
+
+The site now publishes a small public discovery surface for crawlers and agents:
+
+- `/robots.txt`: crawl rules, AI usage preferences, and the sitemap location
+- `/sitemap.xml`: the public entry pages plus live company home pages
+- `/.well-known/api-catalog`: API discovery catalog
+- `/.well-known/agent-card.json`: site agent discovery card
+- `/.well-known/agent-skills/index.json`: published skill index
+- `/.well-known/mcp/server-card.json`: public MCP-related discovery card
+- `/agent-skills/regents-cli.md`: published Regents CLI skill
+- `/api-contract.openapiv3.yaml` and `/cli-contract.yaml`: the live source-of-truth contracts served from the app
 
 ## Local Development
 

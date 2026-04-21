@@ -27,28 +27,56 @@ html[data-color-mode="light"] {
   --brand-paper: #fbf4de;
   --brand-gold: #d4a756;
   --brand-olive: #848078;
-  --background: color-mix(in oklch, var(--brand-paper) 92%, var(--brand-gold) 8%);
-  --foreground: color-mix(in oklch, var(--brand-ink) 92%, var(--brand-charcoal) 8%);
+  --background: color-mix(
+    in oklch,
+    var(--brand-paper) 92%,
+    var(--brand-gold) 8%
+  );
+  --foreground: color-mix(
+    in oklch,
+    var(--brand-ink) 92%,
+    var(--brand-charcoal) 8%
+  );
   --card: color-mix(in oklch, var(--brand-paper) 95%, var(--brand-charcoal) 5%);
   --card-elevated: color-mix(in oklch, var(--brand-paper) 97%, white 3%);
   --card-voxel: color-mix(in oklch, white 94%, var(--brand-paper) 6%);
-  --muted-foreground: color-mix(in oklch, var(--brand-charcoal) 76%, var(--brand-paper) 24%);
+  --muted-foreground: color-mix(
+    in oklch,
+    var(--brand-charcoal) 76%,
+    var(--brand-paper) 24%
+  );
   --accent: var(--brand-gold);
   --primary: var(--brand-ink);
   --positive: #19cf63;
   --chart-2: var(--brand-charcoal);
   --chart-3: var(--brand-olive);
-  --border: color-mix(in oklch, var(--brand-paper) 72%, var(--brand-charcoal) 28%);
+  --border: color-mix(
+    in oklch,
+    var(--brand-paper) 72%,
+    var(--brand-charcoal) 28%
+  );
   --ring: color-mix(in oklch, var(--brand-gold) 68%, var(--brand-ink) 32%);
-  --sidebar: color-mix(in oklch, var(--brand-paper) 96%, var(--brand-charcoal) 4%);
-  --sidebar-accent: color-mix(in oklch, var(--brand-gold) 20%, var(--brand-paper) 80%);
+  --sidebar: color-mix(
+    in oklch,
+    var(--brand-paper) 96%,
+    var(--brand-charcoal) 4%
+  );
+  --sidebar-accent: color-mix(
+    in oklch,
+    var(--brand-gold) 20%,
+    var(--brand-paper) 80%
+  );
   --link-color: #063e66;
   --link-underline: color-mix(in oklch, #063e66 38%, transparent);
   --home-wordmark: var(--foreground);
   --icon-ink: var(--brand-ink);
   --button-primary-bg: var(--brand-ink);
   --button-primary-fg: var(--background);
-  --button-secondary-bg: color-mix(in oklch, var(--background) 82%, transparent);
+  --button-secondary-bg: color-mix(
+    in oklch,
+    var(--background) 82%,
+    transparent
+  );
   --page-spot-1: color-mix(in oklch, var(--brand-charcoal) 14%, transparent);
   --page-spot-2: color-mix(in oklch, var(--accent) 16%, transparent);
   --page-shell-wash: linear-gradient(
@@ -57,39 +85,111 @@ html[data-color-mode="light"] {
     var(--background)
   );
   --layout-shell-background:
-    radial-gradient(circle at 14% 12%, color-mix(in oklch, white 62%, var(--brand-paper) 38%), transparent 32%),
-    radial-gradient(circle at 84% 10%, color-mix(in oklch, var(--accent) 14%, transparent), transparent 28%),
-    linear-gradient(180deg, color-mix(in oklch, #fffdf6 72%, var(--brand-paper) 28%), color-mix(in oklch, var(--background) 94%, white 6%));
+    radial-gradient(
+      circle at 14% 12%,
+      color-mix(in oklch, white 62%, var(--brand-paper) 38%),
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 84% 10%,
+      color-mix(in oklch, var(--accent) 14%, transparent),
+      transparent 28%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, #fffdf6 72%, var(--brand-paper) 28%),
+      color-mix(in oklch, var(--background) 94%, white 6%)
+    );
   --home-shell-background:
-    radial-gradient(circle at 16% 14%, color-mix(in oklch, white 68%, var(--brand-paper) 32%), transparent 26%),
-    radial-gradient(circle at 82% 12%, color-mix(in oklch, var(--accent) 12%, transparent), transparent 24%),
-    linear-gradient(180deg, color-mix(in oklch, #fffef8 76%, var(--brand-paper) 24%), color-mix(in oklch, var(--background) 96%, white 4%));
+    radial-gradient(
+      circle at 16% 14%,
+      color-mix(in oklch, white 68%, var(--brand-paper) 32%),
+      transparent 26%
+    ),
+    radial-gradient(
+      circle at 82% 12%,
+      color-mix(in oklch, var(--accent) 12%, transparent),
+      transparent 24%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, #fffef8 76%, var(--brand-paper) 24%),
+      color-mix(in oklch, var(--background) 96%, white 4%)
+    );
   --route-shell-background:
-    radial-gradient(circle at 10% 8%, color-mix(in oklch, white 52%, var(--brand-paper) 48%), transparent 24%),
-    radial-gradient(circle at 88% 10%, color-mix(in oklch, var(--accent) 10%, transparent), transparent 22%),
-    linear-gradient(180deg, color-mix(in oklch, #fffdf6 64%, var(--background) 36%), var(--background));
+    radial-gradient(
+      circle at 10% 8%,
+      color-mix(in oklch, white 52%, var(--brand-paper) 48%),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at 88% 10%,
+      color-mix(in oklch, var(--accent) 10%, transparent),
+      transparent 22%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, #fffdf6 64%, var(--background) 36%),
+      var(--background)
+    );
   --demo-shell-background: #024b7a;
 }
 
 html[data-color-mode="dark"] {
   color-scheme: dark;
   --background: #034568;
-  --foreground: color-mix(in oklch, var(--brand-paper) 92%, var(--brand-gold) 8%);
+  --foreground: color-mix(
+    in oklch,
+    var(--brand-paper) 92%,
+    var(--brand-gold) 8%
+  );
   --card: color-mix(in oklch, var(--brand-ink) 74%, var(--brand-charcoal) 26%);
-  --card-elevated: color-mix(in oklch, var(--brand-ink) 62%, var(--brand-charcoal) 38%);
-  --card-voxel: color-mix(in oklch, var(--brand-ink) 68%, var(--brand-paper) 32%);
-  --muted-foreground: color-mix(in oklch, var(--brand-paper) 68%, var(--brand-olive) 32%);
+  --card-elevated: color-mix(
+    in oklch,
+    var(--brand-ink) 62%,
+    var(--brand-charcoal) 38%
+  );
+  --card-voxel: color-mix(
+    in oklch,
+    var(--brand-ink) 68%,
+    var(--brand-paper) 32%
+  );
+  --muted-foreground: color-mix(
+    in oklch,
+    var(--brand-paper) 68%,
+    var(--brand-olive) 32%
+  );
   --border: color-mix(in oklch, var(--brand-paper) 20%, var(--brand-ink) 80%);
   --ring: color-mix(in oklch, var(--brand-gold) 58%, var(--brand-paper) 42%);
-  --sidebar: color-mix(in oklch, var(--brand-ink) 70%, var(--brand-charcoal) 30%);
-  --sidebar-accent: color-mix(in oklch, var(--brand-gold) 16%, var(--brand-ink) 84%);
-  --link-color: color-mix(in oklch, var(--brand-paper) 88%, var(--brand-gold) 12%);
+  --sidebar: color-mix(
+    in oklch,
+    var(--brand-ink) 70%,
+    var(--brand-charcoal) 30%
+  );
+  --sidebar-accent: color-mix(
+    in oklch,
+    var(--brand-gold) 16%,
+    var(--brand-ink) 84%
+  );
+  --link-color: color-mix(
+    in oklch,
+    var(--brand-paper) 88%,
+    var(--brand-gold) 12%
+  );
   --link-underline: color-mix(in oklch, var(--brand-paper) 30%, transparent);
   --home-wordmark: var(--brand-paper);
   --icon-ink: var(--brand-paper);
-  --button-primary-bg: color-mix(in oklch, var(--brand-paper) 90%, var(--brand-gold) 10%);
+  --button-primary-bg: color-mix(
+    in oklch,
+    var(--brand-paper) 90%,
+    var(--brand-gold) 10%
+  );
   --button-primary-fg: var(--background);
-  --button-secondary-bg: color-mix(in oklch, var(--card) 88%, var(--background) 12%);
+  --button-secondary-bg: color-mix(
+    in oklch,
+    var(--card) 88%,
+    var(--background) 12%
+  );
   --page-spot-1: color-mix(in oklch, var(--brand-paper) 6%, transparent);
   --page-spot-2: color-mix(in oklch, var(--brand-gold) 12%, transparent);
   --page-shell-wash: linear-gradient(
@@ -98,18 +198,58 @@ html[data-color-mode="dark"] {
     var(--background)
   );
   --layout-shell-background:
-    radial-gradient(circle at 12% 12%, color-mix(in oklch, #6f8fa8 22%, transparent), transparent 30%),
-    radial-gradient(circle at 84% 10%, color-mix(in oklch, #c3d9f2 12%, transparent), transparent 26%),
-    linear-gradient(180deg, color-mix(in oklch, #173f63 78%, var(--brand-ink) 22%), color-mix(in oklch, #0a2e4b 82%, var(--brand-charcoal) 18%));
+    radial-gradient(
+      circle at 12% 12%,
+      color-mix(in oklch, #6f8fa8 22%, transparent),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 84% 10%,
+      color-mix(in oklch, #c3d9f2 12%, transparent),
+      transparent 26%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, #173f63 78%, var(--brand-ink) 22%),
+      color-mix(in oklch, #0a2e4b 82%, var(--brand-charcoal) 18%)
+    );
   --home-shell-background:
-    radial-gradient(circle at 16% 10%, color-mix(in oklch, #89aeca 24%, transparent), transparent 24%),
-    radial-gradient(circle at 82% 12%, color-mix(in oklch, #d8e5f4 10%, transparent), transparent 22%),
-    linear-gradient(180deg, color-mix(in oklch, #234d73 74%, var(--brand-ink) 26%), color-mix(in oklch, #0a2f4d 84%, var(--brand-charcoal) 16%));
+    radial-gradient(
+      circle at 16% 10%,
+      color-mix(in oklch, #89aeca 24%, transparent),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at 82% 12%,
+      color-mix(in oklch, #d8e5f4 10%, transparent),
+      transparent 22%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, #234d73 74%, var(--brand-ink) 26%),
+      color-mix(in oklch, #0a2f4d 84%, var(--brand-charcoal) 16%)
+    );
   --route-shell-background:
-    radial-gradient(circle at 10% 8%, color-mix(in oklch, #7fa7c6 18%, transparent), transparent 22%),
-    radial-gradient(circle at 88% 10%, color-mix(in oklch, #d1e1f2 8%, transparent), transparent 20%),
-    linear-gradient(180deg, color-mix(in oklch, #214a6f 68%, var(--brand-ink) 32%), color-mix(in oklch, #0a2d49 82%, var(--brand-charcoal) 18%));
-  --demo-shell-background: linear-gradient(180deg, color-mix(in oklch, #21486b 74%, var(--brand-ink) 26%), color-mix(in oklch, #0b2c47 84%, var(--brand-charcoal) 16%));
+    radial-gradient(
+      circle at 10% 8%,
+      color-mix(in oklch, #7fa7c6 18%, transparent),
+      transparent 22%
+    ),
+    radial-gradient(
+      circle at 88% 10%,
+      color-mix(in oklch, #d1e1f2 8%, transparent),
+      transparent 20%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, #214a6f 68%, var(--brand-ink) 32%),
+      color-mix(in oklch, #0a2d49 82%, var(--brand-charcoal) 18%)
+    );
+  --demo-shell-background: linear-gradient(
+    180deg,
+    color-mix(in oklch, #21486b 74%, var(--brand-ink) 26%),
+    color-mix(in oklch, #0b2c47 84%, var(--brand-charcoal) 16%)
+  );
 }
 
 * {
@@ -198,8 +338,16 @@ body,
 
 .pp-platform-content-shell {
   background:
-    linear-gradient(180deg, color-mix(in oklch, var(--card) 98%, var(--brand-paper) 2%), color-mix(in oklch, var(--card) 99%, var(--background) 1%)),
-    radial-gradient(circle at top, color-mix(in oklch, var(--accent) 6%, transparent), transparent 42%);
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--card) 98%, var(--brand-paper) 2%),
+      color-mix(in oklch, var(--card) 99%, var(--background) 1%)
+    ),
+    radial-gradient(
+      circle at top,
+      color-mix(in oklch, var(--accent) 6%, transparent),
+      transparent 42%
+    );
   isolation: isolate;
   overflow: clip;
   background-clip: padding-box;
@@ -296,8 +444,16 @@ body,
 
 .pp-platform-content-shell--token {
   background:
-    linear-gradient(180deg, color-mix(in oklch, var(--brand-paper) 5%, transparent), color-mix(in oklch, var(--brand-paper) 5%, transparent)),
-    radial-gradient(circle at top, color-mix(in oklch, var(--accent) 5%, transparent), transparent 46%);
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--brand-paper) 5%, transparent),
+      color-mix(in oklch, var(--brand-paper) 5%, transparent)
+    ),
+    radial-gradient(
+      circle at top,
+      color-mix(in oklch, var(--accent) 5%, transparent),
+      transparent 46%
+    );
 }
 
 .pp-chrome-eyebrow {
@@ -366,7 +522,8 @@ body,
 .pp-wallet-pill-primary {
   background: var(--brand-paper);
   color: var(--brand-ink);
-  box-shadow: 0 16px 36px -30px color-mix(in oklch, var(--brand-ink) 65%, transparent);
+  box-shadow: 0 16px 36px -30px
+    color-mix(in oklch, var(--brand-ink) 65%, transparent);
 }
 
 .pp-wallet-pill-secondary {
@@ -380,7 +537,8 @@ body,
   height: 0.52rem;
   border-radius: 999px;
   background: var(--positive);
-  box-shadow: 0 0 0 0.18rem color-mix(in oklch, var(--positive) 22%, transparent);
+  box-shadow: 0 0 0 0.18rem
+    color-mix(in oklch, var(--positive) 22%, transparent);
 }
 
 .pp-wallet-pill-caret {
@@ -396,13 +554,13 @@ body,
   width: min(19rem, calc(100vw - 2rem));
   border-radius: 1.35rem;
   border: 1px solid var(--border);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklch, var(--card-elevated) 96%, var(--brand-paper) 4%),
-      color-mix(in oklch, var(--card) 98%, var(--background) 2%)
-    );
-  box-shadow: 0 24px 50px -36px color-mix(in oklch, var(--brand-ink) 52%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--card-elevated) 96%, var(--brand-paper) 4%),
+    color-mix(in oklch, var(--card) 98%, var(--background) 2%)
+  );
+  box-shadow: 0 24px 50px -36px
+    color-mix(in oklch, var(--brand-ink) 52%, transparent);
   overflow: clip;
   transform-origin: top right;
 }
@@ -458,7 +616,11 @@ body,
   padding: 0;
   border: 1px solid color-mix(in oklch, var(--border) 88%, transparent);
   border-radius: 999px;
-  background: color-mix(in oklch, var(--card-elevated) 80%, var(--background) 20%);
+  background: color-mix(
+    in oklch,
+    var(--card-elevated) 80%,
+    var(--background) 20%
+  );
   color: var(--muted-foreground);
   box-shadow: inset 0 1px 0 color-mix(in oklch, white 18%, transparent);
   transition:
@@ -473,7 +635,11 @@ body,
 .pp-wallet-icon-button:focus-visible {
   color: var(--foreground);
   border-color: color-mix(in oklch, var(--ring) 72%, transparent);
-  background: color-mix(in oklch, var(--card-elevated) 92%, var(--brand-paper) 8%);
+  background: color-mix(
+    in oklch,
+    var(--card-elevated) 92%,
+    var(--brand-paper) 8%
+  );
   transform: translateY(-1px);
 }
 
@@ -543,13 +709,13 @@ html[data-color-mode="dark"] .pp-wallet-pill-primary {
 }
 
 html[data-color-mode="dark"] .pp-wallet-drawer {
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklch, var(--card-elevated) 92%, var(--brand-paper) 8%),
-      color-mix(in oklch, var(--card) 96%, var(--background) 4%)
-    );
-  box-shadow: 0 24px 52px -38px color-mix(in oklch, var(--brand-paper) 22%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--card-elevated) 92%, var(--brand-paper) 8%),
+    color-mix(in oklch, var(--card) 96%, var(--background) 4%)
+  );
+  box-shadow: 0 24px 52px -38px
+    color-mix(in oklch, var(--brand-paper) 22%, transparent);
 }
 
 html[data-color-mode="dark"] .pp-wallet-address-row {
@@ -629,9 +795,22 @@ html[data-color-mode="dark"] .pp-wallet-drawer-action {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 18% 18%, color-mix(in oklch, var(--background) 12%, transparent), transparent 22%),
-    radial-gradient(circle at 82% 20%, color-mix(in oklch, var(--accent) 10%, transparent), transparent 24%),
-    linear-gradient(180deg, color-mix(in oklch, var(--background) 18%, transparent), transparent 26%, color-mix(in oklch, var(--background) 34%, transparent));
+    radial-gradient(
+      circle at 18% 18%,
+      color-mix(in oklch, var(--background) 12%, transparent),
+      transparent 22%
+    ),
+    radial-gradient(
+      circle at 82% 20%,
+      color-mix(in oklch, var(--accent) 10%, transparent),
+      transparent 24%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--background) 18%, transparent),
+      transparent 26%,
+      color-mix(in oklch, var(--background) 34%, transparent)
+    );
 }
 
 .pp-voxel-background-canvas {
@@ -647,7 +826,9 @@ html[data-color-mode="dark"] .pp-wallet-drawer-action {
 }
 
 .pp-voxel-background-frame {
-  filter: drop-shadow(0 32px 50px color-mix(in oklch, var(--brand-ink) 12%, transparent));
+  filter: drop-shadow(
+    0 32px 50px color-mix(in oklch, var(--brand-ink) 12%, transparent)
+  );
 }
 
 .pp-voxel-background-svg {
@@ -664,13 +845,28 @@ html[data-color-mode="dark"] .pp-wallet-drawer-action {
 
 html[data-color-mode="dark"] .pp-voxel-background::after {
   background:
-    radial-gradient(circle at 18% 18%, color-mix(in oklch, var(--brand-paper) 7%, transparent), transparent 22%),
-    radial-gradient(circle at 82% 20%, color-mix(in oklch, var(--accent) 9%, transparent), transparent 24%),
-    linear-gradient(180deg, color-mix(in oklch, var(--background) 12%, transparent), transparent 24%, color-mix(in oklch, var(--background) 26%, transparent));
+    radial-gradient(
+      circle at 18% 18%,
+      color-mix(in oklch, var(--brand-paper) 7%, transparent),
+      transparent 22%
+    ),
+    radial-gradient(
+      circle at 82% 20%,
+      color-mix(in oklch, var(--accent) 9%, transparent),
+      transparent 24%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--background) 12%, transparent),
+      transparent 24%,
+      color-mix(in oklch, var(--background) 26%, transparent)
+    );
 }
 
 html[data-color-mode="dark"] .pp-voxel-background-frame {
-  filter: drop-shadow(0 28px 44px color-mix(in oklch, var(--brand-paper) 6%, transparent));
+  filter: drop-shadow(
+    0 28px 44px color-mix(in oklch, var(--brand-paper) 6%, transparent)
+  );
 }
 
 html[data-color-mode="dark"] .pp-voxel-background-svg {
@@ -772,12 +968,18 @@ html[data-color-mode="dark"] .pp-voxel-background-svg {
   overflow: visible;
 }
 
-.pp-scene-demo-slot.rg-regent-theme-autolaunch .pp-scene-demo-surface .rg-surface-scene > svg {
+.pp-scene-demo-slot.rg-regent-theme-autolaunch
+  .pp-scene-demo-surface
+  .rg-surface-scene
+  > svg {
   transform: scale(1.02);
   transform-origin: center center;
 }
 
-.pp-scene-demo-slot.rg-regent-theme-platform .pp-scene-demo-surface .rg-surface-scene > svg {
+.pp-scene-demo-slot.rg-regent-theme-platform
+  .pp-scene-demo-surface
+  .rg-surface-scene
+  > svg {
   transform: scale(0.9);
   transform-origin: center center;
 }
@@ -843,7 +1045,9 @@ html[data-color-mode="dark"] .pp-voxel-background-svg {
 }
 
 .pp-sidebar-scene-grid .pp-scene-demo-surface .rg-surface-scene > svg {
-  filter: drop-shadow(0 0 12px color-mix(in oklch, var(--brand-paper) 14%, transparent));
+  filter: drop-shadow(
+    0 0 12px color-mix(in oklch, var(--brand-paper) 14%, transparent)
+  );
 }
 
 .pp-home-briefing,
@@ -853,9 +1057,18 @@ html[data-color-mode="dark"] .pp-voxel-background-svg {
   border: 1px solid var(--border);
   border-radius: 1.75rem;
   background:
-    radial-gradient(circle at 14% 16%, color-mix(in oklch, var(--accent) 6%, transparent), transparent 32%),
-    linear-gradient(180deg, color-mix(in oklch, var(--card) 99%, var(--brand-paper) 1%), color-mix(in oklch, var(--card) 99%, var(--background) 1%));
-  box-shadow: 0 26px 70px -44px color-mix(in oklch, var(--brand-ink) 52%, transparent);
+    radial-gradient(
+      circle at 14% 16%,
+      color-mix(in oklch, var(--accent) 6%, transparent),
+      transparent 32%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--card) 99%, var(--brand-paper) 1%),
+      color-mix(in oklch, var(--card) 99%, var(--background) 1%)
+    );
+  box-shadow: 0 26px 70px -44px
+    color-mix(in oklch, var(--brand-ink) 52%, transparent);
   backdrop-filter: blur(10px);
   isolation: isolate;
   overflow: clip;
@@ -868,19 +1081,39 @@ html[data-color-mode="dark"] .pp-demo-hero,
 html[data-color-mode="dark"] .pp-demo-panel,
 html[data-color-mode="dark"] .pp-platform-content-shell {
   background:
-    radial-gradient(circle at 14% 16%, color-mix(in oklch, var(--accent) 7%, transparent), transparent 32%),
-    linear-gradient(180deg, color-mix(in oklch, var(--card-elevated) 98%, var(--background) 2%), color-mix(in oklch, var(--card) 94%, var(--background) 6%));
+    radial-gradient(
+      circle at 14% 16%,
+      color-mix(in oklch, var(--accent) 7%, transparent),
+      transparent 32%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--card-elevated) 98%, var(--background) 2%),
+      color-mix(in oklch, var(--card) 94%, var(--background) 6%)
+    );
   box-shadow: 0 26px 70px -44px color-mix(in oklch, black 38%, transparent);
 }
 
 html[data-color-mode="dark"] .pp-platform-content-shell--token {
   background:
-    linear-gradient(180deg, color-mix(in oklch, var(--brand-paper) 3%, transparent), color-mix(in oklch, var(--brand-paper) 3%, transparent)),
-    radial-gradient(circle at top, color-mix(in oklch, var(--accent) 5%, transparent), transparent 46%);
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--brand-paper) 3%, transparent),
+      color-mix(in oklch, var(--brand-paper) 3%, transparent)
+    ),
+    radial-gradient(
+      circle at top,
+      color-mix(in oklch, var(--accent) 5%, transparent),
+      transparent 46%
+    );
 }
 
 html[data-color-mode="dark"] .pp-sidebar-shell {
-  background: linear-gradient(180deg, color-mix(in oklch, var(--sidebar) 96%, var(--card-elevated) 4%), color-mix(in oklch, var(--sidebar) 92%, var(--background) 8%));
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--sidebar) 96%, var(--card-elevated) 4%),
+    color-mix(in oklch, var(--sidebar) 92%, var(--background) 8%)
+  );
 }
 
 .pp-home-briefing {
@@ -934,7 +1167,11 @@ html[data-color-mode="dark"] .pp-sidebar-shell {
   line-height: 1.2;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: color-mix(in oklch, var(--foreground) 82%, var(--muted-foreground) 18%);
+  color: color-mix(
+    in oklch,
+    var(--foreground) 82%,
+    var(--muted-foreground) 18%
+  );
   text-shadow: 0 0 10px color-mix(in oklch, var(--accent) 8%, transparent);
   transform: scale(var(--pp-ticker-scale));
   transform-origin: center right;
@@ -957,7 +1194,9 @@ html[data-color-mode="dark"] .pp-sidebar-shell {
   block-size: 0.96rem;
   display: inline-grid;
   place-items: center;
-  filter: drop-shadow(0 0 8px color-mix(in oklch, var(--accent) 10%, transparent));
+  filter: drop-shadow(
+    0 0 8px color-mix(in oklch, var(--accent) 10%, transparent)
+  );
   transition:
     filter 200ms cubic-bezier(0.32, 0, 0.2, 1),
     transform 200ms cubic-bezier(0.32, 0, 0.2, 1);
@@ -1095,8 +1334,11 @@ html[data-color-mode="dark"] .pp-sidebar-shell {
 .pp-cli-command-card {
   border: 1px solid var(--border);
   border-radius: 1.4rem;
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--background) 95%, var(--card) 5%), color-mix(in oklch, var(--background) 91%, var(--card) 9%));
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--background) 95%, var(--card) 5%),
+    color-mix(in oklch, var(--background) 91%, var(--card) 9%)
+  );
   padding: 1rem;
 }
 
@@ -1118,11 +1360,16 @@ html[data-color-mode="dark"] .pp-sidebar-shell {
   position: relative;
   display: block;
   overflow: hidden;
-  border: 1px solid color-mix(in oklch, var(--brand-charcoal) 34%, var(--border) 66%);
+  border: 1px solid
+    color-mix(in oklch, var(--brand-charcoal) 34%, var(--border) 66%);
   border-radius: 1rem;
-  background:
-    linear-gradient(180deg, rgba(21, 31, 45, 0.98), rgba(30, 43, 59, 0.96));
-  padding: 2.55rem 1rem 0.95rem calc(var(--pp-shell-inline-start) + var(--pp-shell-prompt-gutter));
+  background: linear-gradient(
+    180deg,
+    rgba(21, 31, 45, 0.98),
+    rgba(30, 43, 59, 0.96)
+  );
+  padding: 2.55rem 1rem 0.95rem
+    calc(var(--pp-shell-inline-start) + var(--pp-shell-prompt-gutter));
   color: var(--foreground);
   font-family: "GeistPixel Square", sans-serif;
   font-size: 0.9rem;
@@ -1293,15 +1540,30 @@ html[data-color-mode="dark"] .pp-sidebar-shell {
   gap: 1.4rem;
   overflow: hidden;
   background:
-    radial-gradient(circle at 12% 18%, color-mix(in oklch, var(--accent) 12%, transparent), transparent 26%),
-    radial-gradient(circle at 86% 20%, color-mix(in oklch, var(--brand-ink) 10%, transparent), transparent 30%),
-    linear-gradient(180deg, color-mix(in oklch, var(--card) 98%, var(--brand-paper) 2%), color-mix(in oklch, var(--background) 95%, var(--card) 5%));
+    radial-gradient(
+      circle at 12% 18%,
+      color-mix(in oklch, var(--accent) 12%, transparent),
+      transparent 26%
+    ),
+    radial-gradient(
+      circle at 86% 20%,
+      color-mix(in oklch, var(--brand-ink) 10%, transparent),
+      transparent 30%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--card) 98%, var(--brand-paper) 2%),
+      color-mix(in oklch, var(--background) 95%, var(--card) 5%)
+    );
 }
 
 .pp-token-economics-head {
   display: grid;
   gap: clamp(1.2rem, 2vw, 2.2rem);
-  grid-template-columns: minmax(0, 1fr) minmax(12.5rem, 15rem) minmax(17rem, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(12.5rem, 15rem) minmax(
+      17rem,
+      1fr
+    );
   align-items: stretch;
 }
 
@@ -1507,15 +1769,26 @@ html[data-color-mode="dark"] .pp-sidebar-shell {
   align-content: start;
   border: 1px solid var(--border);
   border-radius: 1.25rem;
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--background) 97%, var(--card) 3%), color-mix(in oklch, var(--background) 93%, var(--card) 7%));
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--background) 97%, var(--card) 3%),
+    color-mix(in oklch, var(--background) 93%, var(--card) 7%)
+  );
   padding: 1rem 1.05rem;
 }
 
 .pp-token-economics-detail-card-accent {
   background:
-    radial-gradient(circle at 82% 14%, color-mix(in oklch, var(--accent) 10%, transparent), transparent 28%),
-    linear-gradient(180deg, color-mix(in oklch, var(--card) 98%, var(--brand-paper) 2%), color-mix(in oklch, var(--background) 94%, var(--card) 6%));
+    radial-gradient(
+      circle at 82% 14%,
+      color-mix(in oklch, var(--accent) 10%, transparent),
+      transparent 28%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--card) 98%, var(--brand-paper) 2%),
+      color-mix(in oklch, var(--background) 94%, var(--card) 6%)
+    );
 }
 
 .pp-token-header-icon {
@@ -1642,8 +1915,11 @@ html[data-color-mode="dark"] .pp-token-table-wrap {
 .pp-token-bar-fill {
   block-size: 100%;
   border-radius: inherit;
-  background:
-    linear-gradient(90deg, color-mix(in oklch, var(--brand-paper) 88%, white 12%), color-mix(in oklch, var(--brand-paper) 62%, var(--brand-ink) 38%));
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--brand-paper) 88%, white 12%),
+    color-mix(in oklch, var(--brand-paper) 62%, var(--brand-ink) 38%)
+  );
 }
 
 .pp-token-action {
@@ -1828,9 +2104,7 @@ html[data-color-mode="dark"] .pp-token-table-wrap {
   padding: 1rem;
   perspective: 1600px;
   transform-style: preserve-3d;
-  transform:
-    translateY(var(--pp-card-lift))
-    rotateX(var(--pp-card-tilt-x))
+  transform: translateY(var(--pp-card-lift)) rotateX(var(--pp-card-tilt-x))
     rotateY(var(--pp-card-tilt-y));
   box-shadow: 0 18px 36px -32px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(18px);
@@ -1860,8 +2134,16 @@ html[data-color-mode="dark"] .pp-token-table-wrap {
   background:
     radial-gradient(circle at 12% 10%, rgba(0, 97, 0, 0.18), transparent 30%),
     radial-gradient(circle at 74% 24%, rgba(0, 97, 0, 0.12), transparent 36%),
-    radial-gradient(circle at 82% 78%, rgba(68, 112, 68, 0.14), transparent 42%),
-    linear-gradient(160deg, color-mix(in oklch, var(--card) 78%, oklch(90% 0.05 145) 22%), color-mix(in oklch, var(--card) 64%, oklch(84% 0.07 145) 36%));
+    radial-gradient(
+      circle at 82% 78%,
+      rgba(68, 112, 68, 0.14),
+      transparent 42%
+    ),
+    linear-gradient(
+      160deg,
+      color-mix(in oklch, var(--card) 78%, oklch(90% 0.05 145) 22%),
+      color-mix(in oklch, var(--card) 64%, oklch(84% 0.07 145) 36%)
+    );
 }
 
 .pp-entry-card.rg-regent-theme-autolaunch,
@@ -1869,8 +2151,16 @@ html[data-color-mode="dark"] .pp-token-table-wrap {
   background:
     radial-gradient(circle at 18% 14%, rgba(11, 66, 61, 0.2), transparent 34%),
     radial-gradient(circle at 82% 72%, rgba(11, 66, 61, 0.16), transparent 38%),
-    radial-gradient(circle at 50% 100%, rgba(54, 99, 94, 0.16), transparent 42%),
-    linear-gradient(150deg, color-mix(in oklch, var(--card) 76%, oklch(88% 0.04 185) 24%), color-mix(in oklch, var(--card) 62%, oklch(80% 0.05 185) 38%));
+    radial-gradient(
+      circle at 50% 100%,
+      rgba(54, 99, 94, 0.16),
+      transparent 42%
+    ),
+    linear-gradient(
+      150deg,
+      color-mix(in oklch, var(--card) 76%, oklch(88% 0.04 185) 24%),
+      color-mix(in oklch, var(--card) 62%, oklch(80% 0.05 185) 38%)
+    );
 }
 
 .pp-entry-card.rg-regent-theme-platform,
@@ -1878,9 +2168,17 @@ html[data-color-mode="dark"] .pp-token-table-wrap {
   background:
     radial-gradient(circle at 14% 12%, rgba(9, 75, 117, 0.12), transparent 34%),
     radial-gradient(circle at 84% 18%, rgba(9, 75, 117, 0.08), transparent 30%),
-    radial-gradient(circle at 84% 82%, rgba(173, 190, 203, 0.16), transparent 36%),
+    radial-gradient(
+      circle at 84% 82%,
+      rgba(173, 190, 203, 0.16),
+      transparent 36%
+    ),
     radial-gradient(circle at 32% 88%, rgba(9, 75, 117, 0.06), transparent 34%),
-    linear-gradient(165deg, color-mix(in oklch, var(--brand-paper) 92%, white 8%), color-mix(in oklch, var(--card) 86%, oklch(94% 0.02 235) 14%));
+    linear-gradient(
+      165deg,
+      color-mix(in oklch, var(--brand-paper) 92%, white 8%),
+      color-mix(in oklch, var(--card) 86%, oklch(94% 0.02 235) 14%)
+    );
 }
 
 .pp-entry-card.rg-regent-theme-techtree {
@@ -1985,8 +2283,12 @@ html[data-color-mode="dark"] .pp-token-table-wrap {
   min-block-size: clamp(19rem, 24.5vw, 22.5rem);
 }
 
-.pp-home-card-grid > .pp-entry-card.rg-regent-theme-techtree .pp-card-depth-stage,
-.pp-home-card-grid > .pp-entry-card.rg-regent-theme-autolaunch .pp-card-depth-stage {
+.pp-home-card-grid
+  > .pp-entry-card.rg-regent-theme-techtree
+  .pp-card-depth-stage,
+.pp-home-card-grid
+  > .pp-entry-card.rg-regent-theme-autolaunch
+  .pp-card-depth-stage {
   block-size: clamp(19.75rem, 25.2vw, 22.85rem);
   min-block-size: clamp(19.75rem, 25.2vw, 22.85rem);
 }
@@ -2015,13 +2317,14 @@ html[data-color-mode="dark"] .pp-token-table-wrap {
   padding: 1rem;
   border-radius: 1.6rem;
   border-color: color-mix(in oklch, var(--border) 64%, var(--foreground) 36%);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--card) 94%, white 6%), color-mix(in oklch, var(--card) 74%, var(--background) 26%));
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--card) 94%, white 6%),
+    color-mix(in oklch, var(--card) 74%, var(--background) 26%)
+  );
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
   overflow: hidden;
-  transform:
-    translateZ(46px)
-    translateX(var(--pp-card-scene-drift-x))
+  transform: translateZ(46px) translateX(var(--pp-card-scene-drift-x))
     translateY(var(--pp-card-scene-drift-y))
     rotateX(calc(var(--pp-card-tilt-x) * -0.34))
     rotateY(calc(var(--pp-card-tilt-y) * -0.44));
@@ -2032,14 +2335,24 @@ html[data-color-mode="dark"] .pp-token-table-wrap {
 html[data-color-mode="dark"] .pp-card-surface .rg-surface-scene,
 html[data-color-mode="dark"] .pp-token-header-icon {
   border-color: color-mix(in oklch, var(--brand-paper) 20%, var(--border) 80%);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--card-voxel) 94%, white 6%), color-mix(in oklch, var(--card-voxel) 84%, var(--background) 16%));
-  box-shadow: inset 0 1px 0 color-mix(in oklch, var(--brand-paper) 10%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--card-voxel) 94%, white 6%),
+    color-mix(in oklch, var(--card-voxel) 84%, var(--background) 16%)
+  );
+  box-shadow: inset 0 1px 0
+    color-mix(in oklch, var(--brand-paper) 10%, transparent);
 }
 
-html[data-color-mode="dark"] .pp-home-card-grid .pp-card-surface .rg-surface-scene {
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--card) 94%, white 6%), color-mix(in oklch, var(--card) 74%, var(--background) 26%));
+html[data-color-mode="dark"]
+  .pp-home-card-grid
+  .pp-card-surface
+  .rg-surface-scene {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--card) 94%, white 6%),
+    color-mix(in oklch, var(--card) 74%, var(--background) 26%)
+  );
 }
 
 .pp-card-surface .rg-surface-scene::before {
@@ -2072,12 +2385,18 @@ html[data-color-mode="dark"] .pp-home-card-grid .pp-card-surface .rg-surface-sce
   display: block;
 }
 
-.pp-entry-card.rg-regent-theme-autolaunch .pp-card-surface .rg-surface-scene > svg {
+.pp-entry-card.rg-regent-theme-autolaunch
+  .pp-card-surface
+  .rg-surface-scene
+  > svg {
   transform: translateZ(22px) scale(1.04);
   transform-origin: center center;
 }
 
-.pp-entry-card.rg-regent-theme-platform .pp-card-surface .rg-surface-scene > svg {
+.pp-entry-card.rg-regent-theme-platform
+  .pp-card-surface
+  .rg-surface-scene
+  > svg {
   transform: translateZ(22px) scale(0.75) translateY(-1.2rem);
   transform-origin: center center;
 }
@@ -2297,6 +2616,101 @@ html[data-color-mode="dark"] .pp-preview-link {
   font-size: clamp(1rem, 1.28vw, 1.16rem);
 }
 
+.pp-home-nav-cta,
+.pp-home-primary-cta,
+.pp-home-secondary-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--foreground);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.pp-home-nav-cta:hover,
+.pp-home-nav-cta:focus-visible,
+.pp-home-primary-cta:hover,
+.pp-home-primary-cta:focus-visible,
+.pp-home-secondary-cta:hover,
+.pp-home-secondary-cta:focus-visible {
+  transform: translateY(-1px);
+}
+
+.pp-home-nav-cta {
+  min-height: 2.7rem;
+  min-inline-size: 8.75rem;
+  padding: 0.45rem 1rem;
+  background-color: var(--button-primary-bg);
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in oklch, white 8%, var(--button-primary-bg) 92%),
+    var(--button-primary-bg)
+  );
+  color: var(--button-primary-fg);
+  box-shadow: 0 16px 36px -28px
+    color-mix(in oklch, var(--brand-ink) 68%, transparent);
+  font-family: "GeistPixel Circle", "GeistPixel Square", sans-serif;
+  font-weight: 400;
+}
+
+.pp-home-primary-cta {
+  min-height: 3.25rem;
+  min-inline-size: 11.75rem;
+  padding: 0.7rem 1.25rem 0.72rem;
+  background-color: var(--button-primary-bg);
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in oklch, white 8%, var(--button-primary-bg) 92%),
+    var(--button-primary-bg)
+  );
+  color: var(--button-primary-fg);
+  box-shadow: 0 20px 44px -30px
+    color-mix(in oklch, var(--brand-ink) 72%, transparent);
+  font-family: "GeistPixel Circle", "GeistPixel Square", sans-serif;
+  font-size: 1rem;
+  font-weight: 400;
+  text-shadow: 0 1px 0 color-mix(in oklch, black 18%, transparent);
+}
+
+.pp-home-primary-cta:hover,
+.pp-home-primary-cta:focus-visible,
+.pp-home-nav-cta:hover,
+.pp-home-nav-cta:focus-visible {
+  border-color: color-mix(in oklch, var(--ring) 70%, var(--border) 30%);
+  box-shadow: 0 20px 44px -28px
+    color-mix(in oklch, var(--brand-ink) 62%, transparent);
+}
+
+.pp-home-primary-cta-arrow {
+  display: inline-block;
+  transform: translateY(-0.02em);
+}
+
+.pp-home-secondary-cta {
+  min-height: 3.25rem;
+  min-inline-size: 8.75rem;
+  padding: 0.7rem 1.15rem;
+  background: color-mix(in oklch, var(--card) 94%, var(--background) 6%);
+  box-shadow: inset 0 1px 0 color-mix(in oklch, white 18%, transparent);
+}
+
+.pp-home-secondary-cta:hover,
+.pp-home-secondary-cta:focus-visible {
+  border-color: var(--ring);
+  background: color-mix(in oklch, var(--card) 88%, var(--background) 12%);
+}
+
+.pp-home-shell .rg-scene-error {
+  display: none;
+}
+
 .pp-preview-link {
   position: relative;
 }
@@ -2378,9 +2792,18 @@ html[data-color-mode="dark"] .pp-preview-link {
   border: 1px solid var(--border);
   border-radius: 1.75rem;
   background:
-    radial-gradient(circle at 14% 16%, color-mix(in oklch, var(--accent) 6%, transparent), transparent 32%),
-    linear-gradient(180deg, color-mix(in oklch, var(--card) 99%, var(--brand-paper) 1%), color-mix(in oklch, var(--card) 99%, var(--background) 1%));
-  box-shadow: 0 26px 70px -44px color-mix(in oklch, var(--brand-ink) 52%, transparent);
+    radial-gradient(
+      circle at 14% 16%,
+      color-mix(in oklch, var(--accent) 6%, transparent),
+      transparent 32%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--card) 99%, var(--brand-paper) 1%),
+      color-mix(in oklch, var(--card) 99%, var(--background) 1%)
+    );
+  box-shadow: 0 26px 70px -44px
+    color-mix(in oklch, var(--brand-ink) 52%, transparent);
   backdrop-filter: blur(10px);
 }
 
@@ -2427,7 +2850,10 @@ html[data-color-mode="dark"] .pp-preview-link {
 
 .pp-bug-ledger-head {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.5fr) minmax(7rem, 0.75fr) minmax(9rem, 0.85fr) minmax(9rem, 0.8fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.5fr) minmax(
+      7rem,
+      0.75fr
+    ) minmax(9rem, 0.85fr) minmax(9rem, 0.8fr);
   gap: 0.9rem;
   padding: 0 1.2rem;
   font-size: 0.72rem;
@@ -2438,7 +2864,10 @@ html[data-color-mode="dark"] .pp-preview-link {
 
 .pp-bug-ledger-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.5fr) minmax(7rem, 0.75fr) minmax(9rem, 0.85fr) minmax(9rem, 0.8fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.5fr) minmax(
+      7rem,
+      0.75fr
+    ) minmax(9rem, 0.85fr) minmax(9rem, 0.8fr);
   gap: 0.9rem;
   padding: 1.15rem 1.2rem;
   align-items: start;
@@ -2491,7 +2920,11 @@ html[data-color-mode="dark"] .pp-preview-link {
 }
 
 .pp-status-pill-wont-fix {
-  background: color-mix(in oklch, var(--brand-charcoal) 18%, var(--background) 82%);
+  background: color-mix(
+    in oklch,
+    var(--brand-charcoal) 18%,
+    var(--background) 82%
+  );
   color: color-mix(in oklch, var(--brand-charcoal) 74%, var(--foreground) 26%);
 }
 
@@ -2615,8 +3048,9 @@ html[data-color-mode="dark"] .pp-preview-link {
   flex: 0 0 auto;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: color-mix(in oklch, var(--background) 94%, var(--card) 6%);
-  color: var(--brand-ink);
+  background: color-mix(in oklch, var(--card) 84%, var(--background) 16%);
+  color: color-mix(in oklch, var(--foreground) 88%, var(--brand-ink) 12%);
+  box-shadow: inset 0 1px 0 color-mix(in oklch, white 14%, transparent);
   transition:
     color 160ms ease,
     border-color 160ms ease,
@@ -2648,6 +3082,7 @@ html[data-color-mode="dark"] .pp-preview-link {
 .pp-copy-chip:hover {
   color: var(--foreground);
   border-color: var(--ring);
+  background: color-mix(in oklch, var(--card) 78%, var(--background) 22%);
   transform: translateY(-1px);
 }
 
@@ -2682,9 +3117,18 @@ html[data-color-mode="dark"] .pp-preview-link {
   border: 1px solid var(--border);
   border-radius: 1.75rem;
   background:
-    radial-gradient(circle at 14% 16%, color-mix(in oklch, var(--accent) 7%, transparent), transparent 32%),
-    linear-gradient(180deg, color-mix(in oklch, var(--card) 99%, var(--brand-paper) 1%), color-mix(in oklch, var(--card) 99%, var(--background) 1%));
-  box-shadow: 0 26px 70px -44px color-mix(in oklch, var(--brand-ink) 52%, transparent);
+    radial-gradient(
+      circle at 14% 16%,
+      color-mix(in oklch, var(--accent) 7%, transparent),
+      transparent 32%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--card) 99%, var(--brand-paper) 1%),
+      color-mix(in oklch, var(--card) 99%, var(--background) 1%)
+    );
+  box-shadow: 0 26px 70px -44px
+    color-mix(in oklch, var(--brand-ink) 52%, transparent);
   backdrop-filter: blur(10px);
   isolation: isolate;
   overflow: clip;
@@ -2800,7 +3244,8 @@ html[data-color-mode="dark"] .pp-preview-link {
 .pp-overview-toggle-button[aria-pressed="true"] {
   background: color-mix(in oklch, var(--brand-ink) 14%, var(--card) 86%);
   color: var(--foreground);
-  box-shadow: 0 12px 28px -24px color-mix(in oklch, var(--brand-ink) 70%, transparent);
+  box-shadow: 0 12px 28px -24px
+    color-mix(in oklch, var(--brand-ink) 70%, transparent);
 }
 
 .pp-overview-toggle-button:hover {
@@ -2881,8 +3326,16 @@ html[data-color-mode="dark"] .pp-preview-link {
   border-radius: 1.35rem;
   border-color: color-mix(in oklch, var(--border) 64%, var(--foreground) 36%);
   background:
-    radial-gradient(circle at 16% 16%, color-mix(in oklch, var(--accent) 10%, transparent), transparent 34%),
-    linear-gradient(180deg, color-mix(in oklch, var(--card) 96%, white 4%), color-mix(in oklch, var(--card) 78%, var(--background) 22%));
+    radial-gradient(
+      circle at 16% 16%,
+      color-mix(in oklch, var(--accent) 10%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--card) 96%, white 4%),
+      color-mix(in oklch, var(--card) 78%, var(--background) 22%)
+    );
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
@@ -2914,10 +3367,14 @@ html[data-color-mode="dark"] .pp-preview-link {
   display: block;
   margin: 0;
   overflow-x: auto;
-  border: 1px solid color-mix(in oklch, var(--brand-charcoal) 30%, var(--border) 70%);
+  border: 1px solid
+    color-mix(in oklch, var(--brand-charcoal) 30%, var(--border) 70%);
   border-radius: 1rem;
-  background:
-    linear-gradient(180deg, rgba(21, 31, 45, 0.98), rgba(30, 43, 59, 0.96));
+  background: linear-gradient(
+    180deg,
+    rgba(21, 31, 45, 0.98),
+    rgba(30, 43, 59, 0.96)
+  );
   padding: 0.9rem 1rem;
   color: color-mix(in oklch, var(--brand-paper) 96%, white 4%);
   font-family: "GeistPixel Square", sans-serif;
@@ -2933,9 +3390,18 @@ html[data-color-mode="dark"] .pp-preview-link {
   border: 1px solid var(--border);
   border-radius: 1.75rem;
   background:
-    radial-gradient(circle at 16% 14%, color-mix(in oklch, var(--accent) 10%, transparent), transparent 34%),
-    linear-gradient(180deg, color-mix(in oklch, var(--card) 98%, var(--brand-paper) 2%), color-mix(in oklch, var(--card) 99%, var(--background) 1%));
-  box-shadow: 0 26px 70px -44px color-mix(in oklch, var(--brand-ink) 52%, transparent);
+    radial-gradient(
+      circle at 16% 14%,
+      color-mix(in oklch, var(--accent) 10%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--card) 98%, var(--brand-paper) 2%),
+      color-mix(in oklch, var(--card) 99%, var(--background) 1%)
+    );
+  box-shadow: 0 26px 70px -44px
+    color-mix(in oklch, var(--brand-ink) 52%, transparent);
   backdrop-filter: blur(16px);
   padding: 1.25rem;
 }
@@ -2961,11 +3427,16 @@ html[data-color-mode="dark"] .pp-preview-link {
   display: block;
   overflow-x: auto;
   position: relative;
-  border: 1px solid color-mix(in oklch, var(--brand-charcoal) 30%, var(--border) 70%);
+  border: 1px solid
+    color-mix(in oklch, var(--brand-charcoal) 30%, var(--border) 70%);
   border-radius: 1rem;
-  background:
-    linear-gradient(180deg, rgba(21, 31, 45, 0.98), rgba(30, 43, 59, 0.96));
-  padding: 2.55rem 1rem 1rem calc(var(--pp-shell-inline-start) + var(--pp-shell-prompt-gutter));
+  background: linear-gradient(
+    180deg,
+    rgba(21, 31, 45, 0.98),
+    rgba(30, 43, 59, 0.96)
+  );
+  padding: 2.55rem 1rem 1rem
+    calc(var(--pp-shell-inline-start) + var(--pp-shell-prompt-gutter));
   color: color-mix(in oklch, var(--brand-paper) 96%, white 4%);
   font-family: "GeistPixel Square", sans-serif;
   font-size: 0.92rem;
@@ -3006,9 +3477,18 @@ html[data-color-mode="dark"] .pp-preview-link {
   border: 1px solid var(--border);
   border-radius: 1.75rem;
   background:
-    radial-gradient(circle at 16% 14%, color-mix(in oklch, var(--accent) 12%, transparent), transparent 34%),
-    linear-gradient(180deg, color-mix(in oklch, var(--card) 90%, transparent), color-mix(in oklch, var(--card) 96%, var(--background) 4%));
-  box-shadow: 0 26px 70px -44px color-mix(in oklch, var(--brand-ink) 52%, transparent);
+    radial-gradient(
+      circle at 16% 14%,
+      color-mix(in oklch, var(--accent) 12%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--card) 90%, transparent),
+      color-mix(in oklch, var(--card) 96%, var(--background) 4%)
+    );
+  box-shadow: 0 26px 70px -44px
+    color-mix(in oklch, var(--brand-ink) 52%, transparent);
   backdrop-filter: blur(16px);
   padding: 1.25rem;
 }
@@ -3125,9 +3605,17 @@ html[data-color-mode="dark"] .pp-preview-link {
 
 .pp-logo-root {
   --pp-logo-canvas-bg: #0d4b77;
-  --pp-logo-card-surface: color-mix(in oklch, var(--background) 78%, transparent);
+  --pp-logo-card-surface: color-mix(
+    in oklch,
+    var(--background) 78%,
+    transparent
+  );
   --pp-logo-card-border: var(--border);
-  --pp-logo-toggle-border: color-mix(in oklch, var(--brand-ink) 26%, var(--brand-paper) 74%);
+  --pp-logo-toggle-border: color-mix(
+    in oklch,
+    var(--brand-ink) 26%,
+    var(--brand-paper) 74%
+  );
   --pp-logo-toggle-fill: color-mix(in oklch, var(--brand-ink) 18%, transparent);
   display: grid;
   gap: 1rem;
@@ -3193,10 +3681,19 @@ html[data-color-mode="dark"] .pp-preview-link {
   border: 1px solid var(--border);
   border-radius: 2rem;
   background:
-    radial-gradient(circle at 14% 18%, color-mix(in oklch, var(--rg-node-stroke) 7%, transparent), transparent 30%),
-    linear-gradient(180deg, color-mix(in oklch, var(--card) 98%, var(--brand-paper) 2%), color-mix(in oklch, var(--card) 99%, var(--background) 1%));
+    radial-gradient(
+      circle at 14% 18%,
+      color-mix(in oklch, var(--rg-node-stroke) 7%, transparent),
+      transparent 30%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--card) 98%, var(--brand-paper) 2%),
+      color-mix(in oklch, var(--card) 99%, var(--background) 1%)
+    );
   padding: clamp(1.15rem, 2vw, 1.75rem);
-  box-shadow: 0 28px 70px -50px color-mix(in oklch, var(--rg-node-stroke) 34%, transparent);
+  box-shadow: 0 28px 70px -50px
+    color-mix(in oklch, var(--rg-node-stroke) 34%, transparent);
 }
 
 .pp-logo-section-copy {
@@ -3214,8 +3711,11 @@ html[data-color-mode="dark"] .pp-preview-link {
   overflow: hidden;
   border: 1px solid var(--pp-logo-card-border);
   border-radius: 1.6rem;
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--pp-logo-card-surface) 98%, var(--brand-paper) 2%), color-mix(in oklch, var(--pp-logo-card-surface) 99%, var(--background) 1%));
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--pp-logo-card-surface) 98%, var(--brand-paper) 2%),
+    color-mix(in oklch, var(--pp-logo-card-surface) 99%, var(--background) 1%)
+  );
   padding: 0.9rem;
   min-height: 100%;
 }
@@ -3231,10 +3731,15 @@ html[data-color-mode="dark"] .pp-preview-link {
   display: grid;
   align-items: center;
   min-height: 12rem;
-  border: 1px solid color-mix(in oklch, var(--pp-logo-card-border) 72%, transparent);
+  border: 1px solid
+    color-mix(in oklch, var(--pp-logo-card-border) 72%, transparent);
   border-radius: 1.25rem;
   background:
-    radial-gradient(circle at 50% 18%, color-mix(in oklch, white 9%, transparent), transparent 30%),
+    radial-gradient(
+      circle at 50% 18%,
+      color-mix(in oklch, white 9%, transparent),
+      transparent 30%
+    ),
     var(--pp-logo-canvas-bg);
   padding: 0.85rem;
   box-shadow: inset 0 1px 0 color-mix(in oklch, white 20%, transparent);
@@ -3255,7 +3760,8 @@ html[data-color-mode="dark"] .pp-preview-link {
 .pp-logo-meta div {
   display: grid;
   gap: 0.2rem;
-  border: 1px solid color-mix(in oklch, var(--pp-logo-card-border) 72%, transparent);
+  border: 1px solid
+    color-mix(in oklch, var(--pp-logo-card-border) 72%, transparent);
   border-radius: 1rem;
   background: color-mix(in oklch, var(--background) 94%, var(--card) 6%);
   padding: 0.7rem 0.8rem;
@@ -3283,10 +3789,14 @@ html[data-color-mode="dark"] .pp-preview-link {
 }
 
 .pp-logo-download-button {
-  border: 1px solid color-mix(in oklch, var(--pp-logo-card-border) 80%, transparent);
+  border: 1px solid
+    color-mix(in oklch, var(--pp-logo-card-border) 80%, transparent);
   border-radius: 999px;
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--background) 96%, var(--card) 4%), color-mix(in oklch, var(--background) 94%, var(--card) 6%));
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--background) 96%, var(--card) 4%),
+    color-mix(in oklch, var(--background) 94%, var(--card) 6%)
+  );
   padding: 0.78rem 0.95rem;
   font-size: 0.68rem;
   line-height: 1;
@@ -3302,14 +3812,24 @@ html[data-color-mode="dark"] .pp-preview-link {
 
 .pp-logo-download-button:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in oklch, var(--rg-node-stroke) 44%, var(--pp-logo-card-border) 56%);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--background) 72%, transparent), color-mix(in oklch, var(--accent) 14%, var(--background) 86%));
+  border-color: color-mix(
+    in oklch,
+    var(--rg-node-stroke) 44%,
+    var(--pp-logo-card-border) 56%
+  );
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--background) 72%, transparent),
+    color-mix(in oklch, var(--accent) 14%, var(--background) 86%)
+  );
 }
 
 .pp-logo-root[data-logo-theme="mono"] .pp-logo-download-button {
-  background:
-    linear-gradient(180deg, color-mix(in oklch, white 94%, transparent), color-mix(in oklch, white 88%, transparent));
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, white 94%, transparent),
+    color-mix(in oklch, white 88%, transparent)
+  );
 }
 
 .pp-demo-grid {
@@ -3323,9 +3843,13 @@ html[data-color-mode="dark"] .pp-preview-link {
   border: 1px solid var(--border);
   border-radius: 2rem;
   padding: 1rem;
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--card) 98%, var(--brand-paper) 2%), color-mix(in oklch, var(--card) 99%, var(--background) 1%));
-  box-shadow: 0 30px 90px -52px color-mix(in oklch, var(--brand-ink) 70%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--card) 98%, var(--brand-paper) 2%),
+    color-mix(in oklch, var(--card) 99%, var(--background) 1%)
+  );
+  box-shadow: 0 30px 90px -52px
+    color-mix(in oklch, var(--brand-ink) 70%, transparent);
   backdrop-filter: blur(18px);
 }
 
@@ -3505,6 +4029,32 @@ html[data-color-mode="dark"] .pp-preview-link {
   width: 100%;
   height: 100%;
   overflow: visible;
+}
+
+.pp-footer-voxel-scene > .rg-scene-error {
+  display: none;
+}
+
+.pp-footer-voxel-scene[data-scene-failed="true"] {
+  position: relative;
+}
+
+.pp-footer-voxel-scene[data-scene-failed="true"]::before {
+  content: "";
+  display: block;
+  width: 1.32rem;
+  height: 1.32rem;
+  border-radius: 0.32rem;
+  border: 1px solid
+    color-mix(in oklch, var(--border) 76%, var(--foreground) 24%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, white 42%, var(--card-voxel) 58%),
+    var(--card-voxel)
+  );
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, white 18%, transparent),
+    0 5px 14px -10px color-mix(in oklch, var(--brand-ink) 46%, transparent);
 }
 
 .pp-footer-voxel-toggle .pp-footer-voxel-scene {
@@ -3801,7 +4351,6 @@ html[data-color-mode="dark"] .pp-preview-link {
   .pp-product-cli-grid--two-up {
     grid-template-columns: 1fr;
   }
-
 }
 
 @media (max-width: 980px) {
@@ -3863,8 +4412,12 @@ html[data-color-mode="dark"] .pp-preview-link {
   }
 
   .pp-entry-card.rg-regent-theme-autolaunch .pp-card-depth-stage,
-  .pp-home-card-grid > .pp-entry-card.rg-regent-theme-techtree .pp-card-depth-stage,
-  .pp-home-card-grid > .pp-entry-card.rg-regent-theme-autolaunch .pp-card-depth-stage {
+  .pp-home-card-grid
+    > .pp-entry-card.rg-regent-theme-techtree
+    .pp-card-depth-stage,
+  .pp-home-card-grid
+    > .pp-entry-card.rg-regent-theme-autolaunch
+    .pp-card-depth-stage {
     block-size: clamp(16.5rem, 46vw, 19rem);
     min-block-size: clamp(16.5rem, 46vw, 19rem);
   }
@@ -4025,8 +4578,12 @@ html[data-color-mode="dark"] .pp-preview-link {
   }
 
   .pp-entry-card.rg-regent-theme-autolaunch .pp-card-depth-stage,
-  .pp-home-card-grid > .pp-entry-card.rg-regent-theme-techtree .pp-card-depth-stage,
-  .pp-home-card-grid > .pp-entry-card.rg-regent-theme-autolaunch .pp-card-depth-stage {
+  .pp-home-card-grid
+    > .pp-entry-card.rg-regent-theme-techtree
+    .pp-card-depth-stage,
+  .pp-home-card-grid
+    > .pp-entry-card.rg-regent-theme-autolaunch
+    .pp-card-depth-stage {
     block-size: clamp(15.25rem, 63vw, 18rem);
     min-block-size: clamp(15.25rem, 63vw, 18rem);
   }
@@ -4081,13 +4638,25 @@ html[data-color-mode="dark"] .pp-preview-link {
     padding-right: 0.72rem;
   }
 
-  .pp-home-card-grid > .pp-entry-card.rg-regent-theme-techtree .pp-card-surface .rg-surface-scene > svg,
-  .pp-home-card-grid > .pp-entry-card.rg-regent-theme-autolaunch .pp-card-surface .rg-surface-scene > svg {
+  .pp-home-card-grid
+    > .pp-entry-card.rg-regent-theme-techtree
+    .pp-card-surface
+    .rg-surface-scene
+    > svg,
+  .pp-home-card-grid
+    > .pp-entry-card.rg-regent-theme-autolaunch
+    .pp-card-surface
+    .rg-surface-scene
+    > svg {
     transform: scale(0.9);
     transform-origin: center center;
   }
 
-  .pp-home-card-grid > .pp-entry-card.rg-regent-theme-platform .pp-card-surface .rg-surface-scene > svg {
+  .pp-home-card-grid
+    > .pp-entry-card.rg-regent-theme-platform
+    .pp-card-surface
+    .rg-surface-scene
+    > svg {
     transform: scale(0.68) translateY(-0.65rem);
     transform-origin: center center;
   }
@@ -4196,8 +4765,16 @@ html[data-color-mode="dark"] .pp-preview-link {
 }
 
 .pp-heerich-shell-route {
-  --pp-heerich-shell-panel-bg: color-mix(in oklch, var(--brand-paper) 88%, white 12%);
-  --pp-heerich-shell-panel-border: color-mix(in oklch, var(--brand-gold) 28%, var(--border) 72%);
+  --pp-heerich-shell-panel-bg: color-mix(
+    in oklch,
+    var(--brand-paper) 88%,
+    white 12%
+  );
+  --pp-heerich-shell-panel-border: color-mix(
+    in oklch,
+    var(--brand-gold) 28%,
+    var(--border) 72%
+  );
   --pp-heerich-shell-panel-shadow: 0 1.5rem 5rem rgba(6, 18, 30, 0.24);
   --pp-heerich-shell-centerwash-color: rgba(251, 244, 222, 0.88);
   --pp-heerich-shell-centerwash-edge: rgba(251, 244, 222, 0);
@@ -4207,7 +4784,11 @@ html[data-color-mode="dark"] .pp-preview-link {
   overflow: clip;
   isolation: isolate;
   background:
-    radial-gradient(circle at 50% -12%, rgba(212, 167, 86, 0.28), transparent 34%),
+    radial-gradient(
+      circle at 50% -12%,
+      rgba(212, 167, 86, 0.28),
+      transparent 34%
+    ),
     linear-gradient(180deg, rgba(9, 31, 48, 0.96), rgba(4, 18, 31, 1));
   color: var(--foreground);
 }
@@ -4217,9 +4798,21 @@ html[data-color-mode="dark"] .pp-preview-link {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 50% 12%, rgba(251, 244, 222, 0.16), transparent 24%),
-    radial-gradient(circle at 14% 28%, rgba(212, 167, 86, 0.14), transparent 26%),
-    radial-gradient(circle at 86% 28%, rgba(212, 167, 86, 0.14), transparent 26%);
+    radial-gradient(
+      circle at 50% 12%,
+      rgba(251, 244, 222, 0.16),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at 14% 28%,
+      rgba(212, 167, 86, 0.14),
+      transparent 26%
+    ),
+    radial-gradient(
+      circle at 86% 28%,
+      rgba(212, 167, 86, 0.14),
+      transparent 26%
+    );
   opacity: 0.95;
   pointer-events: none;
   z-index: 0;
@@ -4246,8 +4839,9 @@ html[data-color-mode="dark"] .pp-preview-link {
   position: absolute;
   inset: -6% -4% -4%;
   transform-origin: center top;
-  filter:
-    drop-shadow(0 0 3rem rgba(212, 167, 86, calc(var(--pp-demo2-glow) * 0.42)))
+  filter: drop-shadow(
+      0 0 3rem rgba(212, 167, 86, calc(var(--pp-demo2-glow) * 0.42))
+    )
     drop-shadow(0 0 5rem rgba(8, 31, 48, 0.48));
 }
 
@@ -4262,8 +4856,12 @@ html[data-color-mode="dark"] .pp-preview-link {
   bottom: 26%;
   left: var(--pp-demo2-beam-left, 22%);
   width: clamp(6rem, 12vw, 10rem);
-  background:
-    linear-gradient(180deg, rgba(251, 244, 222, 0.54), rgba(212, 167, 86, 0.18) 38%, transparent 82%);
+  background: linear-gradient(
+    180deg,
+    rgba(251, 244, 222, 0.54),
+    rgba(212, 167, 86, 0.18) 38%,
+    transparent 82%
+  );
   opacity: var(--pp-demo2-beam-opacity, 0.18);
   transform: translateX(-50%) skewX(-10deg);
   filter: blur(16px);
@@ -4282,7 +4880,8 @@ html[data-color-mode="dark"] .pp-preview-link {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: clamp(5.5rem, 10vw, 8rem) clamp(1rem, 4vw, 2.5rem) clamp(2rem, 5vw, 3.5rem);
+  padding: clamp(5.5rem, 10vw, 8rem) clamp(1rem, 4vw, 2.5rem)
+    clamp(2rem, 5vw, 3.5rem);
 }
 
 .pp-heerich-shell-centerwash {
@@ -4311,7 +4910,11 @@ html[data-color-mode="dark"] .pp-preview-link {
   width: min(100%, 64rem);
   padding: clamp(0.4rem, 1.4vw, 1rem);
   border: 1px solid var(--pp-heerich-shell-lane-border);
-  background: linear-gradient(180deg, rgba(251, 244, 222, 0.18), rgba(251, 244, 222, 0.06));
+  background: linear-gradient(
+    180deg,
+    rgba(251, 244, 222, 0.18),
+    rgba(251, 244, 222, 0.06)
+  );
   box-shadow: inset 0 1px 0 rgba(251, 244, 222, 0.18);
 }
 
@@ -4319,8 +4922,11 @@ html[data-color-mode="dark"] .pp-preview-link {
   display: grid;
   gap: 1rem;
   border: 1px solid var(--pp-heerich-shell-panel-border);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--pp-heerich-shell-panel-bg) 96%, white 4%), var(--pp-heerich-shell-panel-bg));
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--pp-heerich-shell-panel-bg) 96%, white 4%),
+    var(--pp-heerich-shell-panel-bg)
+  );
   box-shadow: var(--pp-heerich-shell-panel-shadow);
   padding: clamp(1.15rem, 2vw, 1.75rem);
 }
@@ -4364,36 +4970,71 @@ html[data-color-mode="dark"] .pp-preview-link {
 }
 
 html[data-color-mode="dark"] .pp-heerich-shell-route {
-  --pp-heerich-shell-panel-bg: color-mix(in oklch, var(--brand-ink) 90%, var(--brand-charcoal) 10%);
-  --pp-heerich-shell-panel-border: color-mix(in oklch, var(--brand-gold) 40%, rgba(251, 244, 222, 0.16) 60%);
+  --pp-heerich-shell-panel-bg: color-mix(
+    in oklch,
+    var(--brand-ink) 90%,
+    var(--brand-charcoal) 10%
+  );
+  --pp-heerich-shell-panel-border: color-mix(
+    in oklch,
+    var(--brand-gold) 40%,
+    rgba(251, 244, 222, 0.16) 60%
+  );
   --pp-heerich-shell-panel-shadow: 0 1.5rem 5rem rgba(0, 0, 0, 0.38);
   --pp-heerich-shell-centerwash-color: rgba(9, 24, 39, 0.82);
   --pp-heerich-shell-centerwash-edge: rgba(9, 24, 39, 0);
   --pp-heerich-shell-lane-border: rgba(212, 167, 86, 0.16);
   background:
-    radial-gradient(circle at 50% -12%, rgba(212, 167, 86, 0.2), transparent 34%),
+    radial-gradient(
+      circle at 50% -12%,
+      rgba(212, 167, 86, 0.2),
+      transparent 34%
+    ),
     linear-gradient(180deg, rgba(4, 15, 24, 0.98), rgba(2, 7, 14, 1));
 }
 
 html[data-color-mode="dark"] .pp-heerich-shell-route::before {
   background:
-    radial-gradient(circle at 50% 10%, rgba(251, 244, 222, 0.06), transparent 22%),
-    radial-gradient(circle at 14% 28%, rgba(212, 167, 86, 0.09), transparent 24%),
-    radial-gradient(circle at 86% 28%, rgba(212, 167, 86, 0.09), transparent 24%);
+    radial-gradient(
+      circle at 50% 10%,
+      rgba(251, 244, 222, 0.06),
+      transparent 22%
+    ),
+    radial-gradient(
+      circle at 14% 28%,
+      rgba(212, 167, 86, 0.09),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at 86% 28%,
+      rgba(212, 167, 86, 0.09),
+      transparent 24%
+    );
 }
 
 html[data-color-mode="dark"] .pp-heerich-shell-lane {
-  background: linear-gradient(180deg, rgba(251, 244, 222, 0.05), rgba(251, 244, 222, 0.02));
+  background: linear-gradient(
+    180deg,
+    rgba(251, 244, 222, 0.05),
+    rgba(251, 244, 222, 0.02)
+  );
   box-shadow: inset 0 1px 0 rgba(251, 244, 222, 0.08);
 }
 
 html[data-color-mode="dark"] .pp-heerich-shell-panel {
-  background:
-    linear-gradient(180deg, rgba(8, 22, 36, 0.92), rgba(4, 13, 24, 0.94));
+  background: linear-gradient(
+    180deg,
+    rgba(8, 22, 36, 0.92),
+    rgba(4, 13, 24, 0.94)
+  );
 }
 
 html[data-color-mode="dark"] .pp-heerich-shell-list li {
-  color: color-mix(in oklch, var(--brand-paper) 78%, var(--muted-foreground) 22%);
+  color: color-mix(
+    in oklch,
+    var(--brand-paper) 78%,
+    var(--muted-foreground) 22%
+  );
 }
 
 @media (max-width: 960px) {

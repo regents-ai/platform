@@ -591,16 +591,16 @@ defmodule PlatformPhx.AgentPlatform.Formation do
       |> AgentPlatform.normalize_slug()
 
     success_path =
-      "/agent-formation?" <>
+      "/app/formation?" <>
         URI.encode_query(
-          %{"stage" => "setup", "billing" => "success"}
+          %{"billing" => "success"}
           |> maybe_put_claimed_label(claimed_label)
         )
 
     cancel_path =
-      "/agent-formation?" <>
+      "/app/billing?" <>
         URI.encode_query(
-          %{"stage" => "setup", "billing" => "cancel"}
+          %{"billing" => "cancel"}
           |> maybe_put_claimed_label(claimed_label)
         )
 

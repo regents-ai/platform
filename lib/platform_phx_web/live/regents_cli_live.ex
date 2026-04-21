@@ -2,6 +2,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
   use PlatformPhxWeb, :live_view
 
   alias PlatformPhxWeb.RegentCliCatalog
+  alias PlatformPhxWeb.PublicPageCatalog
 
   @impl true
   def mount(_params, _session, socket) do
@@ -29,17 +30,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
      |> assign(:guidance, guidance)
      |> assign(
        :page_markdown,
-       cli_markdown(%{
-         intro: intro,
-         quick_start: quick_start,
-         quick_start_note: quick_start_note,
-         techtree_start_intro: techtree_start_intro,
-         techtree_start_steps: techtree_start_steps,
-         mental_model: mental_model,
-         common_rules: common_rules,
-         first_command_groups: first_command_groups,
-         guidance: guidance
-       })
+       PublicPageCatalog.cli_markdown()
      )}
   end
 
@@ -51,7 +42,9 @@ defmodule PlatformPhxWeb.RegentCliLive do
       current_scope={assigns[:current_scope]}
       current_human={assigns[:current_human]}
       chrome={:app}
-      active_nav="regents-cli"
+      active_nav="cli"
+      header_eyebrow="CLI"
+      header_title="Regents CLI"
       theme_class="rg-regent-theme-platform"
     >
       <div
@@ -178,94 +171,5 @@ defmodule PlatformPhxWeb.RegentCliLive do
       </div>
     </Layouts.app>
     """
-  end
-
-  defp cli_markdown(%{
-         intro: intro,
-         quick_start: quick_start,
-         quick_start_note: quick_start_note,
-         techtree_start_intro: techtree_start_intro,
-         techtree_start_steps: techtree_start_steps,
-         mental_model: mental_model,
-         common_rules: common_rules,
-         first_command_groups: first_command_groups,
-         guidance: guidance
-       }) do
-    [
-      "# Regents CLI",
-      "",
-      intro,
-      "",
-      "## Quick start",
-      "",
-      "```bash",
-      quick_start,
-      "```",
-      "",
-      quick_start_note,
-      "",
-      "## Start with `regent techtree start`",
-      "",
-      techtree_start_intro,
-      ""
-    ]
-    |> Kernel.++(Enum.map(techtree_start_steps, &"- #{&1}"))
-    |> Kernel.++([
-      "",
-      "## Mental model",
-      "",
-      "The CLI handles local work. The Regent website handles guided account and company setup.",
-      ""
-    ])
-    |> Kernel.++(
-      Enum.map(mental_model, fn fragments ->
-        "- #{fragments_to_markdown(fragments)}"
-      end)
-    )
-    |> Kernel.++([
-      "",
-      "## Common rules",
-      ""
-    ])
-    |> Kernel.++(Enum.map(common_rules, &"- #{fragments_to_markdown(&1)}"))
-    |> Kernel.++([
-      "",
-      "## First commands to know",
-      ""
-    ])
-    |> Kernel.++(
-      Enum.flat_map(first_command_groups, fn group ->
-        [
-          "### #{group.title}",
-          "",
-          "```bash",
-          Enum.join(group.commands, "\n"),
-          "```",
-          "",
-          fragments_to_markdown(group.body_fragments),
-          ""
-        ]
-      end)
-    )
-    |> Kernel.++([
-      "## Guidance for humans and agents",
-      ""
-    ])
-    |> Kernel.++(Enum.map(guidance, &"- #{fragments_to_markdown(&1)}"))
-    |> List.flatten()
-    |> Enum.join("\n")
-  end
-
-  defp fragments_to_markdown(fragments) when is_list(fragments) do
-    fragments
-    |> Enum.map(fn fragment ->
-      case fragment.type do
-        :text -> fragment.text
-        :code -> "`#{fragment.text}`"
-        :highlight -> fragment.text
-        :link -> "[#{fragment.label}](#{fragment.href})"
-      end
-    end)
-    |> Enum.join()
   end
 end

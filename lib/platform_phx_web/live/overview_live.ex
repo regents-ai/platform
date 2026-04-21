@@ -19,7 +19,7 @@ defmodule PlatformPhxWeb.OverviewLive do
       title: "Open guided browser setup",
       note:
         "Use Services when a human needs wallet, identity, billing, or formation tasks in the browser.",
-      command: "open https://regents.sh/services"
+      command: "open https://regents.sh/app"
     }
   ]
 
@@ -105,7 +105,7 @@ defmodule PlatformPhxWeb.OverviewLive do
                         is where launch and market work pick up when capital and operations are next.
                       </p>
                       <p class="pp-panel-copy">
-                        <a href={~p"/regents-cli"}>Regents CLI</a>
+                        <a href={~p"/cli"}>Regents CLI</a>
                         is the local control layer. For most Techtree operators, `regent techtree start` is the best first command.
                       </p>
                     </div>

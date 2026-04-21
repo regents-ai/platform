@@ -74,22 +74,22 @@ defmodule PlatformPhxWeb.AutolaunchLive do
             <article class="pp-route-panel pp-product-panel pp-product-panel--feature">
               <p class="pp-home-kicker">Purpose</p>
               <h2 class="pp-route-panel-title">
-                Autolaunch helps agents raise capital before they scale.
+                Turn agent edge into runway.
               </h2>
               <p class="pp-panel-copy">
-                It covers the launch path from prelaunch planning through Uniswap CCA auctions, bid and position tracking,
-                claims, exits, revsplit accounting, and post-launch operator work.
+                Launch a market around a real agent and bring in aligned backers before compute and
+                API bills set the pace.
               </p>
               <p class="pp-panel-copy">
-                Autolaunch lets an agent with a real edge preseed revenue, fund API and server costs, and start the climb.
+                Buyers bring a budget and a price cap, so the sale rewards conviction more than
+                click speed.
               </p>
               <p class="pp-panel-copy">
-                Each launch runs through a fair CCA auction on Ethereum mainnet and pairs with a revsplit contract that
-                tracks revenue sharing for the token.
+                After the sale, the same product keeps claims, staking, and revenue in one place.
               </p>
               <p class="pp-panel-copy">
-                Autolaunch requires ERC-8004 registration before launch and supports optional ENS and World rails for
-                stronger trust around the agent behind the token.
+                The goal is simple: give a strong agent the capital and staying power to keep
+                improving.
               </p>
             </article>
 
@@ -126,21 +126,30 @@ defmodule PlatformPhxWeb.AutolaunchLive do
             <article class="pp-route-panel pp-product-panel">
               <p class="pp-home-kicker">Agent Skill</p>
               <h2 class="pp-route-panel-title">
-                For your Openclaw or Hermes agent:
+                Give the agent the launch playbook before capital is at risk.
               </h2>
-              <blockquote class="pp-route-quote">
-                [Autolaunch skill.md coming soon]
-              </blockquote>
+              <p class="pp-panel-copy">
+                The skill explains when to stay in the website, when to move into the CLI, and how
+                treasury, fees, and long-term revenue fit together.
+              </p>
+              <div class="pp-link-row">
+                <a
+                  href={~p"/agent-skills/regents-cli.md"}
+                  class="pp-link-button pp-link-button-slim"
+                >
+                  Open Regents CLI skill <span aria-hidden="true">↗</span>
+                </a>
+              </div>
             </article>
 
             <article class="pp-route-panel pp-product-panel">
               <p class="pp-home-kicker">Preview</p>
               <h2 class="pp-route-panel-title">
-                Open the live Autolaunch surface, or inspect the repo that runs it.
+                Open the live market, or inspect the repo behind it.
               </h2>
               <p class="pp-panel-copy">
-                Autolaunch is live at autolaunch.sh. The repo remains the active place to inspect the Phoenix
-                app, local Foundry workspace, and the trust and lifecycle logic behind the market surface.
+                Autolaunch is live at autolaunch.sh. The repo is where the operator docs, contract
+                rules, and launch flow live in full.
               </p>
               <div class="pp-link-row">
                 <.preview_link variant="pill" href="https://autolaunch.sh">
@@ -162,7 +171,7 @@ defmodule PlatformPhxWeb.AutolaunchLive do
             <article class="pp-route-panel pp-product-panel pp-route-panel-span">
               <p class="pp-home-kicker">CLI rails</p>
               <h2 class="pp-route-panel-title">
-                Real Regent commands for launch planning, auctions, and operator follow-up.
+                The short path for operators and agents.
               </h2>
               <div class="pp-product-cli-grid pp-product-cli-grid--two-up">
                 <%= for command <- autolaunch_cli_examples() do %>
@@ -239,43 +248,43 @@ defmodule PlatformPhxWeb.AutolaunchLive do
     [
       %{
         command: "regent autolaunch prelaunch wizard",
-        description: "Builds the launch plan before anything is published onchain."
+        description: "Shape the raise before anything goes live."
       },
       %{
         command: "regent autolaunch prelaunch publish",
-        description: "Publishes the prepared launch metadata and assets."
+        description: "Publish the launch brief and sale assets."
       },
       %{
         command: "regent autolaunch launch run",
-        description: "Starts the real launch execution path from the saved plan."
+        description: "Start the raise from the saved plan."
       },
       %{
         command: "regent autolaunch launch monitor",
-        description: "Tracks lifecycle state while the launch is in motion."
+        description: "Track what needs attention while the sale is live."
       },
       %{
         command: "regent autolaunch launch finalize",
-        description: "Handles the post-auction finalize and settlement follow-up."
+        description: "Settle the launch and move into the market."
       },
       %{
         command: "regent autolaunch auctions list",
-        description: "Lists the planned and recent market surface."
+        description: "See what people can back right now."
       },
       %{
         command: "regent autolaunch bids quote",
-        description: "Computes bid terms before funds are committed."
+        description: "Check the numbers before committing funds."
       },
       %{
         command: "regent autolaunch bids place",
-        description: "Places an auction bid through the operator rail once access opens."
+        description: "Back an agent from the market rail."
       },
       %{
         command: "regent autolaunch positions list",
-        description: "Shows the positions an operator can later claim, exit, or track."
+        description: "Track what can be claimed, exited, or returned."
       },
       %{
         command: "regent autolaunch trust x-link --agent <id>",
-        description: "Runs the X trust follow-up helper for one agent identity."
+        description: "Add public proof around the agent when it matters."
       }
     ]
   end

@@ -301,7 +301,7 @@ defmodule PlatformPhxWeb.AgentPlatformComponents do
                     rel="noreferrer"
                     class="inline-flex items-center gap-2 text-sm text-[color:var(--link-color)] underline decoration-[color:var(--link-underline)] underline-offset-4"
                   >
-                    View public output <span aria-hidden="true">↗</span>
+                    Open public page <span aria-hidden="true">↗</span>
                   </a>
                 </div>
               </section>

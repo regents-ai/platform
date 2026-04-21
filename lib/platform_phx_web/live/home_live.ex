@@ -4,64 +4,10 @@ defmodule PlatformPhxWeb.HomeLive do
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Formation
   alias PlatformPhxWeb.AgentPlatformComponents
+  import PlatformPhxWeb.AppComponents
   alias PlatformPhxWeb.CompanyRoomComponents
   alias PlatformPhxWeb.CompanyRoomSupport
-  alias PlatformPhxWeb.RegentScenes
-
-  @card_specs [
-    %{
-      id: "techtree",
-      theme: "techtree",
-      theme_class: "rg-regent-theme-techtree",
-      logo_path: "/images/techtree-logo.png",
-      eyebrow: "Shared Research and Eval Tree",
-      title: "Techtree",
-      cta_label: "Research",
-      description_fragments: [
-        %{
-          type: :text,
-          text:
-            "Do local research, publish work, and move through BBH with Regents CLI. First tech: "
-        },
-        %{
-          type: :link,
-          href: "https://huggingface.co/datasets/nvidia/Nemotron-RL-bixbench_hypothesis",
-          label: "BBH-Train"
-        },
-        %{
-          type: :text,
-          text: " benchmark by Nvidia."
-        }
-      ],
-      href: "/techtree"
-    },
-    %{
-      id: "autolaunch",
-      theme: "autolaunch",
-      theme_class: "rg-regent-theme-autolaunch",
-      logo_path: "/images/autolaunch-logo.png",
-      eyebrow: "Raise agent capital",
-      title: "Autolaunch",
-      cta_label: "Revenue",
-      description:
-        "Plan launches, track auctions, and follow launch progress across the web view and Regents CLI commands.",
-      href: "/autolaunch"
-    },
-    %{
-      id: "dashboard",
-      theme: "platform",
-      theme_class: "rg-regent-theme-platform",
-      logo_path: "/images/regents-logo.png",
-      eyebrow: "Services",
-      title: "Services",
-      cta_label: "Open",
-      description:
-        "Sign in, check access, redeem passes, claim a name, add billing, and launch your company.",
-      href: "/services"
-    }
-  ]
-
-  @ticker_url "https://dexscreener.com/base/0x4ed3b69ac263ad86482f609b2c2105f64bcfd3a7e02e8e078ec9fec1f0324bed"
+  @install_command "pnpm add -g @regentslabs/cli"
 
   @impl true
   def mount(_params, session, socket) do
@@ -77,9 +23,9 @@ defmodule PlatformPhxWeb.HomeLive do
     {:ok,
      socket
      |> assign(:page_title, if(public_agent, do: public_agent.name, else: "Regents Labs"))
-     |> assign(:cards, build_cards())
+     |> assign(:base_app_id, home_base_app_id(host, public_agent))
+     |> assign(:install_command, @install_command)
      |> assign(:current_host, host)
-     |> assign(:ticker_url, @ticker_url)
      |> assign(
        :public_agent,
        public_agent && AgentPlatform.serialize_agent(public_agent, :public)
@@ -92,29 +38,6 @@ defmodule PlatformPhxWeb.HomeLive do
      )
      |> CompanyRoomSupport.assign_message_form()
      |> assign(:subdomain_missing?, is_nil(public_agent) and subdomain_request?(host))}
-  end
-
-  @impl true
-  def handle_event("regent:node_select", %{"meta" => %{"navigate" => path}}, socket)
-      when is_binary(path) do
-    {:noreply, push_navigate(socket, to: path)}
-  end
-
-  def handle_event("regent:node_select", _params, socket), do: {:noreply, socket}
-
-  def handle_event(event, _params, socket)
-      when event in ["regent:node_hover", "regent:surface_ready"] do
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("regent:surface_error", _params, socket) do
-    {:noreply,
-     put_flash(
-       socket,
-       :error,
-       "One of the Regent entry surfaces could not render in this browser session."
-     )}
   end
 
   @impl true
@@ -262,72 +185,236 @@ defmodule PlatformPhxWeb.HomeLive do
                 <p class="pp-home-kicker">Subdomain not active</p>
                 <h1 class="pp-route-panel-title">No published agent lives on this host yet.</h1>
                 <p class="pp-panel-copy">
-                  Claim a name, finish Agent Formation, and publish the company page before this host goes live.
+                  Claim a name, finish company setup, and publish the company page before this host goes live.
                 </p>
                 <div class="pp-link-row">
-                  <.link navigate={~p"/agent-formation"} class="pp-link-button pp-link-button-slim">
-                    Open Agent Formation <span aria-hidden="true">→</span>
+                  <.link navigate={~p"/app"} class="pp-link-button pp-link-button-slim">
+                    Open app <span aria-hidden="true">→</span>
                   </.link>
                 </div>
               </section>
             <% else %>
-              <header class="pp-home-header" data-home-header>
-                <div class="pp-home-brand-lockup">
-                  <h1 class="pp-home-title pp-home-title--compact">Regents Labs</h1>
-                  <a
-                    href={@ticker_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    class="pp-home-ticker-link"
-                    data-background-suppress
+              <div class="mx-auto flex w-full max-w-[1320px] flex-col gap-10 px-4 py-4 sm:px-6 lg:px-8">
+                <header class="flex flex-wrap items-center justify-between gap-4">
+                  <.link
+                    navigate={~p"/"}
+                    class="flex items-center gap-3 text-[color:var(--foreground)]"
                   >
-                    <span>$REGENT</span>
-                    <span class="pp-home-ticker-icon" aria-hidden="true">
-                      <svg viewBox="0 0 16 16" fill="none">
-                        <path
-                          d="M5 11 11 5M6 5h5v5"
-                          stroke="currentColor"
-                          stroke-width="1.2"
-                          stroke-linecap="square"
-                          stroke-linejoin="miter"
-                        />
-                      </svg>
-                    </span>
-                  </a>
-                </div>
-              </header>
+                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-[color:var(--card)]">
+                      <img
+                        src={~p"/images/regents-logo.png"}
+                        alt="Regents"
+                        class="h-9 w-9 rounded-xl object-cover"
+                      />
+                    </div>
+                    <span class="font-display text-[1.8rem] leading-none">Regents</span>
+                  </.link>
 
-              <section class="pp-home-card-grid" aria-label="Regent surfaces">
-                <%= for card <- @cards do %>
-                  <.entry_card card={card} variant="home" />
-                <% end %>
-              </section>
+                  <div class="flex flex-wrap items-center gap-3 text-sm text-[color:var(--foreground)]">
+                    <.link
+                      navigate={~p"/"}
+                      class="rounded-full border border-[color:var(--border)] px-4 py-2"
+                    >
+                      Regents
+                    </.link>
+                    <.link
+                      navigate={~p"/techtree"}
+                      class="rounded-full border border-[color:var(--border)] px-4 py-2"
+                    >
+                      Techtree
+                    </.link>
+                    <.link
+                      navigate={~p"/autolaunch"}
+                      class="rounded-full border border-[color:var(--border)] px-4 py-2"
+                    >
+                      Autolaunch
+                    </.link>
+                    <.link
+                      navigate={~p"/cli"}
+                      class="rounded-full border border-[color:var(--border)] px-4 py-2"
+                    >
+                      CLI
+                    </.link>
+                    <.link
+                      navigate={~p"/docs"}
+                      class="rounded-full border border-[color:var(--border)] px-4 py-2"
+                    >
+                      Docs
+                    </.link>
+                    <.link
+                      navigate={~p"/app"}
+                      id="home-nav-open-app"
+                      class="pp-home-nav-cta"
+                    >
+                      {if @current_human, do: "Resume formation", else: "Open app"}
+                    </.link>
+                  </div>
+                </header>
 
-              <footer class="pp-home-footer" data-platform-card>
-                <p class="pp-home-footer-copy">&copy; Regents Labs 2026</p>
+                <main class="space-y-10">
+                  <section
+                    class="relative overflow-hidden rounded-[2rem] border border-[color:var(--border)] bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_94%,var(--background)_6%),color-mix(in_oklch,var(--background)_88%,var(--card)_12%))] p-6 shadow-[0_28px_90px_-60px_color-mix(in_oklch,var(--brand-ink)_45%,transparent)] sm:p-8 lg:p-10"
+                    data-home-hero
+                  >
+                    <div class="absolute inset-0 opacity-70" aria-hidden="true">
+                      <div
+                        id="home-voxel-background-canvas"
+                        class="h-full w-full"
+                        phx-hook="VoxelBackground"
+                        data-voxel-background="home"
+                      >
+                      </div>
+                    </div>
 
-                <Layouts.footer_social_links />
-              </footer>
+                    <div class="relative z-10 grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(18rem,0.95fr)] lg:items-end">
+                      <div class="space-y-6" data-home-header>
+                        <p class="text-[10px] uppercase tracking-[0.24em] text-[color:var(--muted-foreground)]">
+                          Hosted company surface for your agent
+                        </p>
+                        <h1 class="font-display text-[clamp(3.2rem,9vw,6.4rem)] leading-[0.88] text-[color:var(--foreground)]">
+                          Form your agent company.
+                        </h1>
+                        <p class="max-w-[48rem] text-base leading-7 text-[color:var(--muted-foreground)]">
+                          Open the hosted Regent company here. Improve the agent in Techtree, then use Autolaunch when funding comes next.
+                        </p>
+
+                        <.home_command command={@install_command} label="Copy install command" />
+
+                        <div class="flex flex-wrap gap-3" data-home-actions>
+                          <.link
+                            navigate={~p"/app"}
+                            id="home-primary-cta"
+                            class="pp-home-primary-cta"
+                          >
+                            <span>{if @current_human, do: "Resume formation", else: "Open app"}</span>
+                            <span aria-hidden="true" class="pp-home-primary-cta-arrow">→</span>
+                          </.link>
+                          <.link
+                            navigate={~p"/cli"}
+                            class="pp-home-secondary-cta"
+                          >
+                            View CLI
+                          </.link>
+                        </div>
+                      </div>
+
+                      <div
+                        class="relative rounded-[1.7rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_84%,var(--card)_16%)] p-5"
+                        data-home-panel
+                      >
+                        <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
+                          The path
+                        </p>
+                        <div class="mt-4 grid gap-3">
+                          <div
+                            class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4"
+                            data-home-step
+                          >
+                            <p class="font-display text-xl text-[color:var(--foreground)]">1. Form</p>
+                            <p class="mt-2 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                              Claim identity, add billing, and open the company.
+                            </p>
+                          </div>
+                          <div
+                            class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4"
+                            data-home-step
+                          >
+                            <p class="font-display text-xl text-[color:var(--foreground)]">
+                              2. Improve
+                            </p>
+                            <p class="mt-2 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                              Use Techtree for research, publishing, and collaboration.
+                            </p>
+                          </div>
+                          <div
+                            class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4"
+                            data-home-step
+                          >
+                            <p class="font-display text-xl text-[color:var(--foreground)]">3. Fund</p>
+                            <p class="mt-2 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                              Use Autolaunch when launch planning and capital come next.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section class="space-y-4" data-home-section>
+                    <div class="space-y-3">
+                      <p class="text-[10px] uppercase tracking-[0.24em] text-[color:var(--muted-foreground)]">
+                        What this page gives you
+                      </p>
+                      <h2 class="font-display text-[clamp(2rem,5vw,3.2rem)] leading-[0.94] text-[color:var(--foreground)]">
+                        One place to open the company, then move on when the next step is ready.
+                      </h2>
+                    </div>
+                    <.home_capability_grid />
+                  </section>
+
+                  <section class="space-y-4" data-home-section>
+                    <div class="space-y-3">
+                      <p class="text-[10px] uppercase tracking-[0.24em] text-[color:var(--muted-foreground)]">
+                        Next surfaces
+                      </p>
+                      <h2 class="font-display text-[clamp(2rem,5vw,3.2rem)] leading-[0.94] text-[color:var(--foreground)]">
+                        Improve the agent in Techtree. Fund it in Autolaunch.
+                      </h2>
+                    </div>
+                    <.sister_project_cards />
+                  </section>
+
+                  <section
+                    class="rounded-[1.7rem] border border-[color:var(--border)] bg-[color:var(--card)] p-6"
+                    data-home-section
+                  >
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
+                          Operator quickstart
+                        </p>
+                        <p class="mt-3 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                          Install the CLI for machine work, open the app for guided company setup, or head to the docs when you need the reference surface.
+                        </p>
+                      </div>
+                      <div class="flex flex-wrap gap-3">
+                        <.link
+                          navigate={~p"/cli"}
+                          class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
+                        >
+                          View CLI
+                        </.link>
+                        <.link
+                          navigate={~p"/app"}
+                          class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
+                        >
+                          Open app
+                        </.link>
+                        <.link
+                          navigate={~p"/docs"}
+                          class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
+                        >
+                          Open docs
+                        </.link>
+                      </div>
+                    </div>
+                  </section>
+                </main>
+
+                <footer class="space-y-3 rounded-[1.7rem] border border-[color:var(--border)] bg-[color:var(--card)] px-6 py-5">
+                  <div class="flex flex-wrap items-center justify-between gap-3 text-sm text-[color:var(--muted-foreground)]">
+                    <p>&copy; Regents Labs 2026</p>
+                    <Layouts.footer_resource_links />
+                  </div>
+                  <Layouts.footer_social_links />
+                </footer>
+              </div>
             <% end %>
           </main>
         </div>
       </Layouts.app>
     <% end %>
     """
-  end
-
-  defp build_cards do
-    total = length(@card_specs)
-
-    Enum.with_index(@card_specs, fn card, index ->
-      scene = RegentScenes.home_scene(card.id)
-
-      card
-      |> Map.put(:scene, scene)
-      |> Map.put(:scene_version, scene["sceneVersion"] || 1)
-      |> Map.put(:sequence_index, index)
-      |> Map.put(:sequence_count, total)
-    end)
   end
 
   defp subdomain_request?(host) when is_binary(host) do
@@ -373,7 +460,7 @@ defmodule PlatformPhxWeb.HomeLive do
   defp owner_panel(_public_agent, _current_human), do: {nil, nil}
 
   defp launch_home_path(nil), do: nil
-  defp launch_home_path(agent), do: ~p"/agent-formation?stage=setup&claimedLabel=#{agent.slug}"
+  defp launch_home_path(agent), do: ~p"/app/formation?claimedLabel=#{agent.slug}"
 
   defp room_agent(%{slug: slug}, %{} = current_human),
     do: AgentPlatform.get_owned_agent(current_human, slug) || AgentPlatform.get_public_agent(slug)
@@ -517,4 +604,12 @@ defmodule PlatformPhxWeb.HomeLive do
   defp runtime_error_message({_, message}) when is_binary(message), do: message
   defp runtime_error_message(message) when is_binary(message), do: message
   defp runtime_error_message(reason), do: inspect(reason)
+
+  defp home_base_app_id(host, nil) when is_binary(host) do
+    if PlatformPhxWeb.SiteUrl.public_entry_host?(host) do
+      "698e58d4af60e86d051b5246"
+    end
+  end
+
+  defp home_base_app_id(_host, _public_agent), do: nil
 end
