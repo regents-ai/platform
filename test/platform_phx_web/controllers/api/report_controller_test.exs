@@ -14,6 +14,20 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
   @signed_registry_address "0x3333333333333333333333333333333333333333"
   @signed_token_id "77"
 
+  setup do
+    TestEthereumAdapter.put_owner(
+      @signed_registry_address,
+      @signed_token_id,
+      @signed_wallet_address
+    )
+
+    on_exit(fn ->
+      TestEthereumAdapter.delete_owner(@signed_registry_address, @signed_token_id)
+    end)
+
+    :ok
+  end
+
   test "bug endpoint stores and confirms a report", %{conn: conn} do
     response =
       conn

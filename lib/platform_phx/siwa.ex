@@ -11,6 +11,9 @@ defmodule PlatformPhx.Siwa do
   @signature_input_regex ~r/^sig1=\((?<components>.+)\)(?<params>(?:;.+)*)$/
   @signature_regex ~r/^sig1=:(?<payload>[A-Za-z0-9+\/=]+):$/
   @content_digest_regex ~r/^sha-256=:(?<payload>[A-Za-z0-9+\/=]+):$/
+  @domain "regent.cx"
+  @verify_uri "https://regent.cx/v1/agent/siwa/verify"
+  @supported_chain_ids [8453, 84532]
   @required_headers ~w(
     x-siwa-receipt
     signature
@@ -82,27 +85,25 @@ defmodule PlatformPhx.Siwa do
          :ok <- validate_siwa_message(message, wallet_address, chain_id, nonce),
          :ok <- verify_wallet_signature(wallet_address, message, signature),
          {:ok, nonce_record} <- consume_nonce(wallet_address, chain_id, nonce),
-         :ok <- ensure_nonce_identity(nonce_record, registry_address, token_id) do
+         :ok <- ensure_nonce_identity(nonce_record, registry_address, token_id),
+         :ok <- ensure_wallet_owns_agent(wallet_address, chain_id, registry_address, token_id),
+         {:ok, receipt} <-
+           issue_receipt(%{
+             "typ" => "siwa_receipt",
+             "jti" => Ecto.UUID.generate(),
+             "sub" => wallet_address,
+             "aud" => nonce_record.audience,
+             "iat" => now_unix_seconds(),
+             "exp" => now_unix_seconds() + receipt_ttl_seconds(),
+             "chain_id" => chain_id,
+             "nonce" => nonce,
+             "key_id" => wallet_address,
+             "registry_address" => nonce_record.registry_address,
+             "token_id" => nonce_record.token_id
+           }) do
       key_id = wallet_address
       issued_at_unix = now_unix_seconds()
       receipt_expires_at_unix = now_unix_seconds() + receipt_ttl_seconds()
-
-      claims =
-        %{
-          "typ" => "siwa_receipt",
-          "jti" => Ecto.UUID.generate(),
-          "sub" => wallet_address,
-          "aud" => nonce_record.audience,
-          "iat" => issued_at_unix,
-          "exp" => receipt_expires_at_unix,
-          "chain_id" => chain_id,
-          "nonce" => nonce,
-          "key_id" => key_id,
-          "registry_address" => nonce_record.registry_address,
-          "token_id" => nonce_record.token_id
-        }
-
-      receipt = issue_receipt(claims)
 
       {:ok,
        %{
@@ -206,23 +207,17 @@ defmodule PlatformPhx.Siwa do
   def content_digest_for_body(_body), do: nil
 
   defp validate_siwa_message(message, wallet_address, chain_id, nonce) do
-    normalized_message = String.trim(message)
+    with {:ok, parsed} <- parse_siwa_message(message),
+         true <- parsed.wallet_address == wallet_address,
+         true <- parsed.chain_id == chain_id,
+         true <- parsed.nonce == nonce do
+      :ok
+    else
+      {:error, reason} ->
+        {:error, {401, "signature_invalid", reason}}
 
-    cond do
-      not String.contains?(
-        normalized_message,
-        "regent.cx wants you to sign in with your Ethereum account:\n#{wallet_address}"
-      ) ->
-        {:error, {401, "signature_invalid", "message wallet address does not match request"}}
-
-      not String.contains?(normalized_message, "\nChain ID: #{chain_id}\n") ->
-        {:error, {401, "signature_invalid", "message chain id does not match request"}}
-
-      not String.contains?(normalized_message, "\nNonce: #{nonce}\n") ->
-        {:error, {401, "signature_invalid", "message nonce does not match request"}}
-
-      true ->
-        :ok
+      false ->
+        {:error, {401, "signature_invalid", "message does not match the requested SIWA claims"}}
     end
   end
 
@@ -410,15 +405,21 @@ defmodule PlatformPhx.Siwa do
   end
 
   defp verify_receipt(receipt, opts) when is_binary(receipt) do
-    with [header_segment, payload_segment, signature_segment] <-
+    with {:ok, secret} <- receipt_secret(),
+         [header_segment, payload_segment, signature_segment] <-
            String.split(receipt, ".", parts: 3),
-         true <- signature_segment == sign_token("#{header_segment}.#{payload_segment}"),
+         true <-
+           secure_compare(
+             signature_segment,
+             sign_token("#{header_segment}.#{payload_segment}", secret)
+           ),
          {:ok, claims} <- decode_claims(payload_segment),
          true <- claims["typ"] == "siwa_receipt",
          true <- claims["exp"] > now_unix_seconds(),
          :ok <- ensure_audience(claims, opts) do
       {:ok, claims}
     else
+      {:error, {_, _, _} = error} -> {:error, error}
       _ -> {:error, {401, "receipt_invalid", "invalid SIWA receipt"}}
     end
   end
@@ -576,14 +577,16 @@ defmodule PlatformPhx.Siwa do
   end
 
   defp issue_receipt(claims) do
-    header = base64url(%{"alg" => "HS256", "typ" => "JWT"})
-    payload = base64url(claims)
-    signature = sign_token("#{header}.#{payload}")
-    "#{header}.#{payload}.#{signature}"
+    with {:ok, secret} <- receipt_secret() do
+      header = base64url(%{"alg" => "HS256", "typ" => "JWT"})
+      payload = base64url(claims)
+      signature = sign_token("#{header}.#{payload}", secret)
+      {:ok, "#{header}.#{payload}.#{signature}"}
+    end
   end
 
-  defp sign_token(signing_input) do
-    :crypto.mac(:hmac, :sha256, receipt_secret(), signing_input)
+  defp sign_token(signing_input, secret) do
+    :crypto.mac(:hmac, :sha256, secret, signing_input)
     |> Base.url_encode64(padding: false)
   end
 
@@ -597,6 +600,67 @@ defmodule PlatformPhx.Siwa do
 
       :error ->
         {:error, :invalid}
+    end
+  end
+
+  defp parse_siwa_message(message) when is_binary(message) do
+    normalized_message = String.trim(message)
+    lines = String.split(normalized_message, "\n", trim: false)
+
+    with [header, wallet_address, "" | rest] <- lines,
+         true <- header == "#{@domain} wants you to sign in with your Ethereum account:",
+         {:ok, statement_lines, field_lines} <- split_statement_and_fields(rest),
+         {:ok, fields} <- parse_siwa_fields(field_lines),
+         :ok <- validate_siwa_fields(fields),
+         true <- Enum.all?(statement_lines, &(String.trim(&1) != "")) do
+      {:ok,
+       %{
+         wallet_address: String.downcase(String.trim(wallet_address)),
+         chain_id: parse_positive_integer!(fields["Chain ID"]),
+         nonce: fields["Nonce"],
+         issued_at: fields["Issued At"],
+         statement: Enum.join(statement_lines, "\n")
+       }}
+    else
+      false -> {:error, "message does not match the canonical SIWA format"}
+      _ -> {:error, "message does not match the canonical SIWA format"}
+    end
+  end
+
+  defp parse_siwa_message(_message),
+    do: {:error, "message does not match the canonical SIWA format"}
+
+  defp split_statement_and_fields(lines) do
+    {statement_lines, remainder} = Enum.split_while(lines, &(&1 != ""))
+
+    case remainder do
+      [] -> {:ok, statement_lines, lines}
+      [_blank | field_lines] -> {:ok, statement_lines, field_lines}
+    end
+  end
+
+  defp parse_siwa_fields(field_lines) do
+    Enum.reduce_while(field_lines, {:ok, %{}}, fn line, {:ok, acc} ->
+      case String.split(line, ": ", parts: 2) do
+        [key, value] when key != "" and value != "" ->
+          {:cont, {:ok, Map.put(acc, key, value)}}
+
+        _ ->
+          {:halt, {:error, :invalid}}
+      end
+    end)
+  end
+
+  defp validate_siwa_fields(fields) do
+    with "1" <- Map.get(fields, "Version"),
+         @verify_uri <- Map.get(fields, "URI"),
+         {:ok, _chain_id} <- parse_positive_integer(Map.get(fields, "Chain ID")),
+         {:ok, _nonce} <- required_value(Map.get(fields, "Nonce")),
+         {:ok, issued_at} <- required_value(Map.get(fields, "Issued At")),
+         {:ok, _datetime, 0} <- DateTime.from_iso8601(issued_at) do
+      :ok
+    else
+      _ -> {:error, "message does not match the canonical SIWA format"}
     end
   end
 
@@ -705,6 +769,40 @@ defmodule PlatformPhx.Siwa do
     }
   end
 
+  defp ensure_wallet_owns_agent(wallet_address, chain_id, registry_address, token_id) do
+    with {:ok, rpc_url} <- base_rpc_url_for_chain(chain_id),
+         {:ok, owner_address} <- Ethereum.owner_of(registry_address, token_id, rpc_url: rpc_url),
+         true <- owner_address == wallet_address do
+      :ok
+    else
+      false ->
+        {:error,
+         {401, "agent_identity_not_owned", "wallet does not own the claimed agent identity"}}
+
+      {:error, "unsupported chain"} ->
+        {:error, {401, "unsupported_chain", "SIWA sign-in only supports Base agent identities"}}
+
+      {:error, reason} ->
+        {:error,
+         {502, "agent_identity_lookup_failed", "could not verify agent ownership: #{reason}"}}
+    end
+  end
+
+  defp base_rpc_url_for_chain(chain_id) when chain_id in @supported_chain_ids do
+    case RuntimeConfig.base_rpc_url() do
+      value when is_binary(value) ->
+        case String.trim(value) do
+          "" -> {:error, "base rpc url is not configured"}
+          trimmed -> {:ok, trimmed}
+        end
+
+      _ ->
+        {:error, "base rpc url is not configured"}
+    end
+  end
+
+  defp base_rpc_url_for_chain(_chain_id), do: {:error, "unsupported chain"}
+
   defp ensure_tables! do
     if :ets.whereis(@nonce_table) == :undefined do
       :ets.new(@nonce_table, [:named_table, :public, :set])
@@ -716,9 +814,16 @@ defmodule PlatformPhx.Siwa do
   end
 
   defp receipt_secret do
-    :platform_phx
-    |> Application.get_env(:siwa, [])
-    |> Keyword.get(:receipt_secret, "platform-siwa-test-secret")
+    case :platform_phx |> Application.get_env(:siwa, []) |> Keyword.get(:receipt_secret) do
+      value when is_binary(value) ->
+        case String.trim(value) do
+          "" -> {:error, {500, "siwa_not_configured", "SIWA receipt secret is not configured"}}
+          secret -> {:ok, secret}
+        end
+
+      _ ->
+        {:error, {500, "siwa_not_configured", "SIWA receipt secret is not configured"}}
+    end
   end
 
   defp nonce_ttl_seconds do
@@ -737,4 +842,10 @@ defmodule PlatformPhx.Siwa do
 
   defp unix_to_iso8601(unix_seconds),
     do: unix_seconds |> DateTime.from_unix!() |> DateTime.to_iso8601()
+
+  defp secure_compare(left, right) when byte_size(left) == byte_size(right) do
+    Plug.Crypto.secure_compare(left, right)
+  end
+
+  defp secure_compare(_left, _right), do: false
 end

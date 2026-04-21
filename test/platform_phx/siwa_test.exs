@@ -10,6 +10,16 @@ defmodule PlatformPhx.SiwaTest do
   @registry_address "0x3333333333333333333333333333333333333333"
   @token_id "77"
 
+  setup do
+    TestEthereumAdapter.put_owner(@registry_address, @token_id, @wallet_address)
+
+    on_exit(fn ->
+      TestEthereumAdapter.delete_owner(@registry_address, @token_id)
+    end)
+
+    :ok
+  end
+
   test "signed requests reject expired signature windows" do
     receipt = verified_receipt()
     body = Jason.encode!(%{"summary" => "Expired request", "details" => "body binding"})
@@ -111,7 +121,7 @@ defmodule PlatformPhx.SiwaTest do
     created = System.os_time(:second)
     expires = created + 120
 
-    assert {:error, {401, "receipt_invalid", message}} =
+    assert {:error, {401, "receipt_binding_mismatch", message}} =
              Siwa.verify_http_request(
                %{
                  "method" => "POST",
@@ -122,7 +132,101 @@ defmodule PlatformPhx.SiwaTest do
                audience: "platform"
              )
 
-    assert message =~ "invalid SIWA receipt"
+    assert message =~ "audience"
+  end
+
+  test "shared sign-in rejects a wallet that does not own the claimed agent identity" do
+    TestEthereumAdapter.put_owner(
+      @registry_address,
+      @token_id,
+      "0x1111111111111111111111111111111111111111"
+    )
+
+    assert {:ok, %{"data" => %{"nonce" => nonce}}} =
+             Siwa.issue_nonce(%{
+               "wallet_address" => @wallet_address,
+               "chain_id" => @chain_id,
+               "registry_address" => @registry_address,
+               "token_id" => @token_id,
+               "audience" => "platform"
+             })
+
+    message = siwa_message(nonce)
+    signature = TestEthereumAdapter.sign_message(@wallet_address, message)
+
+    assert {:error, {401, "agent_identity_not_owned", message}} =
+             Siwa.verify_session(%{
+               "wallet_address" => @wallet_address,
+               "chain_id" => @chain_id,
+               "registry_address" => @registry_address,
+               "token_id" => @token_id,
+               "nonce" => nonce,
+               "message" => message,
+               "signature" => signature
+             })
+
+    assert message =~ "does not own"
+  end
+
+  test "shared sign-in rejects malformed canonical SIWA messages" do
+    assert {:ok, %{"data" => %{"nonce" => nonce}}} =
+             Siwa.issue_nonce(%{
+               "wallet_address" => @wallet_address,
+               "chain_id" => @chain_id,
+               "registry_address" => @registry_address,
+               "token_id" => @token_id,
+               "audience" => "platform"
+             })
+
+    bad_message =
+      """
+      regent.cx wants you to sign in with your Ethereum account:
+      #{@wallet_address}
+
+      URI: https://wrong.example.com/v1/agent/siwa/verify
+      Version: 1
+      Chain ID: #{@chain_id}
+      Nonce: #{nonce}
+      Issued At: 2026-04-16T00:00:00Z
+      """
+      |> String.trim()
+
+    assert {:error, {401, "signature_invalid", message}} =
+             Siwa.verify_session(%{
+               "wallet_address" => @wallet_address,
+               "chain_id" => @chain_id,
+               "registry_address" => @registry_address,
+               "token_id" => @token_id,
+               "nonce" => nonce,
+               "message" => bad_message,
+               "signature" => TestEthereumAdapter.sign_message(@wallet_address, bad_message)
+             })
+
+    assert message =~ "canonical SIWA format"
+  end
+
+  test "http verification fails closed when the receipt secret is missing" do
+    receipt = verified_receipt()
+    body = Jason.encode!(%{"summary" => "Missing secret", "details" => "blocked"})
+    created = System.os_time(:second)
+    expires = created + 120
+
+    original = Application.get_env(:platform_phx, :siwa, [])
+    Application.put_env(:platform_phx, :siwa, Keyword.delete(original, :receipt_secret))
+
+    on_exit(fn ->
+      Application.put_env(:platform_phx, :siwa, original)
+    end)
+
+    assert {:error, {500, "siwa_not_configured", message}} =
+             Siwa.verify_http_request(%{
+               "method" => "POST",
+               "path" => "/v1/agent/bug-report",
+               "headers" => signed_headers(receipt, body, created, expires),
+               "body" => body
+             })
+
+    assert message =~ "not configured"
   end
 
   test "verified agent claims expose the verified ERC-8004 identity" do

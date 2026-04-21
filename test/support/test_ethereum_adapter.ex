@@ -23,6 +23,34 @@ defmodule PlatformPhx.TestEthereumAdapter do
     {:ok, encode_hash(payload)}
   end
 
+  @impl true
+  def owner_of(registry_address, token_id, _opts) do
+    registry_address = PlatformPhx.Ethereum.normalize_address(registry_address)
+
+    case :persistent_term.get({__MODULE__, :owner_of, registry_address, token_id}, :undefined) do
+      owner when is_binary(owner) -> {:ok, owner}
+      :undefined -> {:error, "owner not configured"}
+    end
+  end
+
+  def put_owner(registry_address, token_id, owner_address) do
+    :persistent_term.put(
+      {__MODULE__, :owner_of, PlatformPhx.Ethereum.normalize_address(registry_address),
+       normalize_token_id(token_id)},
+      String.downcase(owner_address)
+    )
+  end
+
+  def delete_owner(registry_address, token_id) do
+    :persistent_term.erase(
+      {__MODULE__, :owner_of, PlatformPhx.Ethereum.normalize_address(registry_address),
+       normalize_token_id(token_id)}
+    )
+  end
+
+  defp normalize_token_id(token_id) when is_integer(token_id), do: token_id
+  defp normalize_token_id(token_id) when is_binary(token_id), do: String.to_integer(token_id)
+
   defp encode_hash(value) do
     "0x" <>
       (:crypto.hash(:sha256, value)

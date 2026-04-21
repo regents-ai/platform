@@ -21,6 +21,8 @@ config :platform_phx,
   ethereum_adapter: PlatformPhx.TestEthereumAdapter,
   opensea_client: PlatformPhx.TestOpenSeaClient
 
+config :platform_phx, :siwa, receipt_secret: "platform-test-receipt-secret"
+
 config :platform_phx, :token_metadata_root, Path.expand("../priv/metadata", __DIR__)
 
 # We don't run a server during test. If one is required,

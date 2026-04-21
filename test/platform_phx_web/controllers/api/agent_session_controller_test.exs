@@ -9,6 +9,16 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
   @registry_address "0x3333333333333333333333333333333333333333"
   @token_id "77"
 
+  setup do
+    TestEthereumAdapter.put_owner(@registry_address, @token_id, @wallet_address)
+
+    on_exit(fn ->
+      TestEthereumAdapter.delete_owner(@registry_address, @token_id)
+    end)
+
+    :ok
+  end
+
   test "create, show, and delete keep the full verified agent identity in the local app session",
        %{
          conn: conn

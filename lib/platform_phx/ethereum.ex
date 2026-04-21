@@ -49,6 +49,20 @@ defmodule PlatformPhx.Ethereum do
     adapter().synthetic_tx_hash(payload)
   end
 
+  @spec owner_of(String.t(), pos_integer(), keyword()) :: {:ok, String.t()} | {:error, String.t()}
+  def owner_of(registry_address, token_id, opts \\ []) do
+    with normalized_registry when is_binary(normalized_registry) <-
+           normalize_address(registry_address),
+         true <- is_integer(token_id) and token_id > 0,
+         {:ok, owner} <- adapter().owner_of(normalized_registry, token_id, opts),
+         normalized_owner when is_binary(normalized_owner) <- normalize_address(owner) do
+      {:ok, normalized_owner}
+    else
+      nil -> {:error, "invalid address"}
+      _ -> {:error, "invalid owner"}
+    end
+  end
+
   @spec json_rpc(String.t(), String.t(), list()) :: {:ok, map() | nil} | {:error, String.t()}
   def json_rpc(url, method, params) do
     request =
