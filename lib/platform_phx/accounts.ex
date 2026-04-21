@@ -1,6 +1,7 @@
 defmodule PlatformPhx.Accounts do
   @moduledoc false
 
+  alias PlatformPhx.Accounts.AvatarSelection
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.Repo
 
@@ -30,13 +31,22 @@ defmodule PlatformPhx.Accounts do
     )
   end
 
+  def update_human(%HumanUser{} = human, attrs) when is_map(attrs) do
+    human
+    |> HumanUser.changeset(normalize_human_attrs(attrs))
+    |> Repo.update()
+  end
+
   defp upsert_fields(attrs, now) do
     attrs
     |> Enum.reduce([updated_at: now], fn {key, value}, acc ->
       case {normalize_attr_key(key), value} do
         {"wallet_address", value} -> [{:wallet_address, value} | acc]
         {"wallet_addresses", value} -> [{:wallet_addresses, value} | acc]
+        {"world_human_id", value} -> [{:world_human_id, value} | acc]
+        {"world_verified_at", value} -> [{:world_verified_at, value} | acc]
         {"display_name", value} -> [{:display_name, value} | acc]
+        {"avatar", value} -> [{:avatar, value} | acc]
         _ -> acc
       end
     end)
@@ -52,8 +62,17 @@ defmodule PlatformPhx.Accounts do
         "wallet_addresses" ->
           Map.put(acc, "wallet_addresses", normalize_addresses(value))
 
+        "world_human_id" ->
+          Map.put(acc, "world_human_id", normalize_text(value, 255))
+
+        "world_verified_at" ->
+          Map.put(acc, "world_verified_at", normalize_datetime(value))
+
         "display_name" ->
           Map.put(acc, "display_name", normalize_text(value, 80))
+
+        "avatar" ->
+          Map.put(acc, "avatar", AvatarSelection.serialize(value))
 
         "stripe_llm_billing_status" ->
           Map.put(acc, "stripe_llm_billing_status", value)
@@ -108,4 +127,15 @@ defmodule PlatformPhx.Accounts do
   end
 
   defp normalize_text(_value, _max_length), do: nil
+
+  defp normalize_datetime(%DateTime{} = value), do: value
+
+  defp normalize_datetime(value) when is_binary(value) do
+    case DateTime.from_iso8601(String.trim(value)) do
+      {:ok, parsed, _offset} -> parsed
+      _ -> nil
+    end
+  end
+
+  defp normalize_datetime(_value), do: nil
 end

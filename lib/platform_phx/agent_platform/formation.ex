@@ -53,7 +53,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
          eligible: AgentPlatform.eligible_holdings?(holdings),
          collections: holdings,
          claimed_names: claimed_names,
-         available_claims: Enum.reject(claimed_names, & &1.in_use),
+         available_claims: Enum.reject(claimed_names, &formation_claim_used?/1),
          billing_account: AgentPlatform.billing_account_payload(billing_account, companies),
          owned_companies: Enum.map(companies, &AgentPlatform.serialize_agent(&1, :private)),
          active_formations:
@@ -259,7 +259,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
       slug: slug,
       claimed_label: slug,
       basename_fqdn: mint.fqdn,
-      ens_fqdn: mint.ens_fqdn || "#{slug}.regent.eth",
+      ens_fqdn: nil,
       status: "forming",
       public_summary: template.summary,
       hero_statement: template.hero_statement,
@@ -299,7 +299,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
                active: false
              })
              |> Repo.insert(),
-           {:ok, _mint_count} <- mark_mint_in_use(mint),
+           {:ok, _mint_count} <- mark_mint_formation_used(mint),
            :ok <- insert_default_services(agent, template),
            :ok <- insert_default_connections(agent, template),
            {:ok, formation} <-
@@ -434,7 +434,8 @@ defmodule PlatformPhx.AgentPlatform.Formation do
                  where: mint.label == ^claimed_label and mint.owner_address in ^wallets,
                  limit: 1
              ) do
-          %Mint{is_in_use: true} ->
+          %Mint{formation_agent_slug: formation_agent_slug}
+          when is_binary(formation_agent_slug) ->
             {:error, {:conflict, "That claimed name is already active as a company"}}
 
           %Mint{} = mint ->
@@ -452,10 +453,13 @@ defmodule PlatformPhx.AgentPlatform.Formation do
 
   defp slug_taken?(_slug), do: false
 
-  defp mark_mint_in_use(%Mint{} = mint) do
+  defp mark_mint_formation_used(%Mint{} = mint) do
     count =
-      from(row in Mint, where: row.id == ^mint.id and row.is_in_use == false)
-      |> Repo.update_all(set: [is_in_use: true])
+      from(
+        row in Mint,
+        where: row.id == ^mint.id and is_nil(row.formation_agent_slug)
+      )
+      |> Repo.update_all(set: [formation_agent_slug: mint.label, is_in_use: true])
       |> elem(0)
 
     if count == 1 do
@@ -538,6 +542,11 @@ defmodule PlatformPhx.AgentPlatform.Formation do
       completed_at: AgentPlatform.iso(formation.completed_at),
       events: events
     }
+  end
+
+  defp formation_claim_used?(claim) when is_map(claim) do
+    is_binary(Map.get(claim, :formation_agent_slug)) or
+      is_binary(Map.get(claim, "formation_agent_slug"))
   end
 
   defp maybe_preload_events(%FormationRun{events: events} = formation) when is_list(events),

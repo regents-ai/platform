@@ -3,14 +3,19 @@ defmodule PlatformPhx.AgentPlatform do
 
   import Ecto.Query, warn: false
 
+  alias PlatformPhx.Accounts
+  alias PlatformPhx.Accounts.AvatarSelection
   alias PlatformPhx.Accounts.HumanUser
+  alias PlatformPhx.Agentbook
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.Artifact
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.Connection
   alias PlatformPhx.AgentPlatform.FormationRun
+  alias PlatformPhx.AgentPlatform.LlmUsageEvent
   alias PlatformPhx.AgentPlatform.PaperclipBootstrap
   alias PlatformPhx.AgentPlatform.Service
+  alias PlatformPhx.AgentPlatform.SpriteUsageRecord
   alias PlatformPhx.AgentPlatform.Subdomain
   alias PlatformPhx.AgentPlatform.TemplateCatalog
   alias PlatformPhx.AgentPlatform.WelcomeCredits
@@ -65,7 +70,14 @@ defmodule PlatformPhx.AgentPlatform do
     Agent
     |> where([agent], agent.owner_human_id == ^id)
     |> order_by([agent], desc: agent.updated_at, asc: agent.slug)
-    |> preload([:subdomain, :services, :connections, :artifacts, formation_run: :events])
+    |> preload([
+      :subdomain,
+      :services,
+      :connections,
+      :artifacts,
+      :owner_human,
+      formation_run: :events
+    ])
     |> Repo.all()
   end
 
@@ -73,14 +85,14 @@ defmodule PlatformPhx.AgentPlatform do
     Agent
     |> where([agent], agent.status == "published")
     |> order_by([agent], asc: agent.slug)
-    |> preload([:subdomain, :services, :connections, :artifacts])
+    |> preload([:subdomain, :services, :connections, :artifacts, :owner_human])
     |> Repo.all()
   end
 
   def get_public_agent(slug) when is_binary(slug) do
     Agent
     |> where([agent], agent.slug == ^normalize_slug(slug) and agent.status == "published")
-    |> preload([:subdomain, :services, :connections, :artifacts])
+    |> preload([:subdomain, :services, :connections, :artifacts, :owner_human])
     |> Repo.one()
   end
 
@@ -89,7 +101,14 @@ defmodule PlatformPhx.AgentPlatform do
   def get_owned_agent(%HumanUser{} = human, slug) when is_binary(slug) do
     Agent
     |> where([agent], agent.owner_human_id == ^human.id and agent.slug == ^normalize_slug(slug))
-    |> preload([:subdomain, :services, :connections, :artifacts, formation_run: :events])
+    |> preload([
+      :subdomain,
+      :services,
+      :connections,
+      :artifacts,
+      :owner_human,
+      formation_run: :events
+    ])
     |> Repo.one()
   end
 
@@ -119,7 +138,7 @@ defmodule PlatformPhx.AgentPlatform do
         join: subdomain in assoc(agent, :subdomain),
         where:
           subdomain.hostname == ^host and subdomain.active == true and agent.status == "published",
-        preload: [:subdomain, :services, :connections, :artifacts]
+        preload: [:subdomain, :services, :connections, :artifacts, :owner_human]
     )
   end
 
@@ -164,20 +183,30 @@ defmodule PlatformPhx.AgentPlatform do
       |> where([mint], mint.owner_address in ^wallets)
       |> order_by([mint], desc: mint.created_at, asc: mint.label)
       |> select([mint], %{
+        id: mint.id,
         label: mint.label,
         fqdn: mint.fqdn,
         ens_fqdn: mint.ens_fqdn,
         created_at: mint.created_at,
-        is_in_use: mint.is_in_use
+        claim_status: mint.claim_status,
+        upgrade_tx_hash: mint.upgrade_tx_hash,
+        upgraded_at: mint.upgraded_at,
+        formation_agent_slug: mint.formation_agent_slug,
+        attached_agent_slug: mint.attached_agent_slug
       })
       |> Repo.all()
       |> Enum.map(fn name ->
         %{
+          id: name.id,
           label: name.label,
           fqdn: name.fqdn,
-          ens_fqdn: name.ens_fqdn,
+          ens_fqdn: name.ens_fqdn || "#{name.label}.regent.eth",
           claimed_at: iso(name.created_at),
-          in_use: name.is_in_use
+          claim_status: name.claim_status,
+          upgrade_tx_hash: name.upgrade_tx_hash,
+          upgraded_at: iso(name.upgraded_at),
+          formation_agent_slug: name.formation_agent_slug,
+          attached_agent_slug: name.attached_agent_slug
         }
       end)
     end
@@ -193,6 +222,35 @@ defmodule PlatformPhx.AgentPlatform do
   end
 
   def holdings_for_human(_human), do: {:ok, empty_holdings()}
+
+  def save_human_avatar(nil, _attrs),
+    do: {:error, {:unauthorized, "Sign in before saving an avatar"}}
+
+  def save_human_avatar(%HumanUser{} = human, attrs) when is_map(attrs) do
+    with {:ok, holdings} <- avatar_holdings(human, attrs),
+         {:ok, avatar} <- AvatarSelection.normalize(attrs, holdings),
+         {:ok, updated_human} <- Accounts.update_human(human, %{avatar: avatar}) do
+      {:ok, updated_human}
+    else
+      {:error, :unconfigured} ->
+        {:error, {:unavailable, "Avatar saving is unavailable right now"}}
+
+      {:error, {:bad_request, _message}} = error ->
+        error
+
+      {:error, {:external, _service, _message}} ->
+        {:error, {:unavailable, "Could not confirm wallet holdings right now"}}
+
+      {:error, message} when is_binary(message) ->
+        {:error, {:bad_request, message}}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:error, {:bad_request, format_changeset(changeset)}}
+
+      {:error, _reason} ->
+        {:error, {:bad_request, "Could not save that avatar"}}
+    end
+  end
 
   def eligible_holdings?(holdings) when is_map(holdings) do
     Enum.any?(["animata1", "animata2", "animataPass"], fn key ->
@@ -237,7 +295,7 @@ defmodule PlatformPhx.AgentPlatform do
       slug: agent.slug,
       claimed_label: agent.claimed_label,
       basename_fqdn: agent.basename_fqdn,
-      ens_fqdn: agent.ens_fqdn,
+      ens: serialize_agent_ens(agent),
       status: agent.status,
       public_summary: agent.public_summary,
       hero_statement: agent.hero_statement,
@@ -250,6 +308,7 @@ defmodule PlatformPhx.AgentPlatform do
         ),
       services: Enum.map(agent.services || [], &serialize_service/1),
       connections: Enum.map(agent.connections || [], &serialize_connection/1),
+      avatar: serialize_avatar(agent_avatar(agent)),
       feed: public_feed(agent, agent.artifacts)
     }
 
@@ -287,6 +346,27 @@ defmodule PlatformPhx.AgentPlatform do
   end
 
   def serialize_agent(nil, _scope), do: nil
+
+  defp serialize_agent_ens(%Agent{} = agent) do
+    attached_claim =
+      Repo.one(
+        from mint in Mint,
+          where: mint.attached_agent_slug == ^agent.slug,
+          select: %{
+            id: mint.id,
+            ens_fqdn: mint.ens_fqdn,
+            claim_status: mint.claim_status
+          },
+          limit: 1
+      )
+
+    %{
+      attached: not is_nil(attached_claim),
+      claim_id: attached_claim && attached_claim.id,
+      name: (attached_claim && attached_claim.ens_fqdn) || blank_to_nil(agent.ens_fqdn),
+      claim_status: attached_claim && attached_claim.claim_status
+    }
+  end
 
   def runtime_payload_map(agent, billing_account \\ nil)
 
@@ -434,6 +514,9 @@ defmodule PlatformPhx.AgentPlatform do
   def billing_allows_runtime?(_account), do: false
 
   def billing_usage_payload(%BillingAccount{} = account, companies) do
+    runtime_spend_by_agent = runtime_spend_by_agent(account)
+    llm_spend_by_agent = llm_spend_by_agent(account)
+
     company_summaries =
       Enum.map(companies, fn company ->
         %{
@@ -443,12 +526,22 @@ defmodule PlatformPhx.AgentPlatform do
           desired_runtime_state: company.desired_runtime_state,
           observed_runtime_state: company.observed_runtime_state,
           sprite_metering_status: effective_metering_status(company, account),
-          sprite_free_until: iso(company.sprite_free_until)
+          sprite_free_until: iso(company.sprite_free_until),
+          runtime_spend_usd_cents: Map.get(runtime_spend_by_agent, company.id, 0),
+          llm_spend_usd_cents: Map.get(llm_spend_by_agent, company.id, 0)
         }
       end)
 
     %{
       runtime_credit_balance_usd_cents: account.runtime_credit_balance_usd_cents || 0,
+      runtime_spend_usd_cents:
+        Enum.reduce(company_summaries, 0, fn company, acc ->
+          acc + company.runtime_spend_usd_cents
+        end),
+      llm_spend_usd_cents:
+        Enum.reduce(company_summaries, 0, fn company, acc ->
+          acc + company.llm_spend_usd_cents
+        end),
       paid_companies: Enum.count(company_summaries, &(&1.sprite_metering_status == "paid")),
       paused_companies: Enum.count(company_summaries, &(&1.sprite_metering_status == "paused")),
       trialing_companies:
@@ -492,7 +585,11 @@ defmodule PlatformPhx.AgentPlatform do
       privy_user_id: human.privy_user_id,
       wallet_address: human.wallet_address,
       wallet_addresses: linked_wallet_addresses(human),
+      world_human_id: human.world_human_id,
+      world_verified_at: iso(human.world_verified_at),
+      human_backed_trust: Agentbook.human_trust_summary(human),
       display_name: human.display_name,
+      avatar: serialize_avatar(human.avatar),
       billing_account: billing_account_payload(billing_account)
     }
   end
@@ -571,6 +668,15 @@ defmodule PlatformPhx.AgentPlatform do
     }
   end
 
+  defp blank_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp blank_to_nil(_value), do: nil
+
   defp runtime_defaults(%Agent{} = agent) do
     case get_template(agent.template_key) do
       nil -> %{}
@@ -647,6 +753,43 @@ defmodule PlatformPhx.AgentPlatform do
       "animata2" => [],
       "animataPass" => []
     }
+  end
+
+  defp runtime_spend_by_agent(%BillingAccount{id: nil}), do: %{}
+
+  defp runtime_spend_by_agent(%BillingAccount{id: billing_account_id}) do
+    Repo.all(
+      from record in SpriteUsageRecord,
+        where: record.billing_account_id == ^billing_account_id,
+        group_by: record.agent_id,
+        select: {record.agent_id, coalesce(sum(record.amount_usd_cents), 0)}
+    )
+    |> Map.new()
+  end
+
+  defp llm_spend_by_agent(%BillingAccount{human_user_id: nil}), do: %{}
+
+  defp llm_spend_by_agent(%BillingAccount{human_user_id: human_user_id}) do
+    Repo.all(
+      from event in LlmUsageEvent,
+        where: event.human_user_id == ^human_user_id,
+        group_by: event.agent_id,
+        select: {event.agent_id, coalesce(sum(event.amount_usd_cents), 0)}
+    )
+    |> Map.new()
+  end
+
+  defp agent_avatar(%Agent{owner_human: %HumanUser{} = owner_human}), do: owner_human.avatar
+  defp agent_avatar(_agent), do: nil
+
+  defp serialize_avatar(avatar), do: AvatarSelection.serialize(avatar)
+
+  defp avatar_holdings(%HumanUser{} = human, attrs) do
+    if AvatarSelection.collection_token_selection?(attrs) do
+      holdings_for_human(human)
+    else
+      {:ok, empty_holdings()}
+    end
   end
 
   defp formation_from_agent(%Agent{formation_run: %FormationRun{} = formation}), do: formation

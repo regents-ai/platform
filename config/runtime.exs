@@ -69,6 +69,22 @@ config :platform_phx, PlatformPhx.Xmtp,
     }
   ]
 
+config :agent_world, :world_id,
+  app_id: System.get_env("WORLD_ID_APP_ID", ""),
+  action: System.get_env("WORLD_ID_ACTION", "agentbook-registration"),
+  rp_id: System.get_env("WORLD_ID_RP_ID", ""),
+  signing_key: System.get_env("WORLD_ID_SIGNING_KEY", ""),
+  ttl_seconds: String.to_integer(System.get_env("WORLD_ID_TTL_SECONDS", "300"))
+
+config :agent_world, :networks, %{
+  "world" => %{
+    rpc_url: System.get_env("WORLDCHAIN_RPC_URL", ""),
+    contract_address:
+      System.get_env("WORLDCHAIN_AGENTBOOK_ADDRESS", "0xA23aB2712eA7BBa896930544C7d6636a96b944dA"),
+    relay_url: System.get_env("WORLDCHAIN_AGENTBOOK_RELAY_URL", "")
+  }
+}
+
 if config_env() != :test do
   oban_queues =
     [billing: 5, runtime_metering: 1]

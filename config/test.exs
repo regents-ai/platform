@@ -25,6 +25,21 @@ config :platform_phx, :siwa, receipt_secret: "platform-test-receipt-secret"
 
 config :platform_phx, :token_metadata_root, Path.expand("../priv/metadata", __DIR__)
 
+config :agent_world, :world_id,
+  app_id: "app_test",
+  action: "agentbook-registration",
+  rp_id: "app_test_rp",
+  signing_key: "test-signing-key",
+  ttl_seconds: 300
+
+config :agent_world, :networks, %{
+  "world" => %{
+    rpc_url: "https://world.example",
+    contract_address: "0xA23aB2712eA7BBa896930544C7d6636a96b944dA",
+    relay_url: ""
+  }
+}
+
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
 config :platform_phx, PlatformPhxWeb.Endpoint,

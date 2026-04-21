@@ -200,14 +200,66 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     assert dashboard_html =~ launch_label
   end
 
-  defp insert_human!(stripe_status) do
+  test "dashboard shows the avatar creator with the saved avatar and owned choices", %{conn: conn} do
+    launch_label = "avatar-launch"
+
+    human =
+      insert_human!("active", %{
+        avatar: %{
+          "kind" => "collection_token",
+          "collection" => "animataPass",
+          "token_id" => 11,
+          "preview_type" => "token_card",
+          "gold_border" => true
+        }
+      })
+
+    insert_billing_account!(human, 900)
+    insert_claimed_name!(human, launch_label)
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "7"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") =>
+        {:ok,
+         %{"nfts" => [%{"collection" => "regent-animata-ii", "identifier" => "9"}], "next" => nil}},
+      request_url(@address, "regents-club") =>
+        {:ok,
+         %{"nfts" => [%{"collection" => "regents-club", "identifier" => "11"}], "next" => nil}}
+    })
+
+    {:ok, view, _html} =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> live("/app/formation?claimedLabel=#{launch_label}")
+
+    view
+    |> element("button", "Open company")
+    |> render_click()
+
+    {:ok, _dashboard, dashboard_html} =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> live("/app/dashboard")
+
+    assert dashboard_html =~ "Agent Avatar Creator"
+    assert dashboard_html =~ "Current saved avatar"
+    assert dashboard_html =~ "Gold border rule"
+    assert dashboard_html =~ "Collection I"
+    assert dashboard_html =~ "Collection II"
+    assert dashboard_html =~ "Open shader studio"
+    assert dashboard_html =~ "dashboard-avatar-animata-pass-11"
+  end
+
+  defp insert_human!(stripe_status, attrs \\ %{}) do
     %HumanUser{}
     |> HumanUser.changeset(%{
       privy_user_id: "privy-#{System.unique_integer([:positive])}",
       wallet_address: @address,
       wallet_addresses: [@address],
       display_name: "operator@regents.sh",
-      stripe_llm_billing_status: stripe_status
+      stripe_llm_billing_status: stripe_status,
+      avatar: Map.get(attrs, :avatar)
     })
     |> Repo.insert!()
   end

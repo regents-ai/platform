@@ -1,7 +1,6 @@
 defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
   use PlatformPhxWeb.ConnCase, async: false
 
-  alias PlatformPhx.Siwa
   alias PlatformPhx.TestEthereumAdapter
 
   @wallet_address "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
@@ -10,10 +9,11 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
   @token_id "77"
 
   setup do
-    TestEthereumAdapter.put_owner(@registry_address, @token_id, @wallet_address)
+    previous_client = Application.get_env(:platform_phx, :siwa_client)
+    Application.put_env(:platform_phx, :siwa_client, PlatformPhx.TestSiwaClient)
 
     on_exit(fn ->
-      TestEthereumAdapter.delete_owner(@registry_address, @token_id)
+      Application.put_env(:platform_phx, :siwa_client, previous_client)
     end)
 
     :ok
@@ -133,45 +133,6 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
   end
 
   test "shared SIWA login can exchange into a local platform session", %{conn: conn} do
-    nonce_conn =
-      conn
-      |> post("/v1/agent/siwa/nonce", %{
-        "wallet_address" => @wallet_address,
-        "chain_id" => @chain_id,
-        "registry_address" => @registry_address,
-        "token_id" => @token_id,
-        "audience" => "platform"
-      })
-
-    %{"data" => %{"nonce" => nonce}} = json_response(nonce_conn, 200)
-
-    message =
-      """
-      regent.cx wants you to sign in with your Ethereum account:
-      #{@wallet_address}
-
-      URI: https://regent.cx/v1/agent/siwa/verify
-      Version: 1
-      Chain ID: #{@chain_id}
-      Nonce: #{nonce}
-      Issued At: 2026-04-16T00:00:00Z
-      """
-      |> String.trim()
-
-    verify_conn =
-      conn
-      |> post("/v1/agent/siwa/verify", %{
-        "wallet_address" => @wallet_address,
-        "chain_id" => @chain_id,
-        "registry_address" => @registry_address,
-        "token_id" => @token_id,
-        "nonce" => nonce,
-        "message" => message,
-        "signature" => TestEthereumAdapter.sign_message(@wallet_address, message)
-      })
-
-    %{"data" => %{"receipt" => receipt}} = json_response(verify_conn, 200)
-
     body = "{}"
     csrf_token = Plug.CSRFProtection.get_csrf_token()
 
@@ -180,7 +141,7 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
       |> init_test_session(%{})
       |> put_csrf_token(csrf_token)
       |> put_req_header("content-type", "application/json")
-      |> put_req_headers(agent_headers("/api/auth/agent/session", body, receipt))
+      |> put_req_headers(agent_headers("/api/auth/agent/session", body, "platform-receipt"))
       |> post("/api/auth/agent/session", body)
 
     response = json_response(session_conn, 200)
@@ -195,45 +156,6 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
   test "shared SIWA proof for a different audience cannot create a platform session", %{
     conn: conn
   } do
-    nonce_conn =
-      conn
-      |> post("/v1/agent/siwa/nonce", %{
-        "wallet_address" => @wallet_address,
-        "chain_id" => @chain_id,
-        "registry_address" => @registry_address,
-        "token_id" => @token_id,
-        "audience" => "techtree"
-      })
-
-    %{"data" => %{"nonce" => nonce}} = json_response(nonce_conn, 200)
-
-    message =
-      """
-      regent.cx wants you to sign in with your Ethereum account:
-      #{@wallet_address}
-
-      URI: https://regent.cx/v1/agent/siwa/verify
-      Version: 1
-      Chain ID: #{@chain_id}
-      Nonce: #{nonce}
-      Issued At: 2026-04-16T00:00:00Z
-      """
-      |> String.trim()
-
-    verify_conn =
-      conn
-      |> post("/v1/agent/siwa/verify", %{
-        "wallet_address" => @wallet_address,
-        "chain_id" => @chain_id,
-        "registry_address" => @registry_address,
-        "token_id" => @token_id,
-        "nonce" => nonce,
-        "message" => message,
-        "signature" => TestEthereumAdapter.sign_message(@wallet_address, message)
-      })
-
-    %{"data" => %{"receipt" => receipt}} = json_response(verify_conn, 200)
-
     body = "{}"
     csrf_token = Plug.CSRFProtection.get_csrf_token()
 
@@ -242,7 +164,7 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
       |> init_test_session(%{})
       |> put_csrf_token(csrf_token)
       |> put_req_header("content-type", "application/json")
-      |> put_req_headers(agent_headers("/api/auth/agent/session", body, receipt))
+      |> put_req_headers(agent_headers("/api/auth/agent/session", body, "techtree-receipt"))
       |> post("/api/auth/agent/session", body)
 
     assert %{"ok" => false, "error" => %{"code" => "siwa_auth_denied"}} =
@@ -259,8 +181,7 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
     |> put_req_header("x-csrf-token", token)
   end
 
-  defp agent_headers(path, body, receipt \\ nil) do
-    receipt = receipt || verified_receipt()
+  defp agent_headers(path, body, receipt \\ "platform-receipt") do
     created = System.os_time(:second)
     expires = created + 120
 
@@ -272,7 +193,7 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
       "x-agent-chain-id" => Integer.to_string(@chain_id),
       "x-agent-registry-address" => @registry_address,
       "x-agent-token-id" => @token_id,
-      "content-digest" => Siwa.content_digest_for_body(body)
+      "content-digest" => content_digest_for_body(body)
     }
 
     components = [
@@ -289,7 +210,7 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
     ]
 
     signature_params =
-      "(#{Enum.map_join(components, " ", &~s(\"#{&1}\"))})" <>
+      "(#{Enum.map_join(components, " ", &~s("#{&1}"))})" <>
         ";created=#{created}" <>
         ";expires=#{expires}" <>
         ~s(;nonce="req-#{System.unique_integer([:positive])}") <>
@@ -305,9 +226,9 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
             header_name -> Map.fetch!(headers, header_name)
           end
 
-        ~s(\"#{component}\": #{value})
+        ~s("#{component}": #{value})
       end)
-      |> Kernel.++([~s(\"@signature-params\": #{signature_params})])
+      |> Kernel.++([~s("@signature-params": #{signature_params})])
       |> Enum.join("\n")
 
     signature =
@@ -319,40 +240,11 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
     |> Map.put("signature", "sig1=:#{signature}:")
   end
 
-  defp verified_receipt do
-    assert {:ok, %{"data" => %{"nonce" => nonce}}} =
-             Siwa.issue_nonce(%{
-               "wallet_address" => @wallet_address,
-               "chain_id" => @chain_id,
-               "registry_address" => @registry_address,
-               "token_id" => @token_id,
-               "audience" => "platform"
-             })
+  defp content_digest_for_body(body) do
+    digest =
+      :crypto.hash(:sha256, body)
+      |> Base.encode64()
 
-    message =
-      """
-      regent.cx wants you to sign in with your Ethereum account:
-      #{@wallet_address}
-
-      URI: https://regent.cx/v1/agent/siwa/verify
-      Version: 1
-      Chain ID: #{@chain_id}
-      Nonce: #{nonce}
-      Issued At: 2026-04-16T00:00:00Z
-      """
-      |> String.trim()
-
-    assert {:ok, %{"data" => %{"receipt" => receipt}}} =
-             Siwa.verify_session(%{
-               "wallet_address" => @wallet_address,
-               "chain_id" => @chain_id,
-               "registry_address" => @registry_address,
-               "token_id" => @token_id,
-               "nonce" => nonce,
-               "message" => message,
-               "signature" => TestEthereumAdapter.sign_message(@wallet_address, message)
-             })
-
-    receipt
+    "sha-256=:#{digest}:"
   end
 end

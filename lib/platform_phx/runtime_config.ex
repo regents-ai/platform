@@ -16,6 +16,8 @@ defmodule PlatformPhx.RuntimeConfig do
   def siwa_http_signature_tolerance_seconds,
     do: fetch_integer("SIWA_HTTP_SIGNATURE_TOLERANCE_SECONDS", 300)
 
+  def siwa_server_base_url, do: fetch("SIWA_SERVER_BASE_URL")
+
   def stripe_billing_pricing_plan_id, do: fetch("STRIPE_BILLING_PRICING_PLAN_ID")
   def stripe_billing_topup_success_url, do: fetch("STRIPE_BILLING_TOPUP_SUCCESS_URL")
   def stripe_billing_topup_cancel_url, do: fetch("STRIPE_BILLING_TOPUP_CANCEL_URL")
@@ -27,6 +29,10 @@ defmodule PlatformPhx.RuntimeConfig do
   def sprites_api_token, do: fetch("SPRITES_API_TOKEN")
   def sprite_cli_path, do: fetch("SPRITE_CLI_PATH") || "sprite"
   def paperclip_http_port, do: fetch("PAPERCLIP_HTTP_PORT") || "3100"
+  def regent_staking_rpc_url, do: fetch("REGENT_STAKING_RPC_URL") || base_rpc_url()
+  def regent_staking_contract_address, do: fetch("REGENT_STAKING_CONTRACT_ADDRESS")
+  def regent_staking_chain_id, do: fetch_integer("REGENT_STAKING_CHAIN_ID", 8453)
+  def regent_staking_chain_label, do: fetch("REGENT_STAKING_CHAIN_LABEL") || "Base"
   def basename_parent_name, do: fetch("AGENT_BASENAME_PARENT_NAME") || "agent.base.eth"
   def ens_parent_name, do: fetch("AGENT_PROTOCOL_ENS_PARENT_NAME") || "regent.eth"
 
@@ -41,6 +47,12 @@ defmodule PlatformPhx.RuntimeConfig do
 
   def ens_public_resolver_address,
     do: fetch("ENS_PUBLIC_RESOLVER_ADDRESS") || "0x226159d592E2b063810a10Ebf6dcbAda94Ed68b8"
+
+  def regent_ens_registrar_address, do: fetch("REGENT_ENS_REGISTRAR_ADDRESS")
+  def regent_ens_owner_address, do: fetch("REGENT_ENS_OWNER_ADDRESS")
+
+  def base_identity_registry_address,
+    do: fetch("BASE_IDENTITY_REGISTRY_ADDRESS") || "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
 
   def basenames_payment_recipient, do: fetch("AGENT_BASENAME_PAYMENT_RECIPIENT")
   def basenames_price_wei, do: fetch("AGENT_BASENAME_PRICE_WEI") || "2500000000000000"

@@ -4,6 +4,8 @@ defmodule PlatformPhxWeb.AgentPlatformComponents do
 
   use Regent
 
+  alias PlatformPhx.Accounts.AvatarSelection
+
   import PlatformPhxWeb.PlatformComponents, only: [preview_link: 1]
 
   attr :agent, :map, required: true
@@ -110,6 +112,19 @@ defmodule PlatformPhxWeb.AgentPlatformComponents do
               </p>
             </div>
 
+            <div
+              :if={@agent.avatar}
+              class={public_avatar_card_class(@agent.avatar)}
+            >
+              <p class="pp-home-kicker">Saved avatar</p>
+              <p class="mt-3 font-display text-[1.45rem] text-[color:var(--foreground)]">
+                {AvatarSelection.current_label(@agent.avatar)}
+              </p>
+              <p class="mt-2 max-w-[40ch] text-sm leading-6 text-[color:var(--muted-foreground)]">
+                {public_avatar_copy(@agent.avatar)}
+              </p>
+            </div>
+
             <div class="flex flex-wrap gap-3">
               <div class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--card)] px-4 py-3">
                 <p class="pp-home-kicker">Claimed Name</p>
@@ -117,7 +132,7 @@ defmodule PlatformPhxWeb.AgentPlatformComponents do
               </div>
               <div class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--card)] px-4 py-3">
                 <p class="pp-home-kicker">Public identity</p>
-                <p class="mt-2 text-sm">{@agent.ens_fqdn}</p>
+                <p class="mt-2 text-sm">{agent_ens_name(@agent)}</p>
               </div>
               <div class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--card)] px-4 py-3">
                 <p class="pp-home-kicker">How this company works</p>
@@ -334,4 +349,33 @@ defmodule PlatformPhxWeb.AgentPlatformComponents do
   end
 
   defp billing_balance(_billing_account), do: "$0.00"
+
+  defp agent_ens_name(%{ens: %{name: name}}) when is_binary(name) and name != "", do: name
+  defp agent_ens_name(_agent), do: "Not attached yet"
+
+  defp public_avatar_card_class(avatar) do
+    [
+      "rounded-[1.35rem] border px-4 py-4",
+      if(AvatarSelection.gold_border?(avatar),
+        do:
+          "border-[color:color-mix(in_oklch,#d4a756_72%,var(--border)_28%)] bg-[linear-gradient(180deg,color-mix(in_oklch,#d4a756_14%,transparent),color-mix(in_oklch,var(--card)_94%,transparent))]",
+        else:
+          "border-[color:var(--border)] bg-[linear-gradient(180deg,color-mix(in_oklch,var(--brand-ink)_8%,transparent),color-mix(in_oklch,var(--card)_94%,transparent))]"
+      )
+    ]
+  end
+
+  defp public_avatar_copy(%{"kind" => "custom_shader", "shader_id" => shader_id}) do
+    AvatarSelection.shader_description(shader_id)
+  end
+
+  defp public_avatar_copy(%{
+         "kind" => "collection_token",
+         "collection" => collection,
+         "token_id" => token_id
+       }) do
+    "#{AvatarSelection.collection_label(collection)} ##{token_id} is the public avatar saved for this company."
+  end
+
+  defp public_avatar_copy(_avatar), do: "This saved look appears on the public company page."
 end

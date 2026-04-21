@@ -316,6 +316,27 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert has_element?(view, "#agent-owner-pause")
   end
 
+  test "public company page shows the saved avatar and keeps the gold border rule", %{conn: conn} do
+    human =
+      insert_human!("0xowner444444444444444444444444444444444444", %{
+        avatar: %{
+          "kind" => "collection_token",
+          "collection" => "animataPass",
+          "token_id" => 17,
+          "preview_type" => "token_card",
+          "gold_border" => true
+        }
+      })
+
+    _agent = insert_public_agent!(human, "avatar-public")
+
+    {:ok, _agent, html} = live(conn, "/agents/avatar-public")
+
+    assert html =~ "Saved avatar"
+    assert html =~ "Regents Club #17"
+    assert html =~ "public avatar saved for this company"
+  end
+
   test "company room lets the owner join and post from the company page", %{conn: conn} do
     human = insert_human!("0xowner222222222222222222222222222222222222")
     agent = insert_public_agent!(human, "owner-room")
@@ -630,7 +651,10 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Techtree"
     assert html =~ "$REGENT staking emissions"
     assert html =~ "20% yield for initial year"
-    assert html =~ "The staking portal and emission claims will open through Autolaunch"
+
+    assert html =~
+             "Platform and Autolaunch both open the same staking rail and the same emission claims."
+
     assert html =~ "pp-token-fee-highlight"
     assert html =~ "agent token&#39;s trading fees from the Uniswap v4 fee hook"
     assert html =~ "raised USDC in CCA auctions."
@@ -638,6 +662,8 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Regents Platform"
     assert html =~ "Stake $REGENT in the protocol revsplit contract."
     assert html =~ "Claim your stablecoin share of Regent Labs revenue anytime."
+    assert html =~ "Stake from Platform or Autolaunch. It is the same rail."
+    assert html =~ "Staking"
 
     assert html =~ "80% or more of protocol skim will go to buybacks."
 
@@ -681,13 +707,14 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     end
   end
 
-  defp insert_human!(wallet_address) do
+  defp insert_human!(wallet_address, attrs \\ %{}) do
     %HumanUser{}
     |> HumanUser.changeset(%{
       privy_user_id: "privy-#{System.unique_integer([:positive])}",
       wallet_address: wallet_address,
       wallet_addresses: [wallet_address],
-      display_name: "owner@regents.sh"
+      display_name: "owner@regents.sh",
+      avatar: Map.get(attrs, :avatar)
     })
     |> Repo.insert!()
   end

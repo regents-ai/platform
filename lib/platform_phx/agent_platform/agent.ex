@@ -124,7 +124,6 @@ defmodule PlatformPhx.AgentPlatform.Agent do
       :slug,
       :claimed_label,
       :basename_fqdn,
-      :ens_fqdn,
       :public_summary
     ])
     |> validate_length(:slug, min: 2, max: 63)

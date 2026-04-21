@@ -133,7 +133,6 @@ defmodule PlatformPhx.Basenames.Reads do
             "label" => mint.label,
             "fqdn" => mint.fqdn,
             "ensFqdn" => mint.ens_fqdn,
-            "ensTxHash" => mint.ens_tx_hash,
             "isFree" => mint.is_free,
             "isInUse" => mint.is_in_use,
             "createdAt" => mint.created_at

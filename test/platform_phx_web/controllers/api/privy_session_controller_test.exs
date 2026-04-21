@@ -94,6 +94,38 @@ defmodule PlatformPhxWeb.Api.PrivySessionControllerTest do
     end
   end
 
+  test "signed-in human can save a shader avatar through the profile route", %{conn: conn} do
+    human =
+      %HumanUser{}
+      |> HumanUser.changeset(%{
+        privy_user_id: "did:privy:avatar-user",
+        wallet_address: "0x1111111111111111111111111111111111111111",
+        wallet_addresses: ["0x1111111111111111111111111111111111111111"],
+        display_name: "Avatar Owner"
+      })
+      |> Repo.insert!()
+
+    response =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
+      |> put("/api/auth/privy/profile/avatar", %{
+        kind: "custom_shader",
+        shader_id: "w3dfWN",
+        define_values: %{}
+      })
+      |> json_response(200)
+
+    assert response["authenticated"] == true
+    assert response["human"]["avatar"]["kind"] == "custom_shader"
+    assert response["human"]["avatar"]["shader_id"] == "w3dfWN"
+    assert response["human"]["avatar"]["preview_type"] == "shader"
+
+    updated_human = Repo.get!(HumanUser, human.id)
+    assert updated_human.avatar["kind"] == "custom_shader"
+    assert updated_human.avatar["shader_id"] == "w3dfWN"
+  end
+
   defp put_csrf_token(conn) do
     token = Plug.CSRFProtection.get_csrf_token()
 

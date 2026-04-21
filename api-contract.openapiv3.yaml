@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: PlatformPhx API
   version: 0.1.0
-  description: HTTP contract for the Platform web product APIs, including the SIWA routes this app currently serves.
+  description: HTTP contract for the Platform web product APIs. Shared SIWA auth behavior is owned by the shared Regent services contract.
 servers:
   - url: /
 paths:
@@ -413,89 +413,6 @@ paths:
                 $ref: '#/components/schemas/SecurityReportResponse'
         '400':
           $ref: '#/components/responses/StatusMessage400'
-  /v1/agent/siwa/nonce:
-    post:
-      operationId: issueAgentSiwaNonce
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AgentSiwaNonceRequest'
-      responses:
-        '200':
-          description: SIWA nonce issued
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AgentSiwaNonceResponse'
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SiwaErrorResponse'
-  /v1/agent/siwa/verify:
-    post:
-      operationId: verifyAgentSiwaSession
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AgentSiwaVerifyRequest'
-      responses:
-        '200':
-          description: SIWA session verified
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AgentSiwaVerifyResponse'
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SiwaErrorResponse'
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SiwaErrorResponse'
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SiwaErrorResponse'
-  /v1/agent/siwa/http-verify:
-    post:
-      operationId: verifyAgentSiwaHttpEnvelope
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AgentSiwaHttpVerifyRequest'
-      responses:
-        '200':
-          description: SIWA HTTP envelope verified
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AgentSiwaHttpVerifyResponse'
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SiwaErrorResponse'
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SiwaErrorResponse'
-        '409':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SiwaErrorResponse'
   /v1/agent/bug-report:
     post:
       operationId: createAgentBugReport
@@ -574,6 +491,81 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OkEnvelope'
+  /api/agentbook/sessions:
+    post:
+      operationId: createAgentbookTrustSession
+      security: [{ AgentSiwaHeaders: [] }]
+      description: Create a hosted human-backed trust session for the current signed Regent agent.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentbookSessionCreateRequest'
+      responses:
+        '200':
+          description: Hosted trust session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentbookSessionResponse'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /api/agentbook/sessions/{id}:
+    get:
+      operationId: getAgentbookTrustSession
+      security: [{ AgentSiwaHeaders: [] }]
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Current hosted trust session status for the signed Regent agent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentbookSessionResponse'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '404':
+          $ref: '#/components/responses/StatusMessage404'
+  /api/agentbook/sessions/{id}/submit:
+    post:
+      operationId: submitAgentbookTrustSession
+      security: [{ AgentSessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentbookSessionSubmitRequest'
+      responses:
+        '200':
+          description: Hosted trust session updated after human approval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentbookSessionResponse'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '404':
+          $ref: '#/components/responses/StatusMessage404'
+  /api/agentbook/lookup:
+    get:
+      operationId: lookupAgentbookTrust
+      security: [{ AgentSiwaHeaders: [] }]
+      responses:
+        '200':
+          description: Current human-backed trust summary for the signed Regent agent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentbookLookupResponse'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
   /api/agent-platform/templates:
     get:
       operationId: agentPlatformTemplates
@@ -709,6 +701,198 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CurrentHumanProfile'
+  /api/auth/privy/profile/avatar:
+    put:
+      operationId: privySessionProfileAvatarUpdate
+      security: [{ PrivySessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AvatarSelectionInput'
+      responses:
+        '200':
+          description: Saved avatar selection for the current signed-in human
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentHumanProfile'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /api/regent/staking:
+    get:
+      operationId: regentStakingOverview
+      responses:
+        '200':
+          description: Shared Regent staking overview for the public token page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegentStakingOverviewResponse'
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
+  /api/regent/staking/account/{address}:
+    get:
+      operationId: regentStakingAccount
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Shared Regent staking overview scoped to one wallet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegentStakingAccountResponse'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
+  /api/regent/staking/stake:
+    post:
+      operationId: regentStakingStake
+      security: [{ PrivySessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegentStakingAmountRequest'
+      responses:
+        '200':
+          description: Prepared wallet action for staking REGENT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegentStakingWalletActionResponse'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
+  /api/regent/staking/unstake:
+    post:
+      operationId: regentStakingUnstake
+      security: [{ PrivySessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegentStakingAmountRequest'
+      responses:
+        '200':
+          description: Prepared wallet action for unstaking REGENT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegentStakingWalletActionResponse'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
+  /api/regent/staking/claim-usdc:
+    post:
+      operationId: regentStakingClaimUsdc
+      security: [{ PrivySessionCookie: [] }]
+      responses:
+        '200':
+          description: Prepared wallet action for claiming USDC rewards
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegentStakingWalletActionResponse'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
+  /api/regent/staking/claim-regent:
+    post:
+      operationId: regentStakingClaimRegent
+      security: [{ PrivySessionCookie: [] }]
+      responses:
+        '200':
+          description: Prepared wallet action for claiming REGENT rewards
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegentStakingWalletActionResponse'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
+  /api/regent/staking/claim-and-restake-regent:
+    post:
+      operationId: regentStakingClaimAndRestakeRegent
+      security: [{ PrivySessionCookie: [] }]
+      responses:
+        '200':
+          description: Prepared wallet action for claiming and restaking REGENT rewards
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegentStakingWalletActionResponse'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
+  /api/regent/staking/deposit-usdc/prepare:
+    post:
+      operationId: regentStakingPrepareDepositUsdc
+      security: [{ PrivySessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegentStakingDepositRequest'
+      responses:
+        '200':
+          description: Prepared multisig payload for treasury USDC deposit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegentStakingPrepareResponse'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
+  /api/regent/staking/withdraw-treasury/prepare:
+    post:
+      operationId: regentStakingPrepareWithdrawTreasury
+      security: [{ PrivySessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegentStakingWithdrawRequest'
+      responses:
+        '200':
+          description: Prepared multisig payload for treasury withdrawal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegentStakingPrepareResponse'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
   /api/agent-platform/formation:
     get:
       operationId: agentPlatformFormation
@@ -844,6 +1028,260 @@ paths:
           $ref: '#/components/responses/StatusMessage401'
         '404':
           $ref: '#/components/responses/StatusMessage404'
+  /api/agent-platform/ens/claims/{claim_id}/prepare-upgrade:
+    post:
+      operationId: agentPlatformEnsPrepareUpgrade
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - name: claim_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Prepared Ethereum mainnet request for upgrading one reserved Regent name onchain
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, claim, prepared]
+                properties:
+                  ok: {type: boolean}
+                  claim:
+                    $ref: '#/components/schemas/ClaimedName'
+                  prepared:
+                    $ref: '#/components/schemas/PreparedEnsUpgrade'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '403':
+          $ref: '#/components/responses/StatusMessage403'
+        '404':
+          $ref: '#/components/responses/StatusMessage404'
+        '409':
+          $ref: '#/components/responses/StatusMessage409'
+  /api/agent-platform/ens/claims/{claim_id}/confirm-upgrade:
+    post:
+      operationId: agentPlatformEnsConfirmUpgrade
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - name: claim_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmEnsUpgradeRequest'
+      responses:
+        '200':
+          description: Confirmed one onchain Regent ENS upgrade and marked the claim live
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, claim]
+                properties:
+                  ok: {type: boolean}
+                  claim:
+                    $ref: '#/components/schemas/ClaimedName'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '403':
+          $ref: '#/components/responses/StatusMessage403'
+        '404':
+          $ref: '#/components/responses/StatusMessage404'
+        '409':
+          $ref: '#/components/responses/StatusMessage409'
+  /api/agent-platform/agents/{slug}/ens/attach:
+    post:
+      operationId: agentPlatformEnsAttach
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttachEnsNameRequest'
+      responses:
+        '200':
+          description: Attached one upgraded Regent ENS name to the selected agent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, agent, claim]
+                properties:
+                  ok: {type: boolean}
+                  agent:
+                    $ref: '#/components/schemas/AgentRecord'
+                  claim:
+                    $ref: '#/components/schemas/ClaimedName'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '403':
+          $ref: '#/components/responses/StatusMessage403'
+        '404':
+          $ref: '#/components/responses/StatusMessage404'
+        '409':
+          $ref: '#/components/responses/StatusMessage409'
+  /api/agent-platform/agents/{slug}/ens/detach:
+    post:
+      operationId: agentPlatformEnsDetach
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detached the current Regent ENS name from the selected agent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, agent]
+                properties:
+                  ok: {type: boolean}
+                  agent:
+                    $ref: '#/components/schemas/AgentRecord'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '403':
+          $ref: '#/components/responses/StatusMessage403'
+        '404':
+          $ref: '#/components/responses/StatusMessage404'
+        '409':
+          $ref: '#/components/responses/StatusMessage409'
+  /api/agent-platform/agents/{slug}/ens/link/plan:
+    post:
+      operationId: agentPlatformEnsLinkPlan
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnsLinkPlanRequest'
+      responses:
+        '200':
+          description: Current bidirectional Regent ENS plus ERC-8004 link status for one agent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, agent, link]
+                properties:
+                  ok: {type: boolean}
+                  agent:
+                    $ref: '#/components/schemas/AgentRecord'
+                  link:
+                    $ref: '#/components/schemas/EnsLinkPlan'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '403':
+          $ref: '#/components/responses/StatusMessage403'
+        '404':
+          $ref: '#/components/responses/StatusMessage404'
+        '409':
+          $ref: '#/components/responses/StatusMessage409'
+  /api/agent-platform/agents/{slug}/ens/link/prepare-bidirectional:
+    post:
+      operationId: agentPlatformEnsPrepareBidirectional
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnsLinkPlanRequest'
+      responses:
+        '200':
+          description: Prepared the next mainnet and Base requests needed to finish the ENS plus ERC-8004 linkage
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, agent, prepared]
+                properties:
+                  ok: {type: boolean}
+                  agent:
+                    $ref: '#/components/schemas/AgentRecord'
+                  prepared:
+                    $ref: '#/components/schemas/PreparedBidirectionalEnsLink'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '403':
+          $ref: '#/components/responses/StatusMessage403'
+        '404':
+          $ref: '#/components/responses/StatusMessage404'
+        '409':
+          $ref: '#/components/responses/StatusMessage409'
+  /api/agent-platform/ens/prepare-primary:
+    post:
+      operationId: agentPlatformEnsPreparePrimary
+      security: [{ AgentSiwaHeaders: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreparePrimaryEnsNameRequest'
+      responses:
+        '200':
+          description: Prepared Ethereum mainnet request for setting the caller wallet's primary ENS name
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, prepared]
+                properties:
+                  ok: {type: boolean}
+                  prepared:
+                    $ref: '#/components/schemas/PreparedReverseEnsName'
+        '400':
+          $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '403':
+          $ref: '#/components/responses/StatusMessage403'
+        '404':
+          $ref: '#/components/responses/StatusMessage404'
+        '409':
+          $ref: '#/components/responses/StatusMessage409'
   /api/agent-platform/billing/topups/checkout:
     post:
       operationId: agentPlatformBillingTopupCheckout
@@ -979,6 +1417,13 @@ paths:
         '503':
           $ref: '#/components/responses/StatusMessage503'
 components:
+  parameters:
+    SessionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
   responses:
     StatusMessage400:
       description: Bad request
@@ -1053,6 +1498,11 @@ components:
       properties:
         statusMessage:
           type: string
+    OkEnvelope:
+      type: object
+      required: [ok]
+      properties:
+        ok: {type: boolean}
     ReportingAgent:
       type: object
       required: [wallet_address, chain_id, registry_address, token_id]
@@ -1062,140 +1512,6 @@ components:
         registry_address: {type: string}
         token_id: {type: string}
         label: {type: [string, 'null']}
-    SiwaErrorResponse:
-      type: object
-      required: [ok, error]
-      properties:
-        ok: {type: boolean}
-        error:
-          type: object
-          required: [code, message]
-          properties:
-            code: {type: string}
-            message: {type: string}
-    AgentSiwaNonceRequest:
-      type: object
-      required: [wallet_address, chain_id, registry_address, token_id, audience]
-      properties:
-        wallet_address: {type: string}
-        chain_id: {type: integer}
-        registry_address: {type: string}
-        token_id: {type: string}
-        audience: {type: string}
-    AgentSiwaNonceResponse:
-      type: object
-      required: [ok, code, data]
-      properties:
-        ok: {type: boolean}
-        code: {type: string}
-        data:
-          type: object
-          required:
-            - nonce
-            - walletAddress
-            - chainId
-            - registryAddress
-            - tokenId
-            - audience
-            - expiresAt
-          properties:
-            nonce: {type: string}
-            walletAddress: {type: string}
-            chainId: {type: integer}
-            registryAddress: {type: string}
-            tokenId: {type: string}
-            audience: {type: string}
-            expiresAt: {type: string, format: date-time}
-    AgentSiwaVerifyRequest:
-      type: object
-      required: [wallet_address, chain_id, registry_address, token_id, nonce, message, signature]
-      properties:
-        wallet_address: {type: string}
-        chain_id: {type: integer}
-        registry_address: {type: string}
-        token_id: {type: string}
-        nonce: {type: string}
-        message: {type: string}
-        signature: {type: string}
-    AgentSiwaVerifyResponse:
-      type: object
-      required: [ok, code, data]
-      properties:
-        ok: {type: boolean}
-        code: {type: string}
-        data:
-          type: object
-          required:
-            - verified
-            - walletAddress
-            - chainId
-            - registryAddress
-            - tokenId
-            - audience
-            - nonce
-            - keyId
-            - signatureScheme
-            - receipt
-            - receiptIssuedAt
-            - receiptExpiresAt
-          properties:
-            verified: {type: boolean}
-            walletAddress: {type: string}
-            chainId: {type: integer}
-            registryAddress: {type: string}
-            tokenId: {type: string}
-            audience: {type: string}
-            nonce: {type: string}
-            keyId: {type: string}
-            signatureScheme: {type: string}
-            receipt: {type: string}
-            receiptIssuedAt: {type: string, format: date-time}
-            receiptExpiresAt: {type: string, format: date-time}
-    AgentSiwaHttpVerifyRequest:
-      type: object
-      required: [method, path, headers]
-      properties:
-        method: {type: string}
-        path: {type: string}
-        headers:
-          type: object
-          additionalProperties: {type: string}
-        body: {type: string}
-    AgentSiwaHttpVerifyResponse:
-      type: object
-      required: [ok, code, data]
-      properties:
-        ok: {type: boolean}
-        code: {type: string}
-        data:
-          type: object
-          required:
-            - verified
-            - walletAddress
-            - chainId
-            - keyId
-            - agent_claims
-            - receiptExpiresAt
-            - requiredHeaders
-            - requiredCoveredComponents
-            - coveredComponents
-          properties:
-            verified: {type: boolean}
-            walletAddress: {type: string}
-            chainId: {type: integer}
-            keyId: {type: string}
-            agent_claims:
-              $ref: '#/components/schemas/ReportingAgent'
-            receiptExpiresAt: {type: string, format: date-time}
-            requiredHeaders:
-              type: array
-              items: {type: string}
-            requiredCoveredComponents:
-              type: array
-              items: {type: string}
-            coveredComponents:
-              type: array
-              items: {type: string}
     ReportStatus:
       type: string
       enum: [pending, fixed, won't fix, duplicate]
@@ -1488,15 +1804,237 @@ components:
                 issued_at: {type: string, format: date-time}
                 expires_at: {type: string, format: date-time}
             - type: 'null'
+    AgentbookSessionCreateRequest:
+      type: object
+      properties:
+        source:
+          type: string
+    AgentbookFrontendRequest:
+      type: object
+      required: [app_id, action, signal, rp_context, allow_legacy_proofs]
+      properties:
+        app_id: {type: string}
+        action: {type: string}
+        signal: {type: string}
+        rp_context: {type: object, additionalProperties: true}
+        allow_legacy_proofs: {type: boolean}
+    AgentbookTrustSummary:
+      type: object
+      required:
+        [connected, world_human_id, unique_agent_count, connected_at, source]
+      properties:
+        connected: {type: boolean}
+        world_human_id: {type: [string, 'null']}
+        unique_agent_count: {type: integer}
+        connected_at: {type: [string, 'null'], format: date-time}
+        source: {type: [string, 'null']}
+    AgentbookSession:
+      type: object
+      required:
+        [
+          session_id,
+          status,
+          wallet_address,
+          chain_id,
+          registry_address,
+          token_id,
+          network,
+          approval_url,
+          expires_at,
+          trust
+        ]
+      properties:
+        session_id: {type: string}
+        status: {type: string}
+        wallet_address: {type: string}
+        chain_id: {type: integer}
+        registry_address: {type: string}
+        token_id: {type: string}
+        network: {type: string}
+        source: {type: [string, 'null']}
+        approval_url: {type: [string, 'null']}
+        connector_uri: {type: [string, 'null']}
+        deep_link_uri: {type: [string, 'null']}
+        expires_at: {type: string, format: date-time}
+        error_text: {type: [string, 'null']}
+        frontend_request:
+          oneOf:
+            - $ref: '#/components/schemas/AgentbookFrontendRequest'
+            - type: 'null'
+        tx_request: {type: [object, 'null'], additionalProperties: true}
+        trust:
+          $ref: '#/components/schemas/AgentbookTrustSummary'
+    AgentbookSessionResponse:
+      type: object
+      required: [ok, session]
+      properties:
+        ok: {type: boolean}
+        session:
+          $ref: '#/components/schemas/AgentbookSession'
+    AgentbookSessionSubmitRequest:
+      type: object
+      required: [session_token, proof]
+      properties:
+        session_token: {type: string}
+        proof: {type: object, additionalProperties: true}
+    AgentbookLookupResult:
+      type: object
+      required:
+        [
+          wallet_address,
+          chain_id,
+          registry_address,
+          token_id,
+          connected,
+          world_human_id,
+          unique_agent_count,
+          connected_at,
+          source
+        ]
+      properties:
+        wallet_address: {type: string}
+        chain_id: {type: integer}
+        registry_address: {type: string}
+        token_id: {type: string}
+        connected: {type: boolean}
+        world_human_id: {type: [string, 'null']}
+        unique_agent_count: {type: integer}
+        connected_at: {type: [string, 'null'], format: date-time}
+        source: {type: [string, 'null']}
+    AgentbookLookupResponse:
+      type: object
+      required: [ok, result]
+      properties:
+        ok: {type: boolean}
+        result:
+          $ref: '#/components/schemas/AgentbookLookupResult'
     ClaimedName:
       type: object
-      required: [label, fqdn, claimed_at, in_use]
+      required: [id, label, fqdn, ens_fqdn, claimed_at, claim_status, formation_agent_slug, attached_agent_slug]
       properties:
+        id: {type: integer}
         label: {type: string}
         fqdn: {type: string}
-        ens_fqdn: {type: [string, 'null']}
+        ens_fqdn: {type: string}
         claimed_at: {type: string, format: date-time}
-        in_use: {type: boolean}
+        claim_status:
+          type: string
+          enum: [reserved, upgrade_pending, onchain_live, upgrade_failed]
+        upgrade_tx_hash: {type: [string, 'null']}
+        upgraded_at: {type: [string, 'null'], format: date-time}
+        formation_agent_slug: {type: [string, 'null']}
+        attached_agent_slug: {type: [string, 'null']}
+    AgentEnsAssignment:
+      type: object
+      required: [attached, claim_status]
+      properties:
+        attached: {type: boolean}
+        claim_id: {type: [integer, 'null']}
+        name: {type: [string, 'null']}
+        claim_status:
+          oneOf:
+            - type: string
+              enum: [reserved, upgrade_pending, onchain_live, upgrade_failed]
+            - type: 'null'
+    PreparedTxRequest:
+      type: object
+      required: [chain_id, to, value, data]
+      properties:
+        chain_id: {type: integer}
+        to: {type: string}
+        value: {type: string}
+        data: {type: string}
+    PreparedTxAction:
+      type: object
+      required: [resource, action, chain_id, tx_request]
+      properties:
+        resource: {type: string}
+        action: {type: string}
+        chain_id: {type: integer}
+        target: {type: [string, 'null']}
+        description: {type: [string, 'null']}
+        tx_request:
+          $ref: '#/components/schemas/PreparedTxRequest'
+    PreparedEnsUpgrade:
+      type: object
+      required: [resource, action, chain_id, expected_name, tx_request]
+      properties:
+        resource: {type: string}
+        action: {type: string}
+        chain_id: {type: integer}
+        expected_name: {type: string}
+        tx_request:
+          $ref: '#/components/schemas/PreparedTxRequest'
+    ConfirmEnsUpgradeRequest:
+      type: object
+      required: [tx_hash]
+      properties:
+        tx_hash: {type: string}
+    AttachEnsNameRequest:
+      type: object
+      required: [claim_id]
+      properties:
+        claim_id: {type: integer}
+    EnsLinkPlanRequest:
+      type: object
+      properties:
+        include_reverse: {type: boolean}
+        signer_address: {type: [string, 'null']}
+        registry_address: {type: [string, 'null']}
+        agent_id:
+          oneOf:
+            - type: integer
+            - type: string
+            - type: 'null'
+        current_agent_uri: {type: [string, 'null']}
+    EnsLinkPlan:
+      type: object
+      required: [ens_name, ensip25_key, ensip25_status, erc8004_status, reverse_status]
+      properties:
+        ens_name: {type: string}
+        ensip25_key: {type: string}
+        ensip25_status: {type: string}
+        erc8004_status: {type: string}
+        reverse_status: {type: string}
+        warnings:
+          type: array
+          items: {type: string}
+    PreparedBidirectionalEnsLink:
+      type: object
+      required: [plan, ensip25, erc8004, reverse]
+      properties:
+        plan:
+          $ref: '#/components/schemas/EnsLinkPlan'
+        ensip25:
+          oneOf:
+            - $ref: '#/components/schemas/PreparedTxAction'
+            - type: string
+              enum: [noop, blocked]
+        erc8004:
+          oneOf:
+            - $ref: '#/components/schemas/PreparedTxAction'
+            - type: string
+              enum: [noop, blocked]
+        reverse:
+          oneOf:
+            - $ref: '#/components/schemas/PreparedTxAction'
+            - type: string
+              enum: [noop, blocked, skipped]
+    PreparePrimaryEnsNameRequest:
+      type: object
+      required: [ens_name]
+      properties:
+        ens_name: {type: string}
+    PreparedReverseEnsName:
+      type: object
+      required: [resource, action, chain_id, ens_name, tx_request]
+      properties:
+        resource: {type: string}
+        action: {type: string}
+        chain_id: {type: integer}
+        ens_name: {type: string}
+        tx_request:
+          $ref: '#/components/schemas/PreparedTxRequest'
     BillingAccount:
       type: object
       required: [status, connected, provider, model_default, margin_bps, runtime_credit_balance_usd_cents, paid_companies, paused_companies, trialing_companies, welcome_credit]
@@ -1522,9 +2060,11 @@ components:
         claimedLabel: {type: string}
     BillingUsageSummary:
       type: object
-      required: [runtime_credit_balance_usd_cents, trialing_companies, paid_companies, paused_companies, welcome_credit, companies]
+      required: [runtime_credit_balance_usd_cents, runtime_spend_usd_cents, llm_spend_usd_cents, trialing_companies, paid_companies, paused_companies, welcome_credit, companies]
       properties:
         runtime_credit_balance_usd_cents: {type: integer}
+        runtime_spend_usd_cents: {type: integer}
+        llm_spend_usd_cents: {type: integer}
         trialing_companies: {type: integer}
         paid_companies: {type: integer}
         paused_companies: {type: integer}
@@ -1536,7 +2076,7 @@ components:
           type: array
           items:
             type: object
-            required: [slug, name, runtime_status, desired_runtime_state, observed_runtime_state, sprite_metering_status, sprite_free_until]
+            required: [slug, name, runtime_status, desired_runtime_state, observed_runtime_state, sprite_metering_status, sprite_free_until, runtime_spend_usd_cents, llm_spend_usd_cents]
             properties:
               slug: {type: string}
               name: {type: string}
@@ -1545,6 +2085,170 @@ components:
               observed_runtime_state: {type: string}
               sprite_metering_status: {type: string}
               sprite_free_until: {type: [string, 'null'], format: date-time}
+              runtime_spend_usd_cents: {type: integer}
+              llm_spend_usd_cents: {type: integer}
+    AvatarSelectionInput:
+      oneOf:
+        - $ref: '#/components/schemas/CustomShaderAvatarInput'
+        - $ref: '#/components/schemas/CollectionAvatarInput'
+    AvatarSelection:
+      oneOf:
+        - $ref: '#/components/schemas/CustomShaderAvatar'
+        - $ref: '#/components/schemas/CollectionAvatar'
+    CustomShaderAvatarInput:
+      type: object
+      required: [kind, shader_id]
+      properties:
+        kind:
+          type: string
+          const: custom_shader
+        shader_id: {type: string}
+        define_values:
+          type: object
+          additionalProperties: {type: string}
+    CollectionAvatarInput:
+      type: object
+      required: [kind, collection, token_id]
+      properties:
+        kind:
+          type: string
+          const: collection_token
+        collection:
+          type: string
+          enum: [animata1, animata2, animataPass]
+        token_id: {type: integer}
+    CustomShaderAvatar:
+      allOf:
+        - $ref: '#/components/schemas/CustomShaderAvatarInput'
+        - type: object
+          required: [preview_type]
+          properties:
+            preview_type:
+              type: string
+              const: shader
+    CollectionAvatar:
+      allOf:
+        - $ref: '#/components/schemas/CollectionAvatarInput'
+        - type: object
+          required: [preview_type, gold_border]
+          properties:
+            preview_type:
+              type: string
+              enum: [collection_chip, token_card]
+            gold_border: {type: boolean}
+    RegentStakingAmountRequest:
+      type: object
+      required: [amount]
+      properties:
+        amount: {type: string}
+    RegentStakingDepositRequest:
+      allOf:
+        - $ref: '#/components/schemas/RegentStakingAmountRequest'
+        - type: object
+          required: [source_tag, source_ref]
+          properties:
+            source_tag: {type: string}
+            source_ref: {type: string}
+    RegentStakingWithdrawRequest:
+      allOf:
+        - $ref: '#/components/schemas/RegentStakingAmountRequest'
+        - type: object
+          properties:
+            recipient: {type: string}
+    RegentStakingTxRequest:
+      type: object
+      required: [chain_id, to, value, data]
+      properties:
+        chain_id: {type: integer}
+        to: {type: string}
+        value: {type: string}
+        data: {type: string}
+    RegentStakingState:
+      type: object
+      required: [chain_id, chain_label, contract_address, owner_address, stake_token_address, usdc_address, treasury_recipient, staker_share_bps, paused, total_staked_raw, total_staked, total_recognized_rewards_usdc_raw, total_recognized_rewards_usdc, treasury_residual_usdc_raw, treasury_residual_usdc, materialized_outstanding_raw, materialized_outstanding, available_reward_inventory_raw, available_reward_inventory, total_claimed_so_far_raw, total_claimed_so_far]
+      properties:
+        chain_id: {type: integer}
+        chain_label: {type: string}
+        contract_address: {type: string}
+        owner_address: {type: string}
+        stake_token_address: {type: string}
+        usdc_address: {type: string}
+        treasury_recipient: {type: string}
+        staker_share_bps: {type: integer}
+        paused: {type: boolean}
+        total_staked_raw: {type: string}
+        total_staked: {type: string}
+        total_recognized_rewards_usdc_raw: {type: string}
+        total_recognized_rewards_usdc: {type: string}
+        treasury_residual_usdc_raw: {type: string}
+        treasury_residual_usdc: {type: string}
+        materialized_outstanding_raw: {type: string}
+        materialized_outstanding: {type: string}
+        available_reward_inventory_raw: {type: string}
+        available_reward_inventory: {type: string}
+        total_claimed_so_far_raw: {type: string}
+        total_claimed_so_far: {type: string}
+        wallet_address: {type: [string, 'null']}
+        connected_wallet_address: {type: [string, 'null']}
+        wallet_stake_balance_raw: {type: [string, 'null']}
+        wallet_stake_balance: {type: [string, 'null']}
+        wallet_token_balance_raw: {type: [string, 'null']}
+        wallet_token_balance: {type: [string, 'null']}
+        wallet_claimable_usdc_raw: {type: [string, 'null']}
+        wallet_claimable_usdc: {type: [string, 'null']}
+        wallet_claimable_regent_raw: {type: [string, 'null']}
+        wallet_claimable_regent: {type: [string, 'null']}
+    RegentStakingOverviewResponse:
+      allOf:
+        - $ref: '#/components/schemas/RegentStakingState'
+        - type: object
+          required: [ok]
+          properties:
+            ok: {type: boolean}
+    RegentStakingAccountResponse:
+      allOf:
+        - $ref: '#/components/schemas/RegentStakingState'
+        - type: object
+          required: [ok, connected_wallet_address]
+          properties:
+            ok: {type: boolean}
+            connected_wallet_address: {type: [string, 'null']}
+    RegentStakingWalletActionResponse:
+      type: object
+      required: [ok, staking, tx_request]
+      properties:
+        ok: {type: boolean}
+        staking:
+          type: object
+          required: [chain_id, chain_label, contract_address, wallet_address]
+          properties:
+            chain_id: {type: integer}
+            chain_label: {type: string}
+            contract_address: {type: string}
+            wallet_address: {type: string}
+        tx_request:
+          $ref: '#/components/schemas/RegentStakingTxRequest'
+    RegentStakingPreparedAction:
+      type: object
+      required: [resource, action, chain_id, target, calldata, params, tx_request]
+      properties:
+        resource: {type: string}
+        action: {type: string}
+        chain_id: {type: integer}
+        target: {type: string}
+        calldata: {type: string}
+        params:
+          type: object
+          additionalProperties: {type: string}
+        tx_request:
+          $ref: '#/components/schemas/RegentStakingTxRequest'
+    RegentStakingPrepareResponse:
+      type: object
+      required: [ok, prepared]
+      properties:
+        ok: {type: boolean}
+        prepared:
+          $ref: '#/components/schemas/RegentStakingPreparedAction'
     WelcomeCredit:
       type: object
       required: [status, amount_usd_cents, credit_scope, granted_at, expires_at, stripe_sync_status]
@@ -1566,7 +2270,7 @@ components:
         runtime_status: {type: string}
     CurrentHuman:
       type: object
-      required: [id, privy_user_id, wallet_addresses, billing_account]
+      required: [id, privy_user_id, wallet_addresses, billing_account, avatar]
       properties:
         id: {type: integer}
         privy_user_id: {type: string}
@@ -1575,6 +2279,10 @@ components:
           type: array
           items: {type: string}
         display_name: {type: [string, 'null']}
+        avatar:
+          oneOf:
+            - $ref: '#/components/schemas/AvatarSelection'
+            - type: 'null'
         billing_account:
           $ref: '#/components/schemas/BillingAccount'
     CurrentHumanProfile:
@@ -1750,7 +2458,7 @@ components:
         published_at: {type: string, format: date-time}
     PublicAgentRecord:
       type: object
-      required: [id, template_key, name, slug, claimed_label, basename_fqdn, ens_fqdn, status, public_summary, services, connections, feed]
+      required: [id, template_key, name, slug, claimed_label, basename_fqdn, ens, status, public_summary, services, connections, feed, avatar]
       properties:
         id: {type: integer}
         owner_human_id: {type: [integer, 'null']}
@@ -1759,7 +2467,8 @@ components:
         slug: {type: string}
         claimed_label: {type: string}
         basename_fqdn: {type: string}
-        ens_fqdn: {type: string}
+        ens:
+          $ref: '#/components/schemas/AgentEnsAssignment'
         status: {type: string}
         public_summary: {type: string}
         hero_statement: {type: [string, 'null']}
@@ -1777,6 +2486,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AgentConnection'
+        avatar:
+          oneOf:
+            - $ref: '#/components/schemas/AvatarSelection'
+            - type: 'null'
         feed:
           type: array
           items:

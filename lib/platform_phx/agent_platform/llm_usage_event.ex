@@ -14,6 +14,7 @@ defmodule PlatformPhx.AgentPlatform.LlmUsageEvent do
     field :input_tokens, :integer, default: 0
     field :output_tokens, :integer, default: 0
     field :cached_tokens, :integer, default: 0
+    field :amount_usd_cents, :integer, default: 0
     field :status, :string, default: "pending"
     field :stripe_meter_event_id, :string
     field :occurred_at, :utc_datetime
@@ -36,6 +37,7 @@ defmodule PlatformPhx.AgentPlatform.LlmUsageEvent do
       :input_tokens,
       :output_tokens,
       :cached_tokens,
+      :amount_usd_cents,
       :status,
       :stripe_meter_event_id,
       :occurred_at,
@@ -47,8 +49,10 @@ defmodule PlatformPhx.AgentPlatform.LlmUsageEvent do
       :external_run_id,
       :provider,
       :model,
-      :occurred_at
+      :occurred_at,
+      :amount_usd_cents
     ])
+    |> validate_number(:amount_usd_cents, greater_than_or_equal_to: 0)
     |> validate_inclusion(:status, ["pending", "reported", "failed"])
     |> unique_constraint(:external_run_id)
   end

@@ -161,6 +161,7 @@ defmodule PlatformPhx.Basenames.Writes do
                payment_chain_id: reservation.payment_chain_id,
                price_wei: reservation.price_wei,
                is_free: reservation.is_free,
+               claim_status: "reserved",
                is_in_use: false
              }) do
         :ok = Payments.attach_credit_usage(reservation.credit_id, node, fqdn)
@@ -219,6 +220,7 @@ defmodule PlatformPhx.Basenames.Writes do
                  owner_address: normalized_address,
                  tx_hash: tx_hash,
                  is_free: true,
+                 claim_status: "reserved",
                  is_in_use: true
                }) do
           {:ok,

@@ -13,6 +13,7 @@ import {
 } from "./dashboard/islands";
 import { mountBoundHook } from "./dashboard/hook_lifecycle";
 import { DashboardXmtpRoomHook } from "./dashboard/xmtp_room";
+import { TokenStakingHook } from "./token_staking";
 import { mountShaderRoot, unmountShaderRoot } from "./shader/root";
 import { mountTokenCardRoot, unmountTokenCardRoot, updateTokenCardRoot } from "./shader/token_card_root";
 import {
@@ -36,6 +37,7 @@ import { mountOverviewMode } from "./overview";
 import { mountColorModeToggle } from "./color_mode";
 import { VoxelBackgroundHook } from "./voxel_background";
 import { registerWebMCP } from "./webmcp";
+import { AgentbookTrustFlow } from "./agentbook_trust_flow";
 
 type HookContext = {
   el: Element;
@@ -699,6 +701,7 @@ const hooks: HooksOptions = {
   DashboardWallet: DashboardWalletHook,
   DashboardNameClaim: DashboardNameClaimHook,
   DashboardRedeem: DashboardRedeemHook,
+  TokenStaking: TokenStakingHook,
   DashboardXmtpRoom: DashboardXmtpRoomHook,
   LaunchProgress: LaunchProgressHook,
   ShaderRoot: ShaderRootHook,
@@ -723,6 +726,7 @@ const hooks: HooksOptions = {
   OverviewMode: OverviewModeHook,
   ColorModeToggle: ColorModeToggleHook,
   VoxelBackground: VoxelBackgroundHook,
+  AgentbookTrustFlow,
 };
 
 const liveSocket = new LiveSocket("/live", Socket, {

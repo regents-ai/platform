@@ -267,6 +267,71 @@ commands:
           command: {type: string}
           origin: {type: string}
           sessionFile: {type: string}
+  - name: regents agentbook register
+    summary: Start a hosted human-backed trust flow for the saved Regent agent identity.
+    auth:
+      mode: agent-siwa
+    transport:
+      kind: http
+      operationIds: [createAgentbookTrustSession]
+    args: []
+    flags:
+      - name: --watch
+        type: boolean
+        required: false
+        default: false
+        description: Keep polling until the hosted trust session finishes or fails.
+    output:
+      format: json
+      schema:
+        type: object
+        required: [ok, session]
+        properties:
+          ok: {type: boolean}
+          session: {type: object, additionalProperties: true}
+  - name: regents agentbook sessions watch
+    summary: Poll one hosted human-backed trust session for the saved Regent agent identity.
+    auth:
+      mode: agent-siwa
+    transport:
+      kind: http
+      operationIds: [getAgentbookTrustSession]
+    args:
+      - name: session_id
+        type: string
+        required: true
+        description: Session id returned by `regents agentbook register`.
+    flags:
+      - name: --interval
+        type: number
+        required: false
+        default: 2
+        description: Seconds between status polls.
+    output:
+      format: json
+      schema:
+        type: object
+        required: [ok, session]
+        properties:
+          ok: {type: boolean}
+          session: {type: object, additionalProperties: true}
+  - name: regents agentbook lookup
+    summary: Show the saved human-backed trust summary for the current Regent agent identity.
+    auth:
+      mode: agent-siwa
+    transport:
+      kind: http
+      operationIds: [lookupAgentbookTrust]
+    args: []
+    flags: []
+    output:
+      format: json
+      schema:
+        type: object
+        required: [ok, result]
+        properties:
+          ok: {type: boolean}
+          result: {type: object, additionalProperties: true}
   - name: regent platform formation status
     summary: Show launch readiness from the saved session, including claimed names, billing, and owned companies.
     auth:

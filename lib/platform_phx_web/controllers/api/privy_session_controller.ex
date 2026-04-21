@@ -70,6 +70,20 @@ defmodule PlatformPhxWeb.Api.PrivySessionController do
     |> then(&ApiErrors.respond(conn, &1))
   end
 
+  def update_avatar(conn, params) when is_map(params) do
+    with %{} = human <- current_human(conn),
+         {:ok, updated_human} <- AgentPlatform.save_human_avatar(human, params),
+         {:ok, payload} <- AgentPlatform.current_human_payload(updated_human) do
+      json(conn, payload)
+    else
+      nil ->
+        ApiErrors.error(conn, {:unauthorized, "Sign in before saving an avatar"})
+
+      {:error, reason} ->
+        ApiErrors.error(conn, reason)
+    end
+  end
+
   def delete(conn, _params) do
     conn
     |> configure_session(drop: true)

@@ -1,6 +1,8 @@
 defmodule PlatformPhxWeb.TokenInfoLive do
   use PlatformPhxWeb, :live_view
 
+  alias PlatformPhx.RegentStaking
+  alias PlatformPhx.RuntimeConfig
   alias PlatformPhx.TokenMarketData
 
   @holders [
@@ -195,6 +197,8 @@ defmodule PlatformPhxWeb.TokenInfoLive do
         {:error, _reason} -> %{market_cap_display: "--", fdv_display: "--"}
       end
 
+    {staking, staking_notice} = load_staking(socket.assigns.current_human)
+
     {:ok,
      socket
      |> assign(:page_title, "Platform Token")
@@ -202,7 +206,13 @@ defmodule PlatformPhxWeb.TokenInfoLive do
      |> assign(:holders, @holders)
      |> assign(:allocations, @allocations)
      |> assign(:token_market_summary, token_market_summary)
-     |> assign(:open_holder, nil)}
+     |> assign(:open_holder, nil)
+     |> assign(:staking, staking)
+     |> assign(:staking_notice, staking_notice)
+     |> assign(:staking_form, to_form(%{"amount" => ""}, as: :staking))
+     |> assign(:staking_amount, "")
+     |> assign(:base_rpc_url, RuntimeConfig.base_rpc_url())
+     |> assign(:base_sepolia_rpc_url, RuntimeConfig.regent_staking_rpc_url())}
   end
 
   @impl true
@@ -224,6 +234,80 @@ defmodule PlatformPhxWeb.TokenInfoLive do
   end
 
   def handle_event("toggle_holder", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("change_staking_amount", %{"staking" => %{"amount" => amount}}, socket) do
+    {:noreply,
+     socket
+     |> assign(:staking_amount, amount)
+     |> assign(:staking_form, to_form(%{"amount" => amount}, as: :staking))}
+  end
+
+  @impl true
+  def handle_event("submit_staking", %{"action" => action}, socket) do
+    params = %{"amount" => socket.assigns.staking_amount}
+
+    case staking_action(action, params, socket.assigns.current_human) do
+      {:ok, %{tx_request: tx_request}} ->
+        {:noreply,
+         socket
+         |> assign(:staking_notice, %{tone: :info, message: staking_pending_copy(action)})
+         |> push_event("regent-staking:tx-request", %{action: action, tx_request: tx_request})}
+
+      {:error, {:unauthorized, _message}} ->
+        {:noreply,
+         assign(socket, :staking_notice, %{
+           tone: :error,
+           message: "Sign in with the wallet that holds your $REGENT first."
+         })}
+
+      {:error, {:bad_request, message}} ->
+        {:noreply, assign(socket, :staking_notice, %{tone: :error, message: message})}
+
+      {:error, :amount_required} ->
+        {:noreply,
+         assign(socket, :staking_notice, %{
+           tone: :error,
+           message: "Enter an amount before continuing."
+         })}
+
+      {:error, :invalid_amount_precision} ->
+        {:noreply,
+         assign(socket, :staking_notice, %{
+           tone: :error,
+           message: "That amount uses too many decimals."
+         })}
+
+      {:error, :unconfigured} ->
+        {:noreply,
+         assign(socket, :staking_notice, %{
+           tone: :error,
+           message: "Staking is unavailable right now."
+         })}
+
+      {:error, _reason} ->
+        {:noreply,
+         assign(socket, :staking_notice, %{
+           tone: :error,
+           message: "Could not prepare that staking action."
+         })}
+    end
+  end
+
+  @impl true
+  def handle_event("staking_tx_complete", %{"action" => action}, socket) do
+    {staking, _previous_notice} = load_staking(socket.assigns.current_human)
+
+    {:noreply,
+     socket
+     |> assign(:staking, staking)
+     |> assign(:staking_notice, %{tone: :success, message: staking_success_copy(action)})}
+  end
+
+  @impl true
+  def handle_event("staking_tx_failed", %{"message" => message}, socket) do
+    {:noreply, assign(socket, :staking_notice, %{tone: :error, message: message})}
+  end
 
   @impl true
   def render(assigns) do
@@ -383,11 +467,150 @@ defmodule PlatformPhxWeb.TokenInfoLive do
                   <p class="pp-token-source-short">20% yield for initial year</p>
                   <p class="pp-panel-copy">
                     As the protocol builds this first year, an emissions reward of 20% of staked $REGENT
-                    will be streamed to stakers. The staking portal and emission claims will open through Autolaunch.
+                    will be streamed to stakers. Platform and Autolaunch both open the same staking rail and the same emission claims.
                   </p>
                 </article>
               </div>
             </div>
+          </section>
+
+          <section
+            id="platform-token-staking"
+            class="pp-route-panel pp-token-panel"
+            data-bridge-block
+            phx-hook="TokenStaking"
+            data-base-rpc-url={@base_rpc_url}
+            data-base-sepolia-rpc-url={@base_sepolia_rpc_url}
+          >
+            <div class="pp-token-section-copy">
+              <p class="pp-home-kicker">Staking</p>
+              <h2 class="pp-route-panel-title">
+                Stake from Platform or Autolaunch. It is the same rail.
+              </h2>
+              <p class="pp-panel-copy">
+                Platform and Autolaunch open the same staking contract, the same reward claims, and the same wallet actions. Use either one. The result is the same.
+              </p>
+            </div>
+
+            <%= if @staking_notice do %>
+              <.staking_notice notice={@staking_notice} />
+            <% end %>
+
+            <%= if @staking do %>
+              <div class="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+                <section class="rounded-[1.4rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_92%,transparent)] p-5">
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    <.staking_metric label="Network" value={@staking.chain_label} />
+                    <.staking_metric
+                      label="Total staked"
+                      value={staking_value(@staking.total_staked)}
+                    />
+                    <.staking_metric
+                      label="Your staked balance"
+                      value={staking_value(@staking.wallet_stake_balance)}
+                    />
+                    <.staking_metric
+                      label="Wallet balance"
+                      value={staking_value(@staking.wallet_token_balance)}
+                    />
+                    <.staking_metric
+                      label="Claimable USDC"
+                      value={staking_value(@staking.wallet_claimable_usdc)}
+                    />
+                    <.staking_metric
+                      label="Claimable REGENT"
+                      value={staking_value(@staking.wallet_claimable_regent)}
+                    />
+                  </div>
+                </section>
+
+                <section class="rounded-[1.4rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_92%,transparent)] p-5">
+                  <div class="space-y-3">
+                    <p class="text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
+                      Wallet actions
+                    </p>
+                    <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
+                      Enter an amount for stake or unstake, then send the wallet action. Claim buttons use your live staking balance automatically.
+                    </p>
+                  </div>
+
+                  <.form
+                    for={@staking_form}
+                    id="platform-token-staking-form"
+                    phx-change="change_staking_amount"
+                    class="mt-4 space-y-4"
+                  >
+                    <.input
+                      id="platform-token-staking-amount"
+                      field={@staking_form[:amount]}
+                      type="text"
+                      placeholder="Amount of REGENT"
+                      autocomplete="off"
+                      class="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--background)] px-4 py-3 text-sm text-[color:var(--foreground)]"
+                    />
+
+                    <div class="grid gap-3 sm:grid-cols-2">
+                      <button
+                        id="platform-token-stake-button"
+                        type="button"
+                        phx-click="submit_staking"
+                        phx-value-action="stake"
+                        class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--foreground)] px-4 py-2 text-sm text-[color:var(--background)] transition hover:opacity-90"
+                      >
+                        Stake on Platform
+                      </button>
+                      <button
+                        id="platform-token-unstake-button"
+                        type="button"
+                        phx-click="submit_staking"
+                        phx-value-action="unstake"
+                        class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
+                      >
+                        Unstake
+                      </button>
+                      <button
+                        id="platform-token-claim-usdc-button"
+                        type="button"
+                        phx-click="submit_staking"
+                        phx-value-action="claim_usdc"
+                        class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
+                      >
+                        Claim USDC
+                      </button>
+                      <button
+                        id="platform-token-claim-regent-button"
+                        type="button"
+                        phx-click="submit_staking"
+                        phx-value-action="claim_regent"
+                        class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
+                      >
+                        Claim REGENT
+                      </button>
+                    </div>
+
+                    <button
+                      id="platform-token-restake-button"
+                      type="button"
+                      phx-click="submit_staking"
+                      phx-value-action="claim_and_restake_regent"
+                      class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
+                    >
+                      Claim and restake REGENT
+                    </button>
+                  </.form>
+
+                  <p class="mt-4 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                    Prefer the launch surface? Autolaunch opens the same staking rail and the same wallet calls.
+                  </p>
+                </section>
+              </div>
+            <% else %>
+              <div class="mt-6 rounded-[1.4rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_92%,transparent)] p-5">
+                <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
+                  Staking details are unavailable right now.
+                </p>
+              </div>
+            <% end %>
           </section>
 
           <section class="pp-route-panel pp-token-panel" data-bridge-block>
@@ -522,5 +745,109 @@ defmodule PlatformPhxWeb.TokenInfoLive do
       </div>
     </Layouts.app>
     """
+  end
+
+  attr :label, :string, required: true
+  attr :value, :string, required: true
+
+  defp staking_metric(assigns) do
+    ~H"""
+    <div class="rounded-[1rem] border border-[color:var(--border)] bg-[color:var(--background)] px-4 py-4">
+      <p class="text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
+        {@label}
+      </p>
+      <p class="mt-3 font-display text-[1.25rem] text-[color:var(--foreground)]">{@value}</p>
+    </div>
+    """
+  end
+
+  attr :notice, :map, required: true
+
+  defp staking_notice(assigns) do
+    ~H"""
+    <div class={[
+      "mt-6 rounded-[1.2rem] border px-4 py-3 text-sm leading-6",
+      staking_notice_class(@notice.tone)
+    ]}>
+      {@notice.message}
+    </div>
+    """
+  end
+
+  defp load_staking(current_human) do
+    case RegentStaking.overview(current_human) do
+      {:ok, staking} ->
+        {staking, nil}
+
+      {:error, :unconfigured} ->
+        {nil, %{tone: :error, message: "Staking is unavailable right now."}}
+
+      {:error, _reason} ->
+        {nil, %{tone: :error, message: "Could not load staking details right now."}}
+    end
+  end
+
+  defp staking_action("stake", params, current_human),
+    do: RegentStaking.stake(params, current_human)
+
+  defp staking_action("unstake", params, current_human),
+    do: RegentStaking.unstake(params, current_human)
+
+  defp staking_action("claim_usdc", params, current_human),
+    do: RegentStaking.claim_usdc(params, current_human)
+
+  defp staking_action("claim_regent", params, current_human),
+    do: RegentStaking.claim_regent(params, current_human)
+
+  defp staking_action("claim_and_restake_regent", params, current_human),
+    do: RegentStaking.claim_and_restake_regent(params, current_human)
+
+  defp staking_action(_action, _params, _current_human), do: {:error, :invalid_action}
+
+  defp staking_pending_copy("stake"),
+    do: "Open your wallet to confirm the staking transaction."
+
+  defp staking_pending_copy("unstake"),
+    do: "Open your wallet to confirm the unstake transaction."
+
+  defp staking_pending_copy("claim_usdc"),
+    do: "Open your wallet to confirm the USDC claim."
+
+  defp staking_pending_copy("claim_regent"),
+    do: "Open your wallet to confirm the REGENT claim."
+
+  defp staking_pending_copy("claim_and_restake_regent"),
+    do: "Open your wallet to confirm the claim-and-restake transaction."
+
+  defp staking_pending_copy(_action), do: "Open your wallet to confirm the staking transaction."
+
+  defp staking_success_copy("stake"), do: "Stake sent. Refreshing your staking snapshot."
+  defp staking_success_copy("unstake"), do: "Unstake sent. Refreshing your staking snapshot."
+
+  defp staking_success_copy("claim_usdc"),
+    do: "USDC claim sent. Refreshing your staking snapshot."
+
+  defp staking_success_copy("claim_regent"),
+    do: "REGENT claim sent. Refreshing your staking snapshot."
+
+  defp staking_success_copy("claim_and_restake_regent"),
+    do: "Claim-and-restake sent. Refreshing your staking snapshot."
+
+  defp staking_success_copy(_action), do: "Transaction sent. Refreshing your staking snapshot."
+
+  defp staking_value(nil), do: "--"
+  defp staking_value(value) when is_binary(value), do: value
+  defp staking_value(value), do: to_string(value)
+
+  defp staking_notice_class(:success) do
+    "border-[color:color-mix(in_oklch,var(--positive)_55%,var(--border)_45%)] bg-[color:color-mix(in_oklch,var(--positive)_10%,transparent)] text-[color:var(--foreground)]"
+  end
+
+  defp staking_notice_class(:error) do
+    "border-[color:#a6574f] bg-[color:color-mix(in_oklch,#a6574f_10%,transparent)] text-[color:var(--foreground)]"
+  end
+
+  defp staking_notice_class(_tone) do
+    "border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_90%,transparent)] text-[color:var(--foreground)]"
   end
 end

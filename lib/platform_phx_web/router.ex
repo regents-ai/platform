@@ -65,6 +65,7 @@ defmodule PlatformPhxWeb.Router do
       live "/", HomeLive
       live "/app", AppEntryLive
       live "/app/access", App.AccessLive
+      live "/app/trust", App.TrustLive
       live "/app/identity", App.IdentityLive
       live "/app/billing", App.BillingLive
       live "/app/formation", App.FormationLive
@@ -110,15 +111,9 @@ defmodule PlatformPhxWeb.Router do
     get "/agent-platform/templates", Api.AgentPlatformController, :templates
     get "/agent-platform/resolve", Api.AgentPlatformController, :resolve
     get "/agent-platform/agents/:slug/feed", Api.AgentPlatformController, :feed
+    get "/regent/staking", Api.RegentStakingController, :show
+    get "/regent/staking/account/:address", Api.RegentStakingController, :account
     post "/agent-platform/stripe/webhooks", Api.StripeWebhookController, :create
-  end
-
-  scope "/v1/agent/siwa", PlatformPhxWeb.Api do
-    pipe_through :api
-
-    post "/nonce", AgentSiwaController, :nonce
-    post "/verify", AgentSiwaController, :verify
-    post "/http-verify", AgentSiwaController, :http_verify
   end
 
   scope "/api/auth/privy", PlatformPhxWeb.Api do
@@ -127,6 +122,7 @@ defmodule PlatformPhxWeb.Router do
     get "/csrf", PrivySessionController, :csrf
     post "/session", PrivySessionController, :create
     get "/profile", PrivySessionController, :show
+    put "/profile/avatar", PrivySessionController, :update_avatar
     delete "/session", PrivySessionController, :delete
   end
 
@@ -141,6 +137,20 @@ defmodule PlatformPhxWeb.Router do
     pipe_through [:session_api, :platform_agent_api]
 
     post "/session", AgentSessionController, :create
+  end
+
+  scope "/api/agentbook", PlatformPhxWeb.Api do
+    pipe_through :session_api
+
+    post "/sessions/:id/submit", AgentbookController, :submit
+  end
+
+  scope "/api/agentbook", PlatformPhxWeb.Api do
+    pipe_through :shared_agent_api
+
+    post "/sessions", AgentbookController, :create
+    get "/sessions/:id", AgentbookController, :show
+    get "/lookup", AgentbookController, :lookup
   end
 
   scope "/v1/agent", PlatformPhxWeb do
@@ -160,8 +170,36 @@ defmodule PlatformPhxWeb.Router do
     post "/billing/topups/checkout", AgentFormationController, :billing_topup_checkout
     post "/formation/companies", AgentFormationController, :create_company
     get "/agents/:slug/runtime", AgentFormationController, :runtime
+    post "/ens/claims/:claim_id/prepare-upgrade", AgentEnsController, :prepare_upgrade
+    post "/ens/claims/:claim_id/confirm-upgrade", AgentEnsController, :confirm_upgrade
+    post "/agents/:slug/ens/attach", AgentEnsController, :attach
+    post "/agents/:slug/ens/detach", AgentEnsController, :detach
+    post "/agents/:slug/ens/link/plan", AgentEnsController, :link_plan
+
+    post "/agents/:slug/ens/link/prepare-bidirectional",
+         AgentEnsController,
+         :prepare_bidirectional
+
     post "/sprites/:slug/pause", AgentFormationController, :pause_sprite
     post "/sprites/:slug/resume", AgentFormationController, :resume_sprite
+  end
+
+  scope "/api/agent-platform", PlatformPhxWeb.Api do
+    pipe_through :shared_agent_api
+
+    post "/ens/prepare-primary", AgentEnsController, :prepare_primary
+  end
+
+  scope "/api/regent/staking", PlatformPhxWeb.Api do
+    pipe_through :session_api
+
+    post "/stake", RegentStakingController, :stake
+    post "/unstake", RegentStakingController, :unstake
+    post "/claim-usdc", RegentStakingController, :claim_usdc
+    post "/claim-regent", RegentStakingController, :claim_regent
+    post "/claim-and-restake-regent", RegentStakingController, :claim_and_restake_regent
+    post "/deposit-usdc/prepare", RegentStakingController, :prepare_deposit
+    post "/withdraw-treasury/prepare", RegentStakingController, :prepare_withdraw_treasury
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

@@ -1,8 +1,12 @@
 defmodule PlatformPhxWeb.App.DashboardLive do
   use PlatformPhxWeb, :live_view
 
+  alias PlatformPhx.Accounts
+  alias PlatformPhx.Accounts.AvatarSelection
+  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Formation
   alias PlatformPhx.Dashboard
+  alias PlatformPhx.TokenCardManifest
   import PlatformPhxWeb.AppComponents
 
   @impl true
@@ -12,6 +16,10 @@ defmodule PlatformPhxWeb.App.DashboardLive do
      |> assign(:page_title, "Dashboard")
      |> assign(:formation_data, nil)
      |> assign(:formation_notice, nil)
+     |> assign(:avatar_save_notice, nil)
+     |> assign(:holdings, empty_holdings())
+     |> assign(:formation_token_cards, %{})
+     |> assign(:shader_options, AvatarSelection.shader_options())
      |> assign(:usage, empty_usage())
      |> load_payload()}
   end
@@ -39,6 +47,21 @@ defmodule PlatformPhxWeb.App.DashboardLive do
   end
 
   @impl true
+  def handle_event("save_avatar", params, socket) do
+    case AgentPlatform.save_human_avatar(socket.assigns.current_human, params) do
+      {:ok, updated_human} ->
+        {:noreply,
+         socket
+         |> assign(:current_human, Accounts.get_human(updated_human.id))
+         |> assign(:avatar_save_notice, %{tone: :success, message: "Saved avatar updated."})
+         |> load_payload()}
+
+      {:error, {_status, message}} ->
+        {:noreply, assign(socket, :avatar_save_notice, %{tone: :error, message: message})}
+    end
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app
@@ -57,7 +80,15 @@ defmodule PlatformPhxWeb.App.DashboardLive do
         phx-hook="DashboardReveal"
       >
         <%= if dashboard_ready?(@formation_data) do %>
-          <.dashboard_stage formation={@formation_data} usage={@usage} />
+          <.dashboard_stage
+            formation={@formation_data}
+            usage={@usage}
+            current_human={@current_human}
+            holdings={@holdings}
+            formation_token_cards={@formation_token_cards}
+            shader_options={@shader_options}
+            avatar_save_notice={@avatar_save_notice}
+          />
         <% else %>
           <.dashboard_not_ready_stage
             formation={@formation_data}
@@ -71,6 +102,7 @@ defmodule PlatformPhxWeb.App.DashboardLive do
 
   defp load_payload(socket) do
     usage = load_usage(socket.assigns.current_human)
+    holdings = load_holdings(socket.assigns.current_human)
 
     result =
       case Dashboard.agent_formation_payload(socket.assigns.current_human) do
@@ -87,6 +119,8 @@ defmodule PlatformPhxWeb.App.DashboardLive do
     socket
     |> assign(:formation_data, result.formation)
     |> assign(:formation_notice, result.notice)
+    |> assign(:holdings, holdings)
+    |> assign(:formation_token_cards, formation_token_cards(holdings))
     |> assign(:usage, usage)
   end
 
@@ -96,6 +130,15 @@ defmodule PlatformPhxWeb.App.DashboardLive do
     case Formation.billing_usage(current_human) do
       {:ok, %{usage: usage}} -> usage
       {:error, _reason} -> empty_usage()
+    end
+  end
+
+  defp load_holdings(nil), do: empty_holdings()
+
+  defp load_holdings(current_human) do
+    case AgentPlatform.holdings_for_human(current_human) do
+      {:ok, holdings} -> holdings
+      {:error, _reason} -> empty_holdings()
     end
   end
 
@@ -166,6 +209,8 @@ defmodule PlatformPhxWeb.App.DashboardLive do
   defp empty_usage do
     %{
       runtime_credit_balance_usd_cents: 0,
+      runtime_spend_usd_cents: 0,
+      llm_spend_usd_cents: 0,
       paid_companies: 0,
       paused_companies: 0,
       trialing_companies: 0,
@@ -173,4 +218,26 @@ defmodule PlatformPhxWeb.App.DashboardLive do
       companies: []
     }
   end
+
+  defp empty_holdings do
+    %{
+      "animata1" => [],
+      "animata2" => [],
+      "animataPass" => []
+    }
+  end
+
+  defp formation_token_cards(%{"animataPass" => token_ids}) when is_list(token_ids) do
+    case TokenCardManifest.fetch_many(token_ids) do
+      {:ok, entries} ->
+        entries
+        |> Enum.reject(fn {_token_id, entry} -> is_nil(entry) end)
+        |> Map.new()
+
+      {:error, _reason} ->
+        %{}
+    end
+  end
+
+  defp formation_token_cards(_holdings), do: %{}
 end

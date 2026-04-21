@@ -9,6 +9,8 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
   alias PlatformPhx.AgentPlatform.FormationEvent
   alias PlatformPhx.AgentPlatform.FormationRun
+  alias PlatformPhx.AgentPlatform.LlmUsageEvent
+  alias PlatformPhx.AgentPlatform.SpriteUsageRecord
   alias PlatformPhx.AgentPlatform.WelcomeCreditGrant
   alias PlatformPhx.AgentPlatform.Workers.RunFormationWorker
   alias PlatformPhx.Basenames.Mint
@@ -333,6 +335,55 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     billing_account = Repo.get_by!(BillingAccount, human_user_id: human.id)
     assert billing_account.stripe_customer_id == "cus_test_agent_formation"
+  end
+
+  test "billing usage reports runtime spend and model spend totals", %{conn: conn} do
+    human = insert_human!()
+    billing_account = insert_billing_account!(human)
+
+    agent =
+      insert_agent!(human, "metered", %{
+        sprite_metering_status: "paid"
+      })
+
+    %SpriteUsageRecord{}
+    |> SpriteUsageRecord.changeset(%{
+      billing_account_id: billing_account.id,
+      agent_id: agent.id,
+      meter_key: "metered-hour",
+      usage_seconds: 3600,
+      amount_usd_cents: 25,
+      window_started_at:
+        DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second),
+      window_ended_at: DateTime.utc_now() |> DateTime.truncate(:second),
+      status: "reported"
+    })
+    |> Repo.insert!()
+
+    %LlmUsageEvent{}
+    |> LlmUsageEvent.changeset(%{
+      agent_id: agent.id,
+      human_user_id: human.id,
+      external_run_id: "run-metered-1",
+      provider: "openai",
+      model: "gpt-5.4-mini",
+      input_tokens: 1200,
+      output_tokens: 320,
+      amount_usd_cents: 46,
+      occurred_at: DateTime.utc_now() |> DateTime.truncate(:second)
+    })
+    |> Repo.insert!()
+
+    response =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> get("/api/agent-platform/billing/usage")
+      |> json_response(200)
+
+    assert response["usage"]["runtime_spend_usd_cents"] == 25
+    assert response["usage"]["llm_spend_usd_cents"] == 46
+    assert get_in(response, ["usage", "companies", Access.at(0), "runtime_spend_usd_cents"]) == 25
+    assert get_in(response, ["usage", "companies", Access.at(0), "llm_spend_usd_cents"]) == 46
   end
 
   test "workspace seed reads the env file and preserves an existing workspace" do

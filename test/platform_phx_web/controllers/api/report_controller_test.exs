@@ -1,7 +1,6 @@
 defmodule PlatformPhxWeb.Api.ReportControllerTest do
   use PlatformPhxWeb.ConnCase, async: false
 
-  alias PlatformPhx.Siwa
   alias PlatformPhx.TestEthereumAdapter
   alias PlatformPhx.OperatorReports.BugReport
   alias PlatformPhx.OperatorReports.SecurityReport
@@ -15,14 +14,11 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
   @signed_token_id "77"
 
   setup do
-    TestEthereumAdapter.put_owner(
-      @signed_registry_address,
-      @signed_token_id,
-      @signed_wallet_address
-    )
+    previous_client = Application.get_env(:platform_phx, :siwa_client)
+    Application.put_env(:platform_phx, :siwa_client, PlatformPhx.TestSiwaClient)
 
     on_exit(fn ->
-      TestEthereumAdapter.delete_owner(@signed_registry_address, @signed_token_id)
+      Application.put_env(:platform_phx, :siwa_client, previous_client)
     end)
 
     :ok
@@ -165,7 +161,7 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
   end
 
   defp agent_headers(path, body) do
-    receipt = verified_receipt()
+    receipt = "regents-receipt"
     created = System.os_time(:second)
     expires = created + 120
 
@@ -177,7 +173,7 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
       "x-agent-chain-id" => Integer.to_string(@signed_chain_id),
       "x-agent-registry-address" => @signed_registry_address,
       "x-agent-token-id" => @signed_token_id,
-      "content-digest" => Siwa.content_digest_for_body(body)
+      "content-digest" => content_digest_for_body(body)
     }
 
     components = [
@@ -224,39 +220,11 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
     |> Map.put("signature", "sig1=:#{signature}:")
   end
 
-  defp verified_receipt do
-    assert {:ok, %{"data" => %{"nonce" => nonce}}} =
-             Siwa.issue_nonce(%{
-               "wallet_address" => @signed_wallet_address,
-               "chain_id" => @signed_chain_id,
-               "registry_address" => @signed_registry_address,
-               "token_id" => @signed_token_id,
-               "audience" => "regents.sh"
-             })
+  defp content_digest_for_body(body) do
+    digest =
+      :crypto.hash(:sha256, body)
+      |> Base.encode64()
 
-    message = """
-    regent.cx wants you to sign in with your Ethereum account:
-    #{@signed_wallet_address}
-
-    URI: https://regent.cx/v1/agent/siwa/verify
-    Version: 1
-    Chain ID: #{@signed_chain_id}
-    Nonce: #{nonce}
-    Issued At: 2026-04-16T00:00:00Z
-    """
-
-    assert {:ok, %{"data" => %{"receipt" => receipt}}} =
-             Siwa.verify_session(%{
-               "wallet_address" => @signed_wallet_address,
-               "chain_id" => @signed_chain_id,
-               "registry_address" => @signed_registry_address,
-               "token_id" => @signed_token_id,
-               "nonce" => nonce,
-               "message" => String.trim(message),
-               "signature" =>
-                 TestEthereumAdapter.sign_message(@signed_wallet_address, String.trim(message))
-             })
-
-    receipt
+    "sha-256=:#{digest}:"
   end
 end

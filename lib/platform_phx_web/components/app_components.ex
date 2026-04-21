@@ -1,6 +1,9 @@
 defmodule PlatformPhxWeb.AppComponents do
   use PlatformPhxWeb, :html
 
+  alias PlatformPhx.Accounts.AvatarSelection
+  alias PlatformPhxWeb.TokenCardPayload
+
   attr :command, :string, required: true
   attr :label, :string, default: "Copy install command"
   attr :id, :string, default: "home-command-copy"
@@ -950,11 +953,16 @@ defmodule PlatformPhxWeb.AppComponents do
 
   attr :formation, :map, required: true
   attr :usage, :map, required: true
+  attr :current_human, :map, required: true
+  attr :holdings, :map, required: true
+  attr :formation_token_cards, :map, required: true
+  attr :shader_options, :list, required: true
+  attr :avatar_save_notice, :map, default: nil
 
   def dashboard_stage(assigns) do
     ~H"""
     <div class="space-y-6">
-      <div class="grid gap-4 md:grid-cols-4">
+      <div class="grid gap-4 md:grid-cols-5">
         <.metric_tile
           label="Billing"
           value={billing_value(@formation.billing_account)}
@@ -966,9 +974,14 @@ defmodule PlatformPhxWeb.AppComponents do
           copy="Available company credit."
         />
         <.metric_tile
-          label="Trialing companies"
-          value={Integer.to_string(@usage.trialing_companies)}
-          copy="Still using launch credit."
+          label="Runtime spend"
+          value={format_usd_cents(@usage.runtime_spend_usd_cents)}
+          copy="Sprites spend already recorded for this account."
+        />
+        <.metric_tile
+          label="Model spend"
+          value={format_usd_cents(@usage.llm_spend_usd_cents)}
+          copy="Model usage already recorded for this account."
         />
         <.metric_tile
           label="Opened companies"
@@ -987,7 +1000,7 @@ defmodule PlatformPhxWeb.AppComponents do
               Control the hosted company from here.
             </h2>
             <p class="mt-4 max-w-[46rem] text-sm leading-6 text-[color:var(--muted-foreground)]">
-              This is the control surface for the company you opened on Regents. Review billing, check company status, and pause or resume a company when needed.
+              This is the control surface for the company you opened on Regents. Review billing, check company status, pick the saved public avatar, and pause or resume a company when needed.
             </p>
           </div>
           <.link
@@ -996,6 +1009,248 @@ defmodule PlatformPhxWeb.AppComponents do
           >
             Open another company
           </.link>
+        </div>
+
+        <div
+          id="app-dashboard-avatar-creator"
+          class="mt-6 grid gap-4 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]"
+        >
+          <section class="space-y-4 rounded-[1.4rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_92%,transparent)] p-5">
+            <div class="space-y-2">
+              <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
+                Agent Avatar Creator
+              </p>
+              <h3 class="font-display text-2xl text-[color:var(--foreground)]">
+                Choose the saved look for your public company pages.
+              </h3>
+              <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
+                Pick an owned collection avatar or save one of the shader looks below. Regents Club keeps the gold border. Saved shader looks do not.
+              </p>
+            </div>
+
+            <%= if @avatar_save_notice do %>
+              <.inline_notice notice={@avatar_save_notice} />
+            <% end %>
+
+            <div class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4">
+              <p class="text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
+                Current saved avatar
+              </p>
+
+              <%= if current_avatar_token_card?(@current_human.avatar, @formation_token_cards) do %>
+                <div class="mt-4 max-w-[16rem]">
+                  <div
+                    data-token-card-root
+                    data-token-card-entry={
+                      current_avatar_token_card_payload(@current_human.avatar, @formation_token_cards)
+                    }
+                    data-token-card-layout="embedded"
+                    data-token-card-active="true"
+                  >
+                  </div>
+                </div>
+              <% else %>
+                <div class={current_avatar_card_class(@current_human.avatar)}>
+                  <p class="font-display text-[1.35rem] text-[color:var(--foreground)]">
+                    {AvatarSelection.current_label(@current_human.avatar)}
+                  </p>
+                  <p class="mt-2 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                    {current_avatar_copy(@current_human.avatar)}
+                  </p>
+                </div>
+              <% end %>
+            </div>
+
+            <div class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4">
+              <p class="text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
+                Gold border rule
+              </p>
+              <p class="mt-3 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                The gold border only appears when the saved avatar is a Regents Club choice. Shader looks and other collection picks stay on the standard frame.
+              </p>
+            </div>
+          </section>
+
+          <section class="space-y-4 rounded-[1.4rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_92%,transparent)] p-5">
+            <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <div class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <p class="text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
+                      Collection I
+                    </p>
+                    <p class="mt-2 text-sm text-[color:var(--muted-foreground)]">
+                      Save one of your Collection I avatars.
+                    </p>
+                  </div>
+                  <span class="rounded-full border border-[color:var(--border)] px-3 py-1 text-xs uppercase tracking-[0.16em] text-[color:var(--foreground)]">
+                    {length(Map.get(@holdings, "animata1", []))}
+                  </span>
+                </div>
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <%= if Map.get(@holdings, "animata1", []) == [] do %>
+                    <span class="text-sm text-[color:var(--muted-foreground)]">
+                      No Collection I avatars found.
+                    </span>
+                  <% else %>
+                    <%= for token_id <- Map.get(@holdings, "animata1", []) do %>
+                      <button
+                        id={"dashboard-avatar-animata1-#{token_id}"}
+                        type="button"
+                        phx-click="save_avatar"
+                        phx-value-kind="collection_token"
+                        phx-value-collection="animata1"
+                        phx-value-token_id={token_id}
+                        class={
+                          avatar_choice_button_class(@current_human.avatar, "animata1", token_id)
+                        }
+                      >
+                        Collection I #{token_id}
+                      </button>
+                    <% end %>
+                  <% end %>
+                </div>
+              </div>
+
+              <div class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <p class="text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
+                      Collection II
+                    </p>
+                    <p class="mt-2 text-sm text-[color:var(--muted-foreground)]">
+                      Save one of your Collection II avatars.
+                    </p>
+                  </div>
+                  <span class="rounded-full border border-[color:var(--border)] px-3 py-1 text-xs uppercase tracking-[0.16em] text-[color:var(--foreground)]">
+                    {length(Map.get(@holdings, "animata2", []))}
+                  </span>
+                </div>
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <%= if Map.get(@holdings, "animata2", []) == [] do %>
+                    <span class="text-sm text-[color:var(--muted-foreground)]">
+                      No Collection II avatars found.
+                    </span>
+                  <% else %>
+                    <%= for token_id <- Map.get(@holdings, "animata2", []) do %>
+                      <button
+                        id={"dashboard-avatar-animata2-#{token_id}"}
+                        type="button"
+                        phx-click="save_avatar"
+                        phx-value-kind="collection_token"
+                        phx-value-collection="animata2"
+                        phx-value-token_id={token_id}
+                        class={
+                          avatar_choice_button_class(@current_human.avatar, "animata2", token_id)
+                        }
+                      >
+                        Collection II #{token_id}
+                      </button>
+                    <% end %>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
+                    Regents Club
+                  </p>
+                  <p class="mt-2 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                    Regents Club keeps the gold border on public company pages.
+                  </p>
+                </div>
+                <span class="rounded-full border border-[color:var(--border)] px-3 py-1 text-xs uppercase tracking-[0.16em] text-[color:var(--foreground)]">
+                  {length(Map.get(@holdings, "animataPass", []))}
+                </span>
+              </div>
+
+              <div
+                id="app-dashboard-pass-gallery"
+                phx-hook="FormationPassGallery"
+                data-token-card-budget="6"
+                data-token-card-chunk="2"
+                class="mt-5 grid justify-items-center gap-x-5 gap-y-6 sm:grid-cols-2 xl:grid-cols-3"
+              >
+                <%= if Map.get(@holdings, "animataPass", []) == [] do %>
+                  <div class="rounded-2xl border border-dashed border-[color:var(--border)] px-4 py-5 text-sm text-[color:var(--muted-foreground)] sm:col-span-2 xl:col-span-3">
+                    No Regents Club passes found for this wallet.
+                  </div>
+                <% else %>
+                  <%= for token_id <- Map.get(@holdings, "animataPass", []) do %>
+                    <button
+                      id={"dashboard-avatar-animata-pass-#{token_id}"}
+                      type="button"
+                      phx-click="save_avatar"
+                      phx-value-kind="collection_token"
+                      phx-value-collection="animataPass"
+                      phx-value-token_id={token_id}
+                      class={[
+                        "group inline-flex shrink-0 transition hover:-translate-y-1",
+                        avatar_token_card_button_class(@current_human.avatar, token_id)
+                      ]}
+                    >
+                      <%= if entry = Map.get(@formation_token_cards, token_id) do %>
+                        <div
+                          data-token-card-root
+                          data-token-card-entry={TokenCardPayload.encode(entry)}
+                          data-token-card-layout="embedded"
+                          data-token-card-active="true"
+                        >
+                        </div>
+                      <% else %>
+                        <div class="flex min-h-[22rem] min-w-[15rem] items-center justify-center rounded-[1.2rem] border border-dashed border-[color:var(--border)] px-4 text-center text-xs uppercase tracking-[0.2em] text-[color:var(--muted-foreground)]">
+                          Card unavailable
+                        </div>
+                      <% end %>
+                    </button>
+                  <% end %>
+                <% end %>
+              </div>
+            </div>
+
+            <div class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p class="text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
+                    Shader looks
+                  </p>
+                  <p class="mt-2 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                    Save one of these shader looks as your account-level avatar.
+                  </p>
+                </div>
+
+                <.link
+                  navigate={~p"/shader"}
+                  class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
+                >
+                  Open shader studio
+                </.link>
+              </div>
+
+              <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <%= for shader <- @shader_options do %>
+                  <button
+                    id={"dashboard-avatar-shader-#{shader.id}"}
+                    type="button"
+                    phx-click="save_avatar"
+                    phx-value-kind="custom_shader"
+                    phx-value-shader_id={shader.id}
+                    class={shader_choice_button_class(@current_human.avatar, shader.id)}
+                  >
+                    <span class="font-display text-[1.1rem] text-[color:var(--foreground)]">
+                      {shader.title}
+                    </span>
+                    <span class="mt-2 text-left text-sm leading-6 text-[color:var(--muted-foreground)]">
+                      {shader.description}
+                    </span>
+                  </button>
+                <% end %>
+              </div>
+            </div>
+          </section>
         </div>
 
         <div class="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
@@ -1196,6 +1451,96 @@ defmodule PlatformPhxWeb.AppComponents do
       <p class="mt-2 text-sm leading-6 text-[color:var(--muted-foreground)]">{@copy}</p>
     </div>
     """
+  end
+
+  defp avatar_choice_button_class(current_avatar, collection, token_id) do
+    selected? =
+      current_avatar_kind?(current_avatar, "collection_token") and
+        current_avatar["collection"] == collection and current_avatar["token_id"] == token_id
+
+    [
+      "inline-flex items-center justify-center rounded-full border px-4 py-2 text-sm transition",
+      if(selected?,
+        do:
+          "border-[color:var(--ring)] bg-[color:color-mix(in_oklch,var(--ring)_14%,transparent)] text-[color:var(--foreground)]",
+        else:
+          "border-[color:var(--border)] text-[color:var(--foreground)] hover:border-[color:var(--ring)]"
+      )
+    ]
+  end
+
+  defp shader_choice_button_class(current_avatar, shader_id) do
+    selected? =
+      current_avatar_kind?(current_avatar, "custom_shader") and
+        current_avatar["shader_id"] == shader_id
+
+    [
+      "flex min-h-[10rem] flex-col items-start rounded-[1.2rem] border px-4 py-4 text-left transition",
+      if(selected?,
+        do:
+          "border-[color:var(--ring)] bg-[linear-gradient(180deg,color-mix(in_oklch,var(--ring)_14%,transparent),color-mix(in_oklch,var(--background)_94%,transparent))]",
+        else: "border-[color:var(--border)] hover:border-[color:var(--ring)]"
+      )
+    ]
+  end
+
+  defp avatar_token_card_button_class(current_avatar, token_id) do
+    selected? =
+      current_avatar_kind?(current_avatar, "collection_token") and
+        current_avatar["collection"] == "animataPass" and current_avatar["token_id"] == token_id
+
+    if selected?,
+      do:
+        "rounded-[1.4rem] ring-2 ring-[color:var(--ring)] ring-offset-4 ring-offset-[color:var(--card)]",
+      else: ""
+  end
+
+  defp current_avatar_kind?(%{"kind" => kind}, expected_kind), do: kind == expected_kind
+  defp current_avatar_kind?(_avatar, _expected_kind), do: false
+
+  defp current_avatar_copy(nil),
+    do: "Save a look here and it will show on every public company page you own."
+
+  defp current_avatar_copy(%{"kind" => "custom_shader", "shader_id" => shader_id}) do
+    AvatarSelection.shader_description(shader_id)
+  end
+
+  defp current_avatar_copy(%{
+         "kind" => "collection_token",
+         "collection" => collection,
+         "token_id" => token_id
+       }) do
+    "#{AvatarSelection.collection_label(collection)} ##{token_id} is saved for every public company page on this account."
+  end
+
+  defp current_avatar_copy(_avatar),
+    do: "Save a look here and it will show on every public company page you own."
+
+  defp current_avatar_card_class(avatar) do
+    [
+      "mt-4 rounded-[1.4rem] border p-5",
+      if(AvatarSelection.gold_border?(avatar),
+        do:
+          "border-[color:color-mix(in_oklch,#d4a756_72%,var(--border)_28%)] bg-[linear-gradient(180deg,color-mix(in_oklch,#d4a756_16%,transparent),color-mix(in_oklch,var(--background)_94%,transparent))]",
+        else:
+          "border-[color:var(--border)] bg-[linear-gradient(180deg,color-mix(in_oklch,var(--brand-ink)_10%,transparent),color-mix(in_oklch,var(--background)_94%,transparent))]"
+      )
+    ]
+  end
+
+  defp current_avatar_token_card?(
+         %{"kind" => "collection_token", "collection" => "animataPass", "token_id" => token_id},
+         token_cards
+       ) do
+    Map.has_key?(token_cards, token_id)
+  end
+
+  defp current_avatar_token_card?(_avatar, _token_cards), do: false
+
+  defp current_avatar_token_card_payload(%{"token_id" => token_id}, token_cards) do
+    token_cards
+    |> Map.fetch!(token_id)
+    |> TokenCardPayload.encode()
   end
 
   defp eligible_services?(services),
