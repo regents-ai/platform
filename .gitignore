@@ -72,3 +72,5 @@ docs/*_plan.md
 docs/*_notes.md
 docs/*_spec.md
 /priv/static/images/animata/cards/*-[0-9a-f]*.png
+/layer2.md
+/layer3.md
