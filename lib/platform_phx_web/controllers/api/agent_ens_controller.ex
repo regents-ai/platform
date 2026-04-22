@@ -26,10 +26,10 @@ defmodule PlatformPhxWeb.Api.AgentEnsController do
     |> then(&ApiErrors.respond(conn, &1))
   end
 
-  def detach(conn, %{"slug" => slug}) do
+  def detach(conn, %{"slug" => slug} = params) do
     conn
     |> current_human()
-    |> Ens.detach(slug)
+    |> Ens.detach(slug, params)
     |> then(&ApiErrors.respond(conn, &1))
   end
 

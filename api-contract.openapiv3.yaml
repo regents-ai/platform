@@ -1118,18 +1118,20 @@ paths:
               $ref: '#/components/schemas/AttachEnsNameRequest'
       responses:
         '200':
-          description: Attached one upgraded Regent ENS name to the selected agent
+          description: Attached one upgraded Regent ENS name to the selected agent and prepared the remaining sync work
           content:
             application/json:
               schema:
                 type: object
-                required: [ok, agent, claim]
+                required: [ok, agent, claim, prepared]
                 properties:
                   ok: {type: boolean}
                   agent:
                     $ref: '#/components/schemas/AgentRecord'
                   claim:
                     $ref: '#/components/schemas/ClaimedName'
+                  prepared:
+                    $ref: '#/components/schemas/PreparedBidirectionalEnsLink'
         '400':
           $ref: '#/components/responses/StatusMessage400'
         '401':
@@ -1150,18 +1152,28 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetachEnsNameRequest'
       responses:
         '200':
-          description: Detached the current Regent ENS name from the selected agent
+          description: Detached the current Regent ENS name from the selected agent and prepared the cleanup work for stale onchain links
           content:
             application/json:
               schema:
                 type: object
-                required: [ok, agent]
+                required: [ok, agent, claim, cleanup]
                 properties:
                   ok: {type: boolean}
                   agent:
                     $ref: '#/components/schemas/AgentRecord'
+                  claim:
+                    $ref: '#/components/schemas/ClaimedName'
+                  cleanup:
+                    $ref: '#/components/schemas/PreparedEnsCleanupSet'
         '401':
           $ref: '#/components/responses/StatusMessage401'
         '403':
@@ -1228,7 +1240,7 @@ paths:
               $ref: '#/components/schemas/EnsLinkPlanRequest'
       responses:
         '200':
-          description: Prepared the next mainnet and Base requests needed to finish the ENS plus ERC-8004 linkage
+          description: Prepared the next Ethereum mainnet and Base requests needed to finish the ENS sync, primary-name readiness, and ERC-8004 linkage
           content:
             application/json:
               schema:
@@ -1262,7 +1274,7 @@ paths:
               $ref: '#/components/schemas/PreparePrimaryEnsNameRequest'
       responses:
         '200':
-          description: Prepared Ethereum mainnet request for setting the caller wallet's primary ENS name
+          description: Prepared the Ethereum mainnet request for setting the caller wallet's primary ENS name after the attached Regent ENS name already forward-resolves to that wallet
           content:
             application/json:
               schema:
@@ -1953,6 +1965,7 @@ components:
         chain_id: {type: integer}
         target: {type: [string, 'null']}
         description: {type: [string, 'null']}
+        caller_wallet_address: {type: [string, 'null']}
         tx_request:
           $ref: '#/components/schemas/PreparedTxRequest'
     PreparedEnsUpgrade:
@@ -1972,14 +1985,31 @@ components:
         tx_hash: {type: string}
     AttachEnsNameRequest:
       type: object
-      required: [claim_id]
+      required: [claim_id, agent_id]
       properties:
         claim_id: {type: integer}
+        include_reverse: {type: boolean}
+        registry_address: {type: [string, 'null']}
+        agent_id:
+          oneOf:
+            - type: integer
+            - type: string
+        current_agent_uri: {type: [string, 'null']}
+    DetachEnsNameRequest:
+      type: object
+      required: [agent_id]
+      properties:
+        include_reverse: {type: boolean}
+        registry_address: {type: [string, 'null']}
+        agent_id:
+          oneOf:
+            - type: integer
+            - type: string
+        current_agent_uri: {type: [string, 'null']}
     EnsLinkPlanRequest:
       type: object
       properties:
         include_reverse: {type: boolean}
-        signer_address: {type: [string, 'null']}
         registry_address: {type: [string, 'null']}
         agent_id:
           oneOf:
@@ -1987,24 +2017,60 @@ components:
             - type: string
             - type: 'null'
         current_agent_uri: {type: [string, 'null']}
+    EnsLinkAction:
+      type: object
+      required: [kind, status, description]
+      properties:
+        kind: {type: string}
+        status: {type: string}
+        description: {type: string}
+        reason:
+          oneOf:
+            - type: string
+            - type: 'null'
     EnsLinkPlan:
       type: object
-      required: [ens_name, ensip25_key, ensip25_status, erc8004_status, reverse_status]
+      required:
+        [
+          ens_name,
+          ensip25_key,
+          ensip25_status,
+          erc8004_status,
+          reverse_status,
+          ensip25_verified,
+          forward_resolution_verified,
+          reverse_resolution_verified,
+          primary_name_verified,
+          fully_synced,
+          actions
+        ]
       properties:
         ens_name: {type: string}
         ensip25_key: {type: string}
         ensip25_status: {type: string}
         erc8004_status: {type: string}
         reverse_status: {type: string}
+        ensip25_verified: {type: boolean}
+        forward_resolution_verified: {type: boolean}
+        reverse_resolution_verified: {type: boolean}
+        primary_name_verified: {type: boolean}
+        fully_synced: {type: boolean}
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnsLinkAction'
         warnings:
           type: array
           items: {type: string}
-    PreparedBidirectionalEnsLink:
+    PreparedEnsCleanupSet:
       type: object
-      required: [plan, ensip25, erc8004, reverse]
+      required: [forward, ensip25, erc8004, reverse]
       properties:
-        plan:
-          $ref: '#/components/schemas/EnsLinkPlan'
+        forward:
+          oneOf:
+            - $ref: '#/components/schemas/PreparedTxAction'
+            - type: string
+              enum: [noop, blocked]
         ensip25:
           oneOf:
             - $ref: '#/components/schemas/PreparedTxAction'
@@ -2020,6 +2086,34 @@ components:
             - $ref: '#/components/schemas/PreparedTxAction'
             - type: string
               enum: [noop, blocked, skipped]
+    PreparedBidirectionalEnsLink:
+      type: object
+      required: [plan, forward, ensip25, erc8004, reverse, cleanup]
+      properties:
+        plan:
+          $ref: '#/components/schemas/EnsLinkPlan'
+        forward:
+          oneOf:
+            - $ref: '#/components/schemas/PreparedTxAction'
+            - type: string
+              enum: [noop, blocked]
+        ensip25:
+          oneOf:
+            - $ref: '#/components/schemas/PreparedTxAction'
+            - type: string
+              enum: [noop, blocked]
+        erc8004:
+          oneOf:
+            - $ref: '#/components/schemas/PreparedTxAction'
+            - type: string
+              enum: [noop, blocked]
+        reverse:
+          oneOf:
+            - $ref: '#/components/schemas/PreparedTxAction'
+            - type: string
+              enum: [noop, blocked, skipped]
+        cleanup:
+          $ref: '#/components/schemas/PreparedEnsCleanupSet'
     PreparePrimaryEnsNameRequest:
       type: object
       required: [ens_name]
@@ -2027,12 +2121,13 @@ components:
         ens_name: {type: string}
     PreparedReverseEnsName:
       type: object
-      required: [resource, action, chain_id, ens_name, tx_request]
+      required: [resource, action, chain_id, ens_name, tx_request, caller_wallet_address]
       properties:
         resource: {type: string}
         action: {type: string}
         chain_id: {type: integer}
         ens_name: {type: string}
+        caller_wallet_address: {type: string}
         tx_request:
           $ref: '#/components/schemas/PreparedTxRequest'
     BillingAccount:

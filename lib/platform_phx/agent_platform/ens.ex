@@ -4,6 +4,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
   import Ecto.Query, warn: false
 
   alias AgentEns
+  alias AgentEns.Internal.ABI
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Agent
@@ -15,6 +16,8 @@ defmodule PlatformPhx.AgentPlatform.Ens do
 
   @ethereum_chain_id 1
   @base_chain_id 8453
+  @zero_address "0x0000000000000000000000000000000000000000"
+  @upgrade_confirmations 2
 
   def prepare_upgrade(nil, _claim_id),
     do: {:error, {:unauthorized, "Sign in before upgrading a Regent name"}}
@@ -39,7 +42,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
   def confirm_upgrade(%HumanUser{} = human, claim_id, attrs) when is_map(attrs) do
     with {:ok, claim} <- owned_claim(human, claim_id),
          {:ok, tx_hash} <- required_tx_hash(attrs["tx_hash"]),
-         :ok <- verify_upgrade_receipt(tx_hash),
+         :ok <- verify_upgrade_receipt(claim, tx_hash),
          {:ok, updated_claim} <-
            set_claim_status(claim, %{
              claim_status: "onchain_live",
@@ -48,7 +51,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
            }) do
       {:ok, %{ok: true, claim: serialize_claim(updated_claim)}}
     else
-      {:error, {:external, _source, _message}} ->
+      {:error, {:external, :ethereum, "That mainnet transaction failed"}} ->
         with {:ok, claim} <- owned_claim(human, claim_id),
              {:ok, failed_claim} <- set_claim_status(claim, %{claim_status: "upgrade_failed"}) do
           {:ok, %{ok: true, claim: serialize_claim(failed_claim)}}
@@ -65,10 +68,12 @@ defmodule PlatformPhx.AgentPlatform.Ens do
   def attach(%HumanUser{} = human, slug, attrs) when is_binary(slug) and is_map(attrs) do
     with %Agent{} = agent <- AgentPlatform.get_owned_agent(human, slug),
          :ok <- ensure_agent_completed(agent),
+         :ok <- ensure_agent_wallet_present(agent),
          :ok <- ensure_agent_not_attached(agent),
          {:ok, claim} <- owned_claim(human, attrs["claim_id"]),
          :ok <- ensure_claim_live(claim),
          :ok <- ensure_claim_not_attached(claim),
+         {:ok, prepared} <- prepare_link_bundle(agent, claim, attrs),
          {:ok, _result} <- attach_claim_transaction(agent, claim),
          reloaded <- AgentPlatform.get_owned_agent(human, slug),
          updated_claim <- Repo.get!(Mint, claim.id) do
@@ -76,7 +81,8 @@ defmodule PlatformPhx.AgentPlatform.Ens do
        %{
          ok: true,
          agent: AgentPlatform.serialize_agent(reloaded, :private),
-         claim: serialize_claim(updated_claim)
+         claim: serialize_claim(updated_claim),
+         prepared: prepared
        }}
     else
       nil -> {:error, {:not_found, "Company not found"}}
@@ -87,10 +93,23 @@ defmodule PlatformPhx.AgentPlatform.Ens do
   def detach(nil, _slug), do: {:error, {:unauthorized, "Sign in before detaching a Regent name"}}
 
   def detach(%HumanUser{} = human, slug) when is_binary(slug) do
+    detach(human, slug, %{})
+  end
+
+  def detach(%HumanUser{} = human, slug, attrs) when is_binary(slug) and is_map(attrs) do
     with %Agent{} = agent <- AgentPlatform.get_owned_agent(human, slug),
-         {:ok, _result} <- detach_claim_transaction(agent),
-         reloaded <- AgentPlatform.get_owned_agent(human, slug) do
-      {:ok, %{ok: true, agent: AgentPlatform.serialize_agent(reloaded, :private)}}
+         {:ok, claim} <- attached_claim(agent),
+         {:ok, cleanup} <- prepare_detach_cleanup(agent, claim, attrs),
+         {:ok, _result} <- detach_claim_transaction(agent, claim),
+         reloaded <- AgentPlatform.get_owned_agent(human, slug),
+         updated_claim <- Repo.get!(Mint, claim.id) do
+      {:ok,
+       %{
+         ok: true,
+         agent: AgentPlatform.serialize_agent(reloaded, :private),
+         claim: serialize_claim(updated_claim),
+         cleanup: cleanup
+       }}
     else
       nil -> {:error, {:not_found, "Company not found"}}
       {:error, _reason} = error -> error
@@ -103,7 +122,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
   def link_plan(%HumanUser{} = human, slug, attrs) when is_binary(slug) and is_map(attrs) do
     with %Agent{} = agent <- AgentPlatform.get_owned_agent(human, slug),
          {:ok, claim} <- attached_claim(agent),
-         {:ok, input} <- build_link_input(claim, attrs),
+         {:ok, input} <- build_link_input(agent, claim, attrs),
          {:ok, plan} <- AgentEns.plan_link(input) do
       {:ok,
        %{
@@ -124,18 +143,12 @@ defmodule PlatformPhx.AgentPlatform.Ens do
       when is_binary(slug) and is_map(attrs) do
     with %Agent{} = agent <- AgentPlatform.get_owned_agent(human, slug),
          {:ok, claim} <- attached_claim(agent),
-         {:ok, input} <- build_link_input(claim, attrs),
-         {:ok, plan} <- AgentEns.plan_link(input) do
+         {:ok, prepared} <- prepare_link_bundle(agent, claim, attrs) do
       {:ok,
        %{
          ok: true,
          agent: AgentPlatform.serialize_agent(agent, :private),
-         prepared: %{
-           plan: serialize_link_plan(plan),
-           ensip25: maybe_prepare_regent_ensip25(plan, claim, input),
-           erc8004: maybe_prepare_erc8004(plan, input),
-           reverse: maybe_prepare_reverse(input, claim.ens_fqdn)
-         }
+         prepared: prepared
        }}
     else
       nil -> {:error, {:not_found, "Company not found"}}
@@ -145,6 +158,21 @@ defmodule PlatformPhx.AgentPlatform.Ens do
 
   def prepare_primary(agent_claims, attrs) when is_map(agent_claims) and is_map(attrs) do
     with {:ok, ens_name} <- required_ens_name(attrs["ens_name"]),
+         {:ok, wallet_address} <- required_wallet_address(agent_claims["wallet_address"]),
+         {:ok, token_id} <- required_integer(agent_claims["token_id"], "token_id"),
+         {:ok, registry_address} <-
+           required_runtime_value(agent_claims["registry_address"], "Base identity registry"),
+         %Agent{} = agent <- agent_for_primary_name(wallet_address, ens_name),
+         {:ok, claim} <- attached_claim(agent),
+         {:ok, input} <-
+           build_link_input(agent, claim, %{
+             "agent_id" => token_id,
+             "registry_address" => registry_address,
+             "current_agent_uri" => attrs["current_agent_uri"],
+             "include_reverse" => true
+           }),
+         {:ok, plan} <- AgentEns.plan_link(input),
+         :ok <- ensure_forward_resolution_verified(plan),
          {:ok, tx} <-
            AgentEns.Tx.build_reverse_set_name_tx(%{
              chain_id: @ethereum_chain_id,
@@ -159,9 +187,17 @@ defmodule PlatformPhx.AgentPlatform.Ens do
            chain_id: tx.chain_id,
            ens_name: ens_name,
            tx_request: serialize_tx_request(tx),
-           caller_wallet_address: agent_claims["wallet_address"]
+           caller_wallet_address: wallet_address
          }
        }}
+    else
+      nil ->
+        {:error,
+         {:conflict,
+          "Attach this Regent ENS name to the authenticated agent before setting it as the primary name"}}
+
+      {:error, _reason} = error ->
+        error
     end
   end
 
@@ -221,10 +257,24 @@ defmodule PlatformPhx.AgentPlatform.Ens do
   defp ensure_agent_completed(%Agent{}),
     do: {:error, {:conflict, "Finish creating the company before attaching a Regent ENS name"}}
 
-  defp ensure_agent_not_attached(%Agent{ens_fqdn: value}) when value in [nil, ""], do: :ok
+  defp ensure_agent_wallet_present(%Agent{wallet_address: value}) when is_binary(value) and value != "",
+    do: :ok
 
-  defp ensure_agent_not_attached(%Agent{}),
-    do: {:error, {:conflict, "Detach the current Regent ENS name before attaching a new one"}}
+  defp ensure_agent_wallet_present(%Agent{}),
+    do:
+      {:error,
+       {:conflict,
+        "Finish the company wallet setup before attaching a Regent ENS name"}}
+
+  defp ensure_agent_not_attached(%Agent{} = agent) do
+    case Repo.exists?(from mint in Mint, where: mint.attached_agent_slug == ^agent.slug) do
+      true ->
+        {:error, {:conflict, "Detach the current Regent ENS name before attaching a new one"}}
+
+      false ->
+        :ok
+    end
+  end
 
   defp regent_upgrade_tx(%Mint{} = claim) do
     with registrar when is_binary(registrar) <- RuntimeConfig.regent_ens_registrar_address(),
@@ -251,11 +301,15 @@ defmodule PlatformPhx.AgentPlatform.Ens do
     end
   end
 
-  defp verify_upgrade_receipt(tx_hash) do
+  defp verify_upgrade_receipt(%Mint{} = claim, tx_hash) do
     with rpc_url when is_binary(rpc_url) <- RuntimeConfig.ethereum_rpc_url(),
-         {:ok, %{"status" => status}} <-
+         {:ok, %{"status" => status} = receipt} <-
            Ethereum.json_rpc(rpc_url, "eth_getTransactionReceipt", [tx_hash]),
-         true <- status == "0x1" do
+         true <- status == "0x1",
+         :ok <- ensure_upgrade_confirmations(rpc_url, receipt),
+         {:ok, transaction} <- Ethereum.json_rpc(rpc_url, "eth_getTransactionByHash", [tx_hash]),
+         :ok <- ensure_expected_upgrade_transaction(claim, transaction),
+         :ok <- ensure_expected_upgrade_logs(claim, receipt) do
       :ok
     else
       nil ->
@@ -279,15 +333,24 @@ defmodule PlatformPhx.AgentPlatform.Ens do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     Repo.transaction(fn ->
-      with {:ok, _claim} <-
-             claim
+      locked_agent =
+        Repo.one!(from locked in Agent, where: locked.id == ^agent.id, lock: "FOR UPDATE")
+
+      locked_claim =
+        Repo.one!(from locked in Mint, where: locked.id == ^claim.id, lock: "FOR UPDATE")
+
+      with :ok <- ensure_agent_not_attached(locked_agent),
+           :ok <- ensure_claim_live(locked_claim),
+           :ok <- ensure_claim_not_attached(locked_claim),
+           {:ok, _claim} <-
+             locked_claim
              |> Mint.changeset(%{attached_agent_slug: agent.slug})
              |> Repo.update(),
            {:ok, _agent} <-
-             agent
-             |> Agent.changeset(%{ens_fqdn: claim.ens_fqdn, updated_at: now})
+             locked_agent
+             |> Agent.changeset(%{ens_fqdn: locked_claim.ens_fqdn, updated_at: now})
              |> Repo.update(),
-           {:ok, _subdomain} <- maybe_update_subdomain(agent, claim.ens_fqdn) do
+           {:ok, _subdomain} <- maybe_update_subdomain(locked_agent, locked_claim.ens_fqdn) do
         :ok
       else
         {:error, reason} -> Repo.rollback(reason)
@@ -296,21 +359,28 @@ defmodule PlatformPhx.AgentPlatform.Ens do
     |> unwrap_transaction()
   end
 
-  defp detach_claim_transaction(%Agent{} = agent) do
+  defp detach_claim_transaction(%Agent{} = agent, %Mint{} = claim) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     Repo.transaction(fn ->
-      Repo.update_all(
-        from(mint in Mint, where: mint.attached_agent_slug == ^agent.slug),
-        set: [attached_agent_slug: nil]
-      )
+      locked_agent =
+        Repo.one!(from locked in Agent, where: locked.id == ^agent.id, lock: "FOR UPDATE")
 
-      with {:ok, _agent} <-
-             agent
+      locked_claim =
+        Repo.one!(from locked in Mint, where: locked.id == ^claim.id, lock: "FOR UPDATE")
+
+      with true <- locked_claim.attached_agent_slug == agent.slug,
+           {:ok, _claim} <-
+             locked_claim
+             |> Mint.changeset(%{attached_agent_slug: nil})
+             |> Repo.update(),
+           {:ok, _agent} <-
+             locked_agent
              |> Agent.changeset(%{ens_fqdn: nil, updated_at: now})
              |> Repo.update() do
         :ok
       else
+        false -> Repo.rollback({:conflict, "That Regent ENS name is no longer attached"})
         {:error, reason} -> Repo.rollback(reason)
       end
     end)
@@ -337,7 +407,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
     |> Repo.update()
   end
 
-  defp build_link_input(%Mint{} = claim, attrs) do
+  defp build_link_input(%Agent{} = agent, %Mint{} = claim, attrs) do
     with {:ok, agent_id} <- required_agent_id(attrs["agent_id"]),
          {:ok, ens_rpc_url} <-
            required_runtime_value(RuntimeConfig.ethereum_rpc_url(), "Ethereum mainnet RPC"),
@@ -348,7 +418,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
              attrs["registry_address"] || RuntimeConfig.base_identity_registry_address(),
              "Base identity registry"
            ) do
-      {:ok,
+         {:ok,
        %{
          ens_name: claim.ens_fqdn,
          ens_chain_id: @ethereum_chain_id,
@@ -357,13 +427,65 @@ defmodule PlatformPhx.AgentPlatform.Ens do
          registry_rpc_url: registry_rpc_url,
          registry_address: registry_address,
          agent_id: agent_id,
-         signer_address: attrs["signer_address"],
+         signer_address: agent.wallet_address,
          include_reverse?: truthy?(attrs["include_reverse"]),
          current_agent_uri: attrs["current_agent_uri"],
-         rpc_module: attrs["rpc_module"],
+         rpc_module: attrs["rpc_module"] || Application.get_env(:platform_phx, :agent_ens_rpc_module),
          erc8004_fetcher: attrs["erc8004_fetcher"],
          erc8004_fetch_opts: attrs["erc8004_fetch_opts"]
        }}
+    end
+  end
+
+  defp prepare_link_bundle(%Agent{} = agent, %Mint{} = claim, attrs) do
+    with {:ok, input} <- build_link_input(agent, claim, attrs),
+         {:ok, plan} <- AgentEns.plan_link(input) do
+      {:ok,
+       %{
+         plan: serialize_link_plan(plan),
+         forward: maybe_prepare_regent_forward(plan, claim, agent),
+         ensip25: maybe_prepare_regent_ensip25(plan, claim, input),
+         erc8004: maybe_prepare_erc8004(plan, input, agent.wallet_address),
+         reverse: maybe_prepare_reverse(plan, agent.wallet_address, claim.ens_fqdn),
+         cleanup: %{forward: :noop, ensip25: :noop, erc8004: :noop, reverse: :skipped}
+       }}
+    end
+  end
+
+  defp prepare_detach_cleanup(%Agent{} = agent, %Mint{} = claim, attrs) do
+    with {:ok, input} <- build_link_input(agent, claim, attrs) do
+      {:ok,
+       %{
+         forward: prepare_regent_forward_cleanup(claim),
+         ensip25: prepare_regent_ensip25_cleanup(claim, input),
+         erc8004: prepare_erc8004_cleanup(input, agent.wallet_address),
+         reverse: prepare_reverse_cleanup(agent.wallet_address)
+       }}
+    end
+  end
+
+  defp maybe_prepare_regent_forward(plan, _claim, _agent) when plan.forward_resolution_verified,
+    do: :noop
+
+  defp maybe_prepare_regent_forward(_plan, %Mint{} = claim, %Agent{} = agent) do
+    case AgentEns.Tx.build_regent_addr_tx(%{
+           chain_id: @ethereum_chain_id,
+           registrar_address: RuntimeConfig.regent_ens_registrar_address(),
+           label: claim.label,
+           address: agent.wallet_address
+         }) do
+      {:ok, tx} ->
+        %{
+          resource: claim.ens_fqdn,
+          action: "write_forward_address",
+          chain_id: tx.chain_id,
+          target: tx.to,
+          description: tx.description,
+          tx_request: serialize_tx_request(tx)
+        }
+
+      {:error, _} ->
+        :blocked
     end
   end
 
@@ -395,10 +517,10 @@ defmodule PlatformPhx.AgentPlatform.Ens do
     end
   end
 
-  defp maybe_prepare_erc8004(plan, _input) when plan.erc8004_status == :ens_service_present,
+  defp maybe_prepare_erc8004(plan, _input, _wallet_address) when plan.erc8004_status == :ens_service_present,
     do: :noop
 
-  defp maybe_prepare_erc8004(_plan, input) do
+  defp maybe_prepare_erc8004(_plan, input, wallet_address) do
     case AgentEns.prepare_erc8004_update(input) do
       {:ok, prepared} ->
         %{
@@ -407,6 +529,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
           chain_id: prepared.tx.chain_id,
           target: prepared.tx.to,
           description: prepared.tx.description,
+          caller_wallet_address: wallet_address,
           tx_request: serialize_tx_request(prepared.tx)
         }
 
@@ -415,13 +538,23 @@ defmodule PlatformPhx.AgentPlatform.Ens do
     end
   end
 
-  defp maybe_prepare_reverse(%{"include_reverse" => value}, _ens_name)
-       when value in [false, nil, "false", "0"],
+  defp maybe_prepare_reverse(%{reverse_resolution_verified: true}, _wallet_address, _ens_name),
+    do: :noop
+
+  defp maybe_prepare_reverse(%{reverse_status: :not_requested}, _wallet_address, _ens_name),
+    do: :skipped
+
+  defp maybe_prepare_reverse(%{reverse_status: :unsupported_network}, _wallet_address, _ens_name),
+    do: :blocked
+
+  defp maybe_prepare_reverse(%{reverse_status: :signer_required}, _wallet_address, _ens_name),
+    do: :blocked
+
+  defp maybe_prepare_reverse(_plan, wallet_address, _ens_name)
+       when not is_binary(wallet_address) or wallet_address == "",
        do: :skipped
 
-  defp maybe_prepare_reverse(%{include_reverse: false}, _ens_name), do: :skipped
-
-  defp maybe_prepare_reverse(_input, ens_name) do
+  defp maybe_prepare_reverse(_plan, wallet_address, ens_name) do
     case AgentEns.Tx.build_reverse_set_name_tx(%{
            chain_id: @ethereum_chain_id,
            ens_name: ens_name
@@ -433,6 +566,96 @@ defmodule PlatformPhx.AgentPlatform.Ens do
           chain_id: tx.chain_id,
           target: tx.to,
           description: tx.description,
+          caller_wallet_address: wallet_address,
+          tx_request: serialize_tx_request(tx)
+        }
+
+      {:error, _} ->
+        :blocked
+    end
+  end
+
+  defp prepare_regent_forward_cleanup(%Mint{} = claim) do
+    case AgentEns.Tx.build_regent_addr_tx(%{
+           chain_id: @ethereum_chain_id,
+           registrar_address: RuntimeConfig.regent_ens_registrar_address(),
+           label: claim.label,
+           address: @zero_address
+         }) do
+      {:ok, tx} ->
+        %{
+          resource: claim.ens_fqdn,
+          action: "clear_forward_address",
+          chain_id: tx.chain_id,
+          target: tx.to,
+          description: tx.description,
+          tx_request: serialize_tx_request(tx)
+        }
+
+      {:error, _} ->
+        :blocked
+    end
+  end
+
+  defp prepare_regent_ensip25_cleanup(%Mint{} = claim, input) do
+    case AgentEns.prepare_regent_ensip25_update(%{
+           chain_id: @ethereum_chain_id,
+           registrar_address: RuntimeConfig.regent_ens_registrar_address(),
+           label: claim.label,
+           registry_chain_id: @base_chain_id,
+           registry_address: input.registry_address,
+           agent_id: input.agent_id,
+           value: ""
+         }) do
+      {:ok, tx} ->
+        %{
+          resource: claim.ens_fqdn,
+          action: "clear_ensip25_proof",
+          chain_id: tx.chain_id,
+          target: tx.to,
+          description: tx.description,
+          tx_request: serialize_tx_request(tx)
+        }
+
+      {:error, _} ->
+        :blocked
+    end
+  end
+
+  defp prepare_erc8004_cleanup(input, wallet_address) do
+    case AgentEns.prepare_erc8004_clear(input) do
+      {:ok, prepared} ->
+        %{
+          resource: "erc8004",
+          action: "clear_agent_registration_name",
+          chain_id: prepared.tx.chain_id,
+          target: prepared.tx.to,
+          description: prepared.tx.description,
+          caller_wallet_address: wallet_address,
+          tx_request: serialize_tx_request(prepared.tx)
+        }
+
+      {:error, _} ->
+        :blocked
+    end
+  end
+
+  defp prepare_reverse_cleanup(wallet_address) when not is_binary(wallet_address) or wallet_address == "",
+    do: :blocked
+
+  defp prepare_reverse_cleanup(wallet_address) do
+    case AgentEns.Tx.build_reverse_set_name_tx(%{
+           chain_id: @ethereum_chain_id,
+           ens_name: ""
+         }) do
+      {:ok, tx} ->
+        %{
+          resource: "addr.reverse",
+          action: "clear_primary_name",
+          chain_id: tx.chain_id,
+          target: tx.to,
+          description: tx.description,
+          caller_wallet_address: wallet_address,
           tx_request: serialize_tx_request(tx)
         }
 
@@ -463,6 +686,20 @@ defmodule PlatformPhx.AgentPlatform.Ens do
       ensip25_status: Atom.to_string(plan.verify_status),
       erc8004_status: Atom.to_string(plan.erc8004_status),
       reverse_status: Atom.to_string(plan.reverse_status),
+      ensip25_verified: plan.verify_status == :verified,
+      forward_resolution_verified: plan.forward_resolution_verified,
+      reverse_resolution_verified: plan.reverse_resolution_verified,
+      primary_name_verified: plan.primary_name_verified,
+      fully_synced: plan.fully_synced,
+      actions:
+        Enum.map(plan.actions, fn action ->
+          %{
+            kind: Atom.to_string(action.kind),
+            status: Atom.to_string(action.status),
+            description: action.description,
+            reason: action.reason && Atom.to_string(action.reason)
+          }
+        end),
       warnings: plan.warnings || []
     }
   end
@@ -515,6 +752,16 @@ defmodule PlatformPhx.AgentPlatform.Ens do
   defp required_tx_hash(_value),
     do: {:error, {:bad_request, "tx_hash must be a 32-byte hex transaction hash"}}
 
+  defp required_wallet_address(value) when is_binary(value) do
+    case PlatformPhx.Ethereum.normalize_address(value) do
+      nil -> {:error, {:bad_request, "wallet_address must be a 20-byte hex address"}}
+      normalized -> {:ok, normalized}
+    end
+  end
+
+  defp required_wallet_address(_value),
+    do: {:error, {:bad_request, "wallet_address must be a 20-byte hex address"}}
+
   defp required_runtime_value(value, _label) when is_binary(value) and value != "",
     do: {:ok, value}
 
@@ -522,13 +769,158 @@ defmodule PlatformPhx.AgentPlatform.Ens do
     do: {:error, {:unavailable, "#{label} is not configured"}}
 
   defp required_ens_name(value) when is_binary(value) do
-    case String.trim(value) do
-      "" -> {:error, {:bad_request, "ens_name is required"}}
-      trimmed -> {:ok, trimmed}
+    case AgentEns.Normalize.normalize(value) do
+      {:ok, normalized} -> {:ok, normalized}
+      {:error, _} -> {:error, {:bad_request, "ens_name must be a valid ENS name"}}
     end
   end
 
   defp required_ens_name(_value), do: {:error, {:bad_request, "ens_name is required"}}
+
+  defp agent_for_primary_name(wallet_address, ens_name) do
+    Repo.one(
+      from agent in Agent,
+        where: agent.wallet_address == ^wallet_address and agent.ens_fqdn == ^ens_name,
+        limit: 1
+    )
+  end
+
+  defp ensure_forward_resolution_verified(%{forward_resolution_verified: true}), do: :ok
+
+  defp ensure_forward_resolution_verified(_plan) do
+    {:error,
+     {:conflict,
+      "The attached Regent ENS name must already point to the authenticated agent wallet before it can be set as the primary name"}}
+  end
+
+  defp ensure_upgrade_confirmations(rpc_url, %{"blockNumber" => block_number}) do
+    with {:ok, latest_block} <- Ethereum.json_rpc(rpc_url, "eth_blockNumber", []),
+         latest when is_binary(latest) <- latest_block,
+         confirmations <-
+           Ethereum.hex_to_integer(latest) - Ethereum.hex_to_integer(block_number) + 1,
+         true <- confirmations >= @upgrade_confirmations do
+      :ok
+    else
+      false ->
+        {:error,
+         {:external, :ethereum, "That mainnet transaction needs more confirmations before it can be marked live"}}
+
+      {:error, message} when is_binary(message) ->
+        {:error, {:external, :ethereum, message}}
+    end
+  end
+
+  defp ensure_upgrade_confirmations(_rpc_url, _receipt),
+    do: {:error, {:external, :ethereum, "That mainnet transaction receipt is incomplete"}}
+
+  defp ensure_expected_upgrade_transaction(%Mint{} = claim, %{"to" => to, "input" => input}) do
+    with registrar when is_binary(registrar) <- RuntimeConfig.regent_ens_registrar_address(),
+         owner when is_binary(owner) <- RuntimeConfig.regent_ens_owner_address(),
+         resolver when is_binary(resolver) <- RuntimeConfig.ens_public_resolver_address(),
+         true <- PlatformPhx.Ethereum.normalize_address(to) == PlatformPhx.Ethereum.normalize_address(registrar),
+         true <- String.starts_with?(input || "", ABI.selector("upgradeClaim(string,address,address)")),
+         {:ok, decoded} <- decode_upgrade_claim_input(input),
+         true <- decoded.label == claim.label,
+         true <- decoded.owner_address == PlatformPhx.Ethereum.normalize_address(owner),
+         true <- decoded.resolver_address == PlatformPhx.Ethereum.normalize_address(resolver) do
+      :ok
+    else
+      nil ->
+        {:error, {:unavailable, "The Regent ENS upgrade path is not configured"}}
+
+      false ->
+        {:error,
+         {:bad_request,
+          "That transaction does not match the expected Regent ENS upgrade for this claimed name"}}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp ensure_expected_upgrade_transaction(_claim, _transaction) do
+    {:error, {:external, :ethereum, "That mainnet transaction could not be loaded"}}
+  end
+
+  defp ensure_expected_upgrade_logs(%Mint{} = claim, %{"logs" => logs}) when is_list(logs) do
+    expected_node = String.downcase(claim.ens_node || "")
+
+    if expected_node != "" and
+         Enum.any?(logs, fn
+           %{"topics" => topics} when is_list(topics) ->
+             Enum.any?(topics, &(String.downcase(&1) == expected_node))
+
+           _ ->
+             false
+         end) do
+      :ok
+    else
+      {:error,
+       {:bad_request,
+        "That transaction did not emit the expected Regent ENS node event for this claimed name"}}
+    end
+  end
+
+  defp ensure_expected_upgrade_logs(_claim, _receipt),
+    do: {:error, {:external, :ethereum, "That mainnet transaction receipt is incomplete"}}
+
+  defp decode_upgrade_claim_input("0x" <> data) when byte_size(data) >= 8 do
+    payload = binary_part(data, 8, byte_size(data) - 8)
+
+    with {:ok, label} <- decode_dynamic_string(payload, 0),
+         {:ok, owner_address} <- decode_address_word(payload, 1),
+         {:ok, resolver_address} <- decode_address_word(payload, 2) do
+      {:ok,
+       %{
+         label: label,
+         owner_address: owner_address,
+         resolver_address: resolver_address
+       }}
+    else
+      _ -> {:error, {:bad_request, "That transaction input could not be decoded"}}
+    end
+  end
+
+  defp decode_upgrade_claim_input(_input),
+    do: {:error, {:bad_request, "That transaction input could not be decoded"}}
+
+  defp decode_dynamic_string(payload, word_index) do
+    with {:ok, offset} <- decode_word_as_integer(payload, word_index),
+         {:ok, length} <- decode_word_as_integer(payload, div(offset, 32)),
+         start <- (offset + 32) * 2,
+         size <- length * 2,
+         true <- byte_size(payload) >= start + size,
+         encoded <- binary_part(payload, start, size),
+         {:ok, binary} <- Base.decode16(encoded, case: :mixed) do
+      {:ok, binary}
+    else
+      _ -> {:error, :invalid}
+    end
+  end
+
+  defp decode_address_word(payload, word_index) do
+    with {:ok, word} <- decode_word(payload, word_index) do
+      {:ok, "0x" <> String.slice(String.downcase(word), -40, 40)}
+    end
+  end
+
+  defp decode_word_as_integer(payload, word_index) do
+    with {:ok, word} <- decode_word(payload, word_index) do
+      {:ok, String.to_integer(word, 16)}
+    else
+      _ -> {:error, :invalid}
+    end
+  end
+
+  defp decode_word(payload, word_index) do
+    start = word_index * 64
+
+    if byte_size(payload) >= start + 64 do
+      {:ok, binary_part(payload, start, 64)}
+    else
+      {:error, :invalid}
+    end
+  end
 
   defp truthy?(value), do: value in [true, "true", "1", 1]
 
