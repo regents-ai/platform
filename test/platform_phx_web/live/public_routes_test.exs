@@ -475,13 +475,12 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert csp =~ connect_origin(RuntimeConfig.base_rpc_url())
   end
 
-  test "token card image is served from the hosted card path", %{conn: conn} do
+  test "platform no longer serves token card images directly", %{conn: conn} do
     conn =
       conn
       |> get("/images/animata/cards/1.png")
 
-    assert response(conn, 200)
-    assert get_resp_header(conn, "content-type") == ["image/png"]
+    assert response(conn, 404)
   end
 
   test "token card route returns not found for unknown token", %{conn: conn} do
@@ -498,7 +497,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
       |> json_response(200)
 
     assert payload["name"] == "Regents Club #615"
-    assert payload["image"] == "https://regents.sh/images/animata/cards/615.png"
+    assert payload["image"] == "https://media.regents.sh/images/animata/cards/615.png"
     assert payload["animation_url"] == "https://regents.sh/cards/regents-club/615"
   end
 
