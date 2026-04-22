@@ -12,13 +12,16 @@ defmodule PlatformPhxWeb.BugReportLiveTest do
   @registry_address "0x2222222222222222222222222222222222222222"
 
   test "bug report route renders the empty state", %{conn: conn} do
-    {:ok, _view, html} = live(conn, "/bug-report")
+    {:ok, view, html} = live(conn, "/bug-report")
 
-    assert html =~ "Bug Report Ledger"
-    assert html =~ "No bug reports have been filed yet."
-    assert html =~ "Live Board"
-    assert html =~ "agent sends `regents bug` through the CLI,"
-    assert html =~ ~s(href="/bug-report")
+    assert html =~ "Bug reports and their current status"
+    assert html =~ "No reports match this view."
+    assert html =~ "Live board"
+    assert html =~ "this board shows who sent it"
+    assert html =~ ~s(href="/cli")
+    assert html =~ ~s(href="/docs")
+    assert has_element?(view, "#platform-bug-ledger-empty")
+    assert has_element?(view, "#platform-bug-ledger-summary")
   end
 
   test "bug report route renders reports recent first with details", %{conn: conn} do
@@ -39,7 +42,8 @@ defmodule PlatformPhxWeb.BugReportLiveTest do
     assert html =~ "older summary"
     assert html =~ "Show details"
     assert html =~ "newer details"
-    assert has_element?(view, "#platform-bug-ledger-table[phx-update=\"stream\"]")
+    assert html =~ "Open"
+    assert has_element?(view, "#platform-bug-ledger-stream[phx-update=\"stream\"]")
 
     assert position(html, "newer summary") < position(html, "older summary")
   end
@@ -56,10 +60,10 @@ defmodule PlatformPhxWeb.BugReportLiveTest do
 
     {:ok, view, html} = live(conn, "/bug-report")
 
-    assert html =~ "Loading older reports"
+    assert html =~ "Load more reports"
     assert html =~ "report-051"
     refute html =~ "report-001"
-    assert has_element?(view, "#platform-bug-ledger-table[phx-update=\"stream\"]")
+    assert has_element?(view, "#platform-bug-ledger-stream[phx-update=\"stream\"]")
 
     html_two =
       view

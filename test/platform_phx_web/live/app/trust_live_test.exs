@@ -93,7 +93,10 @@ defmodule PlatformPhxWeb.App.TrustLiveTest do
       |> live("/app/trust?session_id=#{session_id}&token=#{token}")
 
     assert html =~ "Connect a human-backed trust record"
-    assert html =~ "Open World App"
+    assert html =~ "Connection summary"
+    assert html =~ "Connect from your device"
+    assert html =~ "Approval status"
+    assert html =~ "Connection states"
     assert html =~ "phx-hook=\"AgentbookTrustFlow\""
     assert html =~ "data-session="
   end

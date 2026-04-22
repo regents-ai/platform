@@ -299,7 +299,7 @@ defmodule PlatformPhxWeb.AgentPlatformComponents do
           </div>
 
           <div class="grid gap-4">
-            <%= for artifact <- @agent.feed || [] do %>
+            <%= for artifact <- public_feed_items(@agent) do %>
               <section class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--card)] p-4">
                 <div class="space-y-2">
                   <div class="flex flex-wrap items-center justify-between gap-3">
@@ -352,6 +352,10 @@ defmodule PlatformPhxWeb.AgentPlatformComponents do
 
   defp agent_ens_name(%{ens: %{name: name}}) when is_binary(name) and name != "", do: name
   defp agent_ens_name(_agent), do: "Not attached yet"
+
+  defp public_feed_items(%{feed: feed}) when is_list(feed), do: feed
+  defp public_feed_items(%{artifacts: artifacts}) when is_list(artifacts), do: artifacts
+  defp public_feed_items(_agent), do: []
 
   defp public_avatar_card_class(avatar) do
     [
