@@ -2499,7 +2499,7 @@ defmodule PlatformPhxWeb.AppComponents do
       "reserve_claim" -> "Saving your company name"
       "create_sprite" -> "Starting your company"
       "bootstrap_sprite" -> "Preparing your company"
-      "bootstrap_paperclip" -> "Connecting company tools"
+      "bootstrap_workspace" -> "Connecting your company workspace"
       "create_company" -> "Building your company home"
       "create_hermes" -> "Getting the company assistant ready"
       "create_checkpoint" -> "Saving your first restore point"

@@ -5,9 +5,7 @@ defmodule PlatformPhx.SpriteRunnerFake do
     {:ok,
      %{
        "sprite_url" => "https://#{agent.slug}.sprites.dev",
-       "paperclip_url" => "https://#{agent.slug}.sprites.dev:3100",
-       "paperclip_company_id" => "#{agent.slug}-company",
-       "paperclip_agent_id" => "#{agent.slug}-hermes",
+       "workspace_url" => "https://#{agent.slug}.sprites.dev",
        "workspace_path" => "/app/company",
        "workspace_seed_version" => "company-workspace-v1",
        "hermes_command" => "/app/bin/hermes-company",

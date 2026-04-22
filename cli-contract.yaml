@@ -813,16 +813,14 @@ components:
       allOf:
         - $ref: '#/components/schemas/PublicAgentRecord'
         - type: object
-          required: [sprite_name, sprite_service_name, paperclip_company_id, paperclip_agent_id, runtime_status, checkpoint_status, desired_runtime_state, observed_runtime_state, sprite_free_until, sprite_metering_status]
+          required: [sprite_name, sprite_service_name, workspace_url, workspace_http_port, runtime_status, checkpoint_status, desired_runtime_state, observed_runtime_state, sprite_free_until, sprite_metering_status]
           properties:
             sprite_name: {type: [string, 'null']}
             sprite_service_name: {type: [string, 'null']}
             sprite_checkpoint_ref: {type: [string, 'null']}
             sprite_created_at: {type: [string, 'null'], format: date-time}
-            paperclip_deployment_mode: {type: [string, 'null']}
-            paperclip_http_port: {type: [integer, 'null']}
-            paperclip_company_id: {type: [string, 'null']}
-            paperclip_agent_id: {type: [string, 'null']}
+            workspace_url: {type: [string, 'null']}
+            workspace_http_port: {type: [integer, 'null']}
             hermes_adapter_type: {type: [string, 'null']}
             hermes_model: {type: [string, 'null']}
             hermes_persist_session: {type: boolean}
@@ -939,7 +937,7 @@ components:
         runtime_status: {type: string}
     AgentRuntime:
       type: object
-      required: [sprite, paperclip, hermes, checkpoint]
+      required: [sprite, workspace, hermes, checkpoint]
       properties:
         sprite:
           type: object
@@ -952,19 +950,17 @@ components:
             metering_status: {type: string}
             desired_runtime_state: {type: string}
             observed_runtime_state: {type: string}
-        paperclip:
+        workspace:
           type: object
-          required: [company_id, status, deployment_mode, http_port]
+          required: [url, status, http_port]
           properties:
-            company_id: {type: [string, 'null']}
+            url: {type: [string, 'null']}
             status: {type: string}
-            deployment_mode: {type: string}
             http_port: {type: integer}
         hermes:
           type: object
-          required: [agent_id, status, adapter_type, model, persist_session, toolsets, runtime_plugins, shared_skills]
+          required: [status, adapter_type, model, persist_session, toolsets, runtime_plugins, shared_skills]
           properties:
-            agent_id: {type: [string, 'null']}
             status: {type: string}
             adapter_type: {type: string}
             model: {type: string}

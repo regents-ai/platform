@@ -13,7 +13,7 @@ defmodule PlatformPhx.AgentPlatform do
   alias PlatformPhx.AgentPlatform.Connection
   alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.AgentPlatform.LlmUsageEvent
-  alias PlatformPhx.AgentPlatform.PaperclipBootstrap
+  alias PlatformPhx.AgentPlatform.WorkspaceBootstrap
   alias PlatformPhx.AgentPlatform.Service
   alias PlatformPhx.AgentPlatform.SpriteUsageRecord
   alias PlatformPhx.AgentPlatform.Subdomain
@@ -322,10 +322,8 @@ defmodule PlatformPhx.AgentPlatform do
           sprite_service_name: agent.sprite_service_name,
           sprite_checkpoint_ref: agent.sprite_checkpoint_ref,
           sprite_created_at: iso(agent.sprite_created_at),
-          paperclip_deployment_mode: agent.paperclip_deployment_mode,
-          paperclip_http_port: agent.paperclip_http_port,
-          paperclip_company_id: agent.paperclip_company_id,
-          paperclip_agent_id: agent.paperclip_agent_id,
+          workspace_url: agent.workspace_url,
+          workspace_http_port: agent.workspace_http_port,
           hermes_adapter_type: agent.hermes_adapter_type,
           hermes_model: agent.hermes_model || @default_hermes_model,
           hermes_persist_session: agent.hermes_persist_session != false,
@@ -382,7 +380,7 @@ defmodule PlatformPhx.AgentPlatform do
 
     %{
       sprite: runtime_sprite_payload(agent, billing_account),
-      paperclip: runtime_paperclip_payload(agent, runtime_defaults, workspace),
+      workspace: runtime_workspace_payload(agent, runtime_defaults, workspace),
       hermes: runtime_hermes_payload(agent, runtime_defaults, workspace),
       checkpoint: runtime_checkpoint_payload(agent)
     }
@@ -696,14 +694,11 @@ defmodule PlatformPhx.AgentPlatform do
     }
   end
 
-  defp runtime_paperclip_payload(%Agent{} = agent, runtime_defaults, workspace) do
+  defp runtime_workspace_payload(%Agent{} = agent, runtime_defaults, workspace) do
     base = %{
-      company_id: agent.paperclip_company_id,
+      url: agent.workspace_url,
       status: effective_runtime_status(agent),
-      deployment_mode:
-        agent.paperclip_deployment_mode || runtime_defaults[:paperclip_deployment_mode] ||
-          "authenticated",
-      http_port: agent.paperclip_http_port || runtime_defaults[:paperclip_http_port] || 3100
+      http_port: agent.workspace_http_port || runtime_defaults[:workspace_http_port] || 3000
     }
 
     maybe_put_workspace(base, workspace)
@@ -711,10 +706,9 @@ defmodule PlatformPhx.AgentPlatform do
 
   defp runtime_hermes_payload(%Agent{} = agent, runtime_defaults, workspace) do
     base = %{
-      agent_id: agent.paperclip_agent_id,
       status: effective_runtime_status(agent),
       adapter_type:
-        agent.hermes_adapter_type || runtime_defaults[:hermes_adapter_type] || "hermes_local",
+        agent.hermes_adapter_type || runtime_defaults[:hermes_adapter_type] || "stock",
       model: agent.hermes_model || runtime_defaults[:hermes_model] || @default_hermes_model,
       persist_session:
         if(is_boolean(agent.hermes_persist_session),
@@ -799,12 +793,12 @@ defmodule PlatformPhx.AgentPlatform do
     metadata = formation.metadata || %{}
 
     %{
-      workspace_path: metadata["workspace_path"] || PaperclipBootstrap.workspace_path(),
+      workspace_path: metadata["workspace_path"] || WorkspaceBootstrap.workspace_path(),
       workspace_seed_version:
-        metadata["workspace_seed_version"] || PaperclipBootstrap.workspace_seed_version(),
-      hermes_command: metadata["hermes_command"] || PaperclipBootstrap.hermes_command(),
+        metadata["workspace_seed_version"] || WorkspaceBootstrap.workspace_seed_version(),
+      hermes_command: metadata["hermes_command"] || WorkspaceBootstrap.hermes_command(),
       prompt_template_version:
-        metadata["prompt_template_version"] || PaperclipBootstrap.prompt_template_version()
+        metadata["prompt_template_version"] || WorkspaceBootstrap.prompt_template_version()
     }
   end
 

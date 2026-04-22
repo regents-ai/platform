@@ -18,7 +18,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
   @runner_steps [
     "create_sprite",
     "bootstrap_sprite",
-    "bootstrap_paperclip",
+    "bootstrap_workspace",
     "create_company",
     "create_hermes",
     "create_checkpoint"
@@ -107,9 +107,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
       agent
       |> Agent.changeset(%{
         sprite_url: result["sprite_url"],
-        paperclip_url: result["paperclip_url"],
-        paperclip_company_id: result["paperclip_company_id"],
-        paperclip_agent_id: result["paperclip_agent_id"],
+        workspace_url: result["workspace_url"],
         sprite_checkpoint_ref: result["checkpoint_ref"],
         sprite_created_at: now(),
         runtime_status: "forming",
@@ -286,7 +284,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
 
   defp success_message_for_step("create_sprite"), do: "The first launch step is complete."
   defp success_message_for_step("bootstrap_sprite"), do: "Your company setup is in place."
-  defp success_message_for_step("bootstrap_paperclip"), do: "Your company tools are connected."
+  defp success_message_for_step("bootstrap_workspace"), do: "Your company workspace is connected."
   defp success_message_for_step("create_company"), do: "Your company home is built."
   defp success_message_for_step("create_hermes"), do: "Your company assistant is ready."
   defp success_message_for_step("create_checkpoint"), do: "Your first restore point is saved."

@@ -262,12 +262,14 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert runtime_response["agent"]["status"] == "published"
     assert runtime_response["agent"]["subdomain"]["active"] == true
     assert runtime_response["runtime"]["sprite"]["owner"] == "regents"
-    assert runtime_response["runtime"]["paperclip"]["workspace_path"] == "/app/company"
+    assert runtime_response["runtime"]["workspace"]["workspace_path"] == "/app/company"
 
-    assert runtime_response["runtime"]["paperclip"]["workspace_seed_version"] ==
+    assert runtime_response["runtime"]["workspace"]["workspace_seed_version"] ==
              "company-workspace-v1"
 
-    assert runtime_response["runtime"]["hermes"]["adapter_type"] == "hermes_local"
+    assert runtime_response["runtime"]["workspace"]["url"] == "https://startline.sprites.dev"
+    assert runtime_response["runtime"]["workspace"]["http_port"] == 3000
+    assert runtime_response["runtime"]["hermes"]["adapter_type"] == "stock"
     assert runtime_response["runtime"]["hermes"]["model"] == "glm-5.1"
     assert runtime_response["runtime"]["hermes"]["command"] == "/app/bin/hermes-company"
 
@@ -393,7 +395,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     env_file_path = Path.join(tmp_dir, ".env")
 
     script_path =
-      "/Users/sean/Documents/regent/platform/priv/agent_formation/paperclip-regents/seed_company_workspace.mjs"
+      "/Users/sean/Documents/regent/platform/priv/agent_formation/hermes-workspace/seed_company_workspace.mjs"
 
     File.mkdir_p!(tmp_dir)
 
@@ -653,7 +655,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     paused_sprite_name = "#{paused_agent.slug}-sprite"
     active_sprite_name = "#{active_agent.slug}-sprite"
 
-    assert_receive {:start_service, ^paused_sprite_name, "paperclip"}
+    assert_receive {:start_service, ^paused_sprite_name, "hermes-workspace"}
 
     assert :ok ==
              perform_job(PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker, %{
@@ -668,8 +670,8 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
                }
              })
 
-    assert_receive {:stop_service, ^paused_sprite_name, "paperclip"}
-    assert_receive {:stop_service, ^active_sprite_name, "paperclip"}
+    assert_receive {:stop_service, ^paused_sprite_name, "hermes-workspace"}
+    assert_receive {:stop_service, ^active_sprite_name, "hermes-workspace"}
   end
 
   test "billing setup rejects a missing csrf token", %{conn: conn} do
@@ -1001,7 +1003,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       status: "published",
       public_summary: "Runtime control test company",
       sprite_name: "#{slug}-sprite",
-      sprite_service_name: "paperclip",
+      sprite_service_name: "hermes-workspace",
       stripe_llm_billing_status: "active",
       stripe_customer_id: "cus_test_agent_formation",
       stripe_pricing_plan_subscription_id: "sub_test_agent_formation",

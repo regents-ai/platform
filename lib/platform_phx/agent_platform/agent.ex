@@ -33,11 +33,8 @@ defmodule PlatformPhx.AgentPlatform.Agent do
     field :sprite_service_name, :string
     field :sprite_checkpoint_ref, :string
     field :sprite_created_at, :utc_datetime
-    field :paperclip_url, :string
-    field :paperclip_deployment_mode, :string
-    field :paperclip_http_port, :integer
-    field :paperclip_company_id, :string
-    field :paperclip_agent_id, :string
+    field :workspace_url, :string
+    field :workspace_http_port, :integer
     field :hermes_adapter_type, :string
     field :hermes_model, :string
     field :hermes_persist_session, :boolean, default: true
@@ -92,11 +89,8 @@ defmodule PlatformPhx.AgentPlatform.Agent do
       :sprite_service_name,
       :sprite_checkpoint_ref,
       :sprite_created_at,
-      :paperclip_url,
-      :paperclip_deployment_mode,
-      :paperclip_http_port,
-      :paperclip_company_id,
-      :paperclip_agent_id,
+      :workspace_url,
+      :workspace_http_port,
       :hermes_adapter_type,
       :hermes_model,
       :hermes_persist_session,

@@ -3,7 +3,7 @@ defmodule PlatformPhx.AgentPlatform.SpriteRunner do
 
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.FormationRun
-  alias PlatformPhx.AgentPlatform.PaperclipBootstrap
+  alias PlatformPhx.AgentPlatform.WorkspaceBootstrap
 
   def run(%Agent{} = agent, %FormationRun{} = formation) do
     client().run(agent, formation)
@@ -18,7 +18,7 @@ defmodule PlatformPhx.AgentPlatform.SpriteRunner do
 
     alias PlatformPhx.AgentPlatform.Agent
     alias PlatformPhx.AgentPlatform.FormationRun
-    alias PlatformPhx.AgentPlatform.PaperclipBootstrap
+    alias PlatformPhx.AgentPlatform.WorkspaceBootstrap
 
     def run(%Agent{} = agent, %FormationRun{} = formation) do
       log_path =
@@ -26,11 +26,11 @@ defmodule PlatformPhx.AgentPlatform.SpriteRunner do
           Path.join(System.tmp_dir!(), "agent-formation-#{agent.slug}-#{formation.id}.log")
 
       env =
-        PaperclipBootstrap.build_env(agent, formation)
+        WorkspaceBootstrap.build_env(agent, formation)
         |> Enum.to_list()
 
       case System.cmd(
-             PaperclipBootstrap.script_path(),
+             WorkspaceBootstrap.script_path(),
              [],
              env: env,
              stderr_to_stdout: true

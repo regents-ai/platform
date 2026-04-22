@@ -54,7 +54,7 @@ defmodule PlatformPhx.AgentPlatform.FormationRun do
       "reserve_claim",
       "create_sprite",
       "bootstrap_sprite",
-      "bootstrap_paperclip",
+      "bootstrap_workspace",
       "create_company",
       "create_hermes",
       "create_checkpoint",

@@ -26,16 +26,15 @@ defmodule PlatformPhx.AgentPlatform.TemplateCatalog do
       ],
       runtime_defaults: %{
         sprite_owner: "regents",
-        sprite_service_name: "paperclip",
-        paperclip_deployment_mode: "authenticated",
-        paperclip_http_port: 3100,
-        hermes_adapter_type: "hermes_local",
+        sprite_service_name: "hermes-workspace",
+        workspace_http_port: 3000,
+        hermes_adapter_type: "stock",
         hermes_model: "glm-5.1",
         hermes_persist_session: true,
         hermes_toolsets: template.hermes_toolsets,
         hermes_runtime_plugins: ["regents"],
         hermes_shared_skills: ["regents"],
-        paperclip_company_purpose: template.paperclip_company_purpose,
+        company_purpose: template.company_purpose,
         hermes_worker_role: template.hermes_worker_role,
         recommended_network_domains: template.recommended_network_domains,
         checkpoint_moments: template.checkpoint_moments
@@ -52,13 +51,13 @@ defmodule PlatformPhx.AgentPlatform.TemplateCatalog do
         summary:
           "Contract audit specialist with public findings feeds, Slack access, X posting, and payment-gated review services.",
         hero_statement:
-          "Sprite-hosted Solidity audit business with a private Paperclip company, a Hermes operator, and a clean public storefront.",
+          "Sprite-hosted Solidity audit business with a private Hermes workspace, a Hermes operator, and a clean public storefront.",
         what_it_does: [
           "Reviews EVM contracts for bugs, risks, and launch blockers.",
           "Posts non-private findings and completion summaries publicly.",
           "Supports Slack intake, X posting, and wallet-based service delivery."
         ],
-        paperclip_company_purpose:
+        company_purpose:
           "Run a single Solidity audit business with paid reviews, public completion artifacts, and direct operator intake.",
         hermes_worker_role:
           "Primary Solidity security reviewer responsible for audits, threat models, and plain-English findings.",
@@ -71,8 +70,8 @@ defmodule PlatformPhx.AgentPlatform.TemplateCatalog do
           "basescan.org"
         ],
         checkpoint_moments: [
-          "After Paperclip is reachable on the Sprite",
-          "After Hermes and the adapter are installed",
+          "After Hermes Workspace is reachable on the Sprite",
+          "After Hermes Agent and the workspace are installed",
           "After the service menu and public feed are published"
         ],
         services: [
@@ -101,13 +100,13 @@ defmodule PlatformPhx.AgentPlatform.TemplateCatalog do
         summary:
           "Anchor and Sealevel audit specialist for teams that need a public service storefront and fast exploit-focused review.",
         hero_statement:
-          "Sprite-hosted Solana audit business with a private Paperclip runtime and a persistent Hermes reviewer.",
+          "Sprite-hosted Solana audit business with a private Hermes workspace and a persistent Hermes reviewer.",
         what_it_does: [
           "Reviews Solana and Anchor programs for authority, CPI, account, and signer issues.",
           "Publishes non-private review summaries after paid work is finished.",
           "Accepts Slack, X, and wallet-native service intake."
         ],
-        paperclip_company_purpose:
+        company_purpose:
           "Run one Solana audit company with private operator workflows and public completion summaries.",
         hermes_worker_role:
           "Primary Solana and Anchor auditor handling exploit-focused review, authority checks, and launch readiness.",
@@ -120,7 +119,7 @@ defmodule PlatformPhx.AgentPlatform.TemplateCatalog do
           "explorer.solana.com"
         ],
         checkpoint_moments: [
-          "After Paperclip is reachable on the Sprite",
+          "After Hermes Workspace is reachable on the Sprite",
           "After Hermes is registered as the main worker",
           "After the public work feed is seeded"
         ],
@@ -150,13 +149,13 @@ defmodule PlatformPhx.AgentPlatform.TemplateCatalog do
         summary:
           "Service-agent recruiter that recommends the right specialist for a concrete business need and writes the operator handoff.",
         hero_statement:
-          "Sprite-hosted agent recruiter with a private Paperclip company and a Hermes matchmaker for real business problems.",
+          "Sprite-hosted agent recruiter with a private Hermes workspace and a Hermes matchmaker for real business problems.",
         what_it_does: [
           "Tracks and compares useful service agents across business categories.",
           "Recommends the best specialist for the job at hand.",
           "Publishes non-private shortlist and handoff summaries."
         ],
-        paperclip_company_purpose:
+        company_purpose:
           "Run a service-agent recruiting company that delivers shortlists and handoff briefs.",
         hermes_worker_role:
           "Primary agent recruiter responsible for market scans, specialist matching, and operator handoffs.",
@@ -168,7 +167,7 @@ defmodule PlatformPhx.AgentPlatform.TemplateCatalog do
           "x.com"
         ],
         checkpoint_moments: [
-          "After Paperclip is reachable on the Sprite",
+          "After Hermes Workspace is reachable on the Sprite",
           "After the recruiting sources are configured",
           "After the public shortlist feed is published"
         ],
@@ -204,7 +203,7 @@ defmodule PlatformPhx.AgentPlatform.TemplateCatalog do
           "Turns agent outputs into public posting and campaign assets.",
           "Publishes non-private outcome summaries for completed work."
         ],
-        paperclip_company_purpose:
+        company_purpose:
           "Run a growth marketing company for agent businesses with paid planning and public proof-of-work.",
         hermes_worker_role:
           "Primary growth operator responsible for launch plans, content calendars, and channel strategy.",
@@ -217,7 +216,7 @@ defmodule PlatformPhx.AgentPlatform.TemplateCatalog do
           "farcaster.xyz"
         ],
         checkpoint_moments: [
-          "After Paperclip is reachable on the Sprite",
+          "After Hermes Workspace is reachable on the Sprite",
           "After posting and campaign tools are connected",
           "After the launch calendar artifact is published"
         ],
@@ -253,7 +252,7 @@ defmodule PlatformPhx.AgentPlatform.TemplateCatalog do
           "Runs scoped research or evaluation workflows.",
           "Publishes non-private summaries for finished work."
         ],
-        paperclip_company_purpose:
+        company_purpose:
           "Run a research and science workflow company with reproducible outputs and skill-aware operator guidance.",
         hermes_worker_role:
           "Primary research operator responsible for workflow design, study execution, and tool recommendations.",
@@ -266,7 +265,7 @@ defmodule PlatformPhx.AgentPlatform.TemplateCatalog do
           "arxiv.org"
         ],
         checkpoint_moments: [
-          "After Paperclip is reachable on the Sprite",
+          "After Hermes Workspace is reachable on the Sprite",
           "After research sources and MCP tools are configured",
           "After the first public study artifact is published"
         ],
@@ -302,7 +301,7 @@ defmodule PlatformPhx.AgentPlatform.TemplateCatalog do
           "Maps recurring jobs and operator checkpoints.",
           "Publishes non-private cadence and automation summaries."
         ],
-        paperclip_company_purpose:
+        company_purpose:
           "Run an operations cadence company for multi-agent businesses with recurring jobs and public summaries.",
         hermes_worker_role:
           "Primary operations tempo operator responsible for recurring schedules, checkpoints, and operator pacing.",
@@ -314,7 +313,7 @@ defmodule PlatformPhx.AgentPlatform.TemplateCatalog do
           "slack.com"
         ],
         checkpoint_moments: [
-          "After Paperclip is reachable on the Sprite",
+          "After Hermes Workspace is reachable on the Sprite",
           "After recurring workflows are configured",
           "After the cadence report artifact is published"
         ],
@@ -344,14 +343,14 @@ defmodule PlatformPhx.AgentPlatform.TemplateCatalog do
         summary:
           "Zero-to-one launch specialist for new agent businesses that need naming, runtime, wallet, posting, and pricing setup.",
         hero_statement:
-          "Sprite-hosted launch company that takes a new agent business from idea to Paperclip runtime and public storefront.",
+          "Sprite-hosted launch company that takes a new agent business from idea to workspace and public storefront.",
         what_it_does: [
           "Helps operators package an agent into a real service business.",
           "Defines the first runtime, menu, pricing, and public rails.",
           "Publishes non-private kickoff and launch summaries."
         ],
-        paperclip_company_purpose:
-          "Run a launch setup company that turns new agent ideas into working Sprite, Paperclip, and storefront deployments.",
+        company_purpose:
+          "Run a launch setup company that turns new agent ideas into working Sprite, Hermes Workspace, and storefront deployments.",
         hermes_worker_role:
           "Primary launch operator responsible for setup briefs, provisioning plans, and first-service packaging.",
         hermes_toolsets: ["terminal", "file", "web", "productivity"],
@@ -363,7 +362,7 @@ defmodule PlatformPhx.AgentPlatform.TemplateCatalog do
           "x.com"
         ],
         checkpoint_moments: [
-          "After Paperclip is reachable on the Sprite",
+          "After Hermes Workspace is reachable on the Sprite",
           "After Hermes and payment rails are connected",
           "After the kickoff artifact is published"
         ],

@@ -28,7 +28,7 @@ defmodule PlatformPhx.RuntimeConfig do
   def welcome_credit_expiry_days, do: fetch_integer("WELCOME_CREDIT_EXPIRY_DAYS", 60)
   def sprites_api_token, do: fetch("SPRITES_API_TOKEN")
   def sprite_cli_path, do: fetch("SPRITE_CLI_PATH") || "sprite"
-  def paperclip_http_port, do: fetch("PAPERCLIP_HTTP_PORT") || "3100"
+  def workspace_http_port, do: fetch("WORKSPACE_HTTP_PORT") || "3000"
   def regent_staking_rpc_url, do: fetch("REGENT_STAKING_RPC_URL") || base_rpc_url()
   def regent_staking_contract_address, do: fetch("REGENT_STAKING_CONTRACT_ADDRESS")
   def regent_staking_chain_id, do: fetch_integer("REGENT_STAKING_CHAIN_ID", 8453)
