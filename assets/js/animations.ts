@@ -271,19 +271,19 @@ function mountHomeEntryCtas(root: ParentNode): Array<() => void> {
       });
     };
 
-    const onPointerEnter = () => animateTo(1, 500, "inOutQuart");
+    const onPointerEnter = () => animateTo(1, 240, "outQuart");
     const onPointerLeave = () => {
       if (lockedCollapsed) return;
-      animateTo(0, 500, "inOutQuart");
+      animateTo(0, 200, "outQuart");
     };
-    const onFocus = () => animateTo(1, 500, "inOutQuart");
+    const onFocus = () => animateTo(1, 240, "outQuart");
     const onBlur = () => {
       if (lockedCollapsed) return;
-      animateTo(0, 500, "inOutQuart");
+      animateTo(0, 200, "outQuart");
     };
     const onClick = () => {
       lockedCollapsed = true;
-      animateTo(1, 320, "outQuart");
+      animateTo(1, 180, "outQuart");
     };
     const onResize = () => {
       const currentProgress = motion.progress;

@@ -28,17 +28,17 @@ type FooterVoxelHookContext = {
 };
 
 const LIGHT_PALETTE: FooterVoxelPalette = {
-  top: "#fbfeff",
-  left: "#d7e4f0",
-  right: "#eef4fa",
-  stroke: "#5e7b93",
+  top: "#fbf4e6",
+  left: "#d9c28a",
+  right: "#efe1c3",
+  stroke: "#6d5830",
 };
 
 const DARK_PALETTE: FooterVoxelPalette = {
-  top: "#6aa6d9",
-  left: "#1e4f79",
-  right: "#2e6e9b",
-  stroke: "#143450",
+  top: "#dfc06d",
+  left: "#6a5326",
+  right: "#96753a",
+  stroke: "#352711",
 };
 
 function footerVoxelMotionReduced(): boolean {

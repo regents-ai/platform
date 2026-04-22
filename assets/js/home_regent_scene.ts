@@ -106,7 +106,7 @@ function flowWeightsForFace(face: FaceSpec | undefined): Map<string, number> {
 function setWrapperState(wrapper: SVGGElement, scale: number, opacity: number): void {
   wrapper.style.setProperty("transform-box", "fill-box");
   wrapper.style.setProperty("transform-origin", "center");
-  wrapper.style.transform = `scale(${Math.max(scale, 0.0001)})`;
+  wrapper.style.transform = `scale(${Math.max(scale, 0.92)})`;
   wrapper.style.opacity = `${Math.max(opacity, 0.0001)}`;
 }
 
@@ -217,7 +217,7 @@ class HomeRegentLoopAnimator {
       return;
     }
 
-    this.wrappers.forEach(({ wrapper }) => setWrapperState(wrapper, 0.0001, 0.0001));
+    this.wrappers.forEach(({ wrapper }) => setWrapperState(wrapper, 0.92, 0.12));
     this.playBuild(HOME_LOGO_BUILD_DURATION_MS);
 
     const cycleOffset = this.sequenceIndex * HOME_LOGO_SEQUENCE_DURATION_MS;
@@ -231,8 +231,8 @@ class HomeRegentLoopAnimator {
 
   private playBuild(durationMs: number): void {
     animate(this.wrappers.map(({ wrapper }) => wrapper), {
-      scale: [0.0001, 1],
-      opacity: [0.0001, 1],
+      scale: [0.92, 1],
+      opacity: [0.12, 1],
       delay: (_target: unknown, index: number) =>
         this.wrappers[index].flowWeight * durationMs * 0.72,
       duration: Math.max(durationMs * 0.28, 240),
@@ -242,8 +242,8 @@ class HomeRegentLoopAnimator {
 
   private playDissolve(): void {
     animate(this.wrappers.map(({ wrapper }) => wrapper), {
-      scale: [1, 0.0001],
-      opacity: [1, 0.0001],
+      scale: [1, 0.92],
+      opacity: [1, 0.12],
       delay: (_target: unknown, index: number) =>
         this.wrappers[index].flowWeight * HOME_LOGO_DISSOLUTION_DURATION_MS * 0.72,
       duration: Math.max(HOME_LOGO_DISSOLUTION_DURATION_MS * 0.28, 180),
@@ -254,7 +254,7 @@ class HomeRegentLoopAnimator {
   private runCycle(): void {
     this.playDissolve();
     this.buildTimeout = window.setTimeout(() => {
-      this.wrappers.forEach(({ wrapper }) => setWrapperState(wrapper, 0.0001, 0.0001));
+      this.wrappers.forEach(({ wrapper }) => setWrapperState(wrapper, 0.92, 0.12));
       this.playBuild(HOME_LOGO_REBUILD_DURATION_MS);
     }, HOME_LOGO_DISSOLUTION_DURATION_MS);
   }

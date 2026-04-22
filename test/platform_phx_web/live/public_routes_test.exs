@@ -91,8 +91,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "platform-docs-shell"
     assert html =~ "Start here"
     assert html =~ "Copy page as markdown"
-    assert html =~ "The Regent story, short version"
-    assert html =~ "The four surfaces"
+    assert html =~ "Where to go next"
     assert html =~ "Quick links"
     assert html =~ "App setup"
     assert html =~ "href=\"/app\""
@@ -100,12 +99,13 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "href=\"/techtree\""
     assert html =~ "href=\"/autolaunch\""
     assert html =~ "href=\"/bug-report\""
-    refute html =~ "Open app"
+    assert html =~ "href=\"/app/dashboard\""
+    refute html =~ "The Regent story, short version"
     assert has_element?(docs, "#platform-shell-sidebar")
     assert has_element?(docs, "#platform-shell-header-desktop")
     assert has_element?(docs, "#platform-shell-header-mobile")
-    assert has_element?(docs, "#platform-docs-story")
-    assert has_element?(docs, "#platform-docs-surfaces")
+    assert has_element?(docs, "#platform-docs-hero")
+    assert has_element?(docs, "#platform-docs-index")
     assert has_element?(docs, "#platform-docs-quick-links")
   end
 
@@ -206,7 +206,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "pnpm add -g @regentslabs/cli"
     assert html =~ "regents techtree start"
     assert html =~ "App setup"
-    assert html =~ "View CLI docs"
+    assert html =~ "Go to App setup"
     assert has_element?(cli, "#platform-regents-cli-quick-start")
     assert has_element?(cli, "#platform-regents-cli-commands")
     assert has_element?(cli, "#platform-regents-cli-guidance")
@@ -634,7 +634,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "For agents"
     assert html =~ "regents techtree apply &lt;flow&gt;"
     assert html =~ "regents autolaunch plan"
-    assert html =~ "View CLI docs"
+    assert html =~ "Go to App setup"
     assert has_element?(regents_cli, "#platform-regents-cli-hero")
     assert has_element?(regents_cli, "#platform-regents-cli-best-first-command")
     assert has_element?(regents_cli, "#platform-regents-cli-guidance")

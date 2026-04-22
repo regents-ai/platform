@@ -16,6 +16,8 @@ import { DashboardXmtpRoomHook } from "./dashboard/xmtp_room";
 import { TokenStakingHook } from "./token_staking";
 import { mountShaderRoot, unmountShaderRoot } from "./shader/root";
 import { mountTokenCardRoot, unmountTokenCardRoot, updateTokenCardRoot } from "./shader/token_card_root";
+import { mountClipboardCopy } from "./clipboard_copy";
+import { createCleanupHook } from "./hook_cleanup";
 import {
   hooks as regentHooks,
   installHeerich,
@@ -140,18 +142,8 @@ function mountLaunchProgress(root: HTMLElement): () => void {
 }
 
 const LaunchProgressHook = {
-  mounted(this: HookContext) {
-    this.__launchProgressCleanup?.();
-    this.__launchProgressCleanup = mountLaunchProgress(this.el as HTMLElement);
-  },
-  updated(this: HookContext) {
-    this.__launchProgressCleanup?.();
-    this.__launchProgressCleanup = mountLaunchProgress(this.el as HTMLElement);
-  },
-  destroyed(this: HookContext) {
-    this.__launchProgressCleanup?.();
-  },
-};
+  ...createCleanupHook("__launchProgressCleanup", mountLaunchProgress),
+} satisfies HooksOptions[string];
 
 const ShaderRootHook = {
   mounted(this: HookContext) {
@@ -178,42 +170,13 @@ const HeerichProceduralDemoHook = {
   },
 };
 const Demo2TunnelHook = {
-  mounted(this: HookContext & { __demo2Cleanup?: () => void }) {
-    this.__demo2Cleanup?.();
-    this.__demo2Cleanup = mountDemo2Tunnel(this.el as HTMLElement);
-  },
-  updated(this: HookContext & { __demo2Cleanup?: () => void }) {
-    this.__demo2Cleanup?.();
-    this.__demo2Cleanup = mountDemo2Tunnel(this.el as HTMLElement);
-  },
-  destroyed(this: HookContext & { __demo2Cleanup?: () => void }) {
-    this.__demo2Cleanup?.();
-  },
-};
+  ...createCleanupHook("__demo2Cleanup", mountDemo2Tunnel),
+} satisfies HooksOptions[string];
 const ClipboardCopyHook = {
-  mounted(this: HookContext & { __copyReset?: number }) {
-    const button = this.el as HTMLButtonElement;
-    const copyText = button.dataset.copyText ?? "";
-
-    const resetCopied = () => {
-      button.dataset.copied = "false";
-      delete this.__copyReset;
-    };
-
-    button.addEventListener("click", () => {
-      if (!copyText) return;
-
-      void navigator.clipboard.writeText(copyText).then(() => {
-        if (this.__copyReset) window.clearTimeout(this.__copyReset);
-        button.dataset.copied = "true";
-        this.__copyReset = window.setTimeout(resetCopied, 1400);
-      });
-    });
-  },
-  destroyed(this: HookContext & { __copyReset?: number }) {
-    if (this.__copyReset) window.clearTimeout(this.__copyReset);
-  },
-};
+  ...createCleanupHook("__clipboardCopyCleanup", (root) =>
+    mountClipboardCopy(root as HTMLButtonElement),
+  ),
+} satisfies HooksOptions[string];
 
 type QuickSearchItem = {
   href: string;
@@ -421,11 +384,17 @@ function mountBugReportLedger(root: HTMLElement, pushEvent?: (event: string, pay
 
 const BugReportLedgerHook = {
   mounted(this: HookContext & { __bugReportCleanup?: () => void; pushEvent?: (event: string, payload: object) => void }) {
-    this.__bugReportCleanup = mountBugReportLedger(this.el as HTMLElement, this.pushEvent?.bind(this));
+    this.__bugReportCleanup = mountBugReportLedger(
+      this.el as HTMLElement,
+      this.pushEvent?.bind(this),
+    );
   },
   updated(this: HookContext & { __bugReportCleanup?: () => void; pushEvent?: (event: string, payload: object) => void }) {
     this.__bugReportCleanup?.();
-    this.__bugReportCleanup = mountBugReportLedger(this.el as HTMLElement, this.pushEvent?.bind(this));
+    this.__bugReportCleanup = mountBugReportLedger(
+      this.el as HTMLElement,
+      this.pushEvent?.bind(this),
+    );
   },
   destroyed(this: HookContext & { __bugReportCleanup?: () => void }) {
     this.__bugReportCleanup?.();
@@ -437,34 +406,16 @@ function mountRegentCliAtlas(root: HTMLElement): () => void {
 }
 
 const RegentCliAtlasHook = {
-  mounted(this: HookContext & { __regentCliCleanup?: () => void }) {
-    this.__regentCliCleanup = mountRegentCliAtlas(this.el as HTMLElement);
-  },
-  updated(this: HookContext & { __regentCliCleanup?: () => void }) {
-    this.__regentCliCleanup?.();
-    this.__regentCliCleanup = mountRegentCliAtlas(this.el as HTMLElement);
-  },
-  destroyed(this: HookContext & { __regentCliCleanup?: () => void }) {
-    this.__regentCliCleanup?.();
-  },
-};
+  ...createCleanupHook("__regentCliCleanup", mountRegentCliAtlas),
+} satisfies HooksOptions[string];
 
 function mountFormationHistory(root: HTMLElement): () => void {
   return mountDisclosurePanels(root, "[data-formation-toggle]", "Expand", "Collapse");
 }
 
 const FormationHistoryHook = {
-  mounted(this: HookContext & { __formationHistoryCleanup?: () => void }) {
-    this.__formationHistoryCleanup = mountFormationHistory(this.el as HTMLElement);
-  },
-  updated(this: HookContext & { __formationHistoryCleanup?: () => void }) {
-    this.__formationHistoryCleanup?.();
-    this.__formationHistoryCleanup = mountFormationHistory(this.el as HTMLElement);
-  },
-  destroyed(this: HookContext & { __formationHistoryCleanup?: () => void }) {
-    this.__formationHistoryCleanup?.();
-  },
-};
+  ...createCleanupHook("__formationHistoryCleanup", mountFormationHistory),
+} satisfies HooksOptions[string];
 
 function mountFormationPassGallery(root: HTMLElement): () => void {
   const cardRoots = Array.from(root.querySelectorAll<HTMLElement>("[data-token-card-root]"));
@@ -525,17 +476,8 @@ function mountFormationPassGallery(root: HTMLElement): () => void {
 }
 
 const FormationPassGalleryHook = {
-  mounted(this: HookContext & { __formationPassGalleryCleanup?: () => void }) {
-    this.__formationPassGalleryCleanup = mountFormationPassGallery(this.el as HTMLElement);
-  },
-  updated(this: HookContext & { __formationPassGalleryCleanup?: () => void }) {
-    this.__formationPassGalleryCleanup?.();
-    this.__formationPassGalleryCleanup = mountFormationPassGallery(this.el as HTMLElement);
-  },
-  destroyed(this: HookContext & { __formationPassGalleryCleanup?: () => void }) {
-    this.__formationPassGalleryCleanup?.();
-  },
-};
+  ...createCleanupHook("__formationPassGalleryCleanup", mountFormationPassGallery),
+} satisfies HooksOptions[string];
 
 function mountSidebarCommunity(root: HTMLElement): () => void {
   const button = root.querySelector<HTMLButtonElement>("[data-community-toggle]");
@@ -712,43 +654,16 @@ function mountSidebarCommunity(root: HTMLElement): () => void {
 }
 
 const SidebarCommunityHook = {
-  mounted(this: HookContext & { __sidebarCommunityCleanup?: () => void }) {
-    this.__sidebarCommunityCleanup = mountSidebarCommunity(this.el as HTMLElement);
-  },
-  updated(this: HookContext & { __sidebarCommunityCleanup?: () => void }) {
-    this.__sidebarCommunityCleanup?.();
-    this.__sidebarCommunityCleanup = mountSidebarCommunity(this.el as HTMLElement);
-  },
-  destroyed(this: HookContext & { __sidebarCommunityCleanup?: () => void }) {
-    this.__sidebarCommunityCleanup?.();
-  },
-};
+  ...createCleanupHook("__sidebarCommunityCleanup", mountSidebarCommunity),
+} satisfies HooksOptions[string];
 
 const OverviewModeHook = {
-  mounted(this: HookContext & { __overviewModeCleanup?: () => void }) {
-    this.__overviewModeCleanup = mountOverviewMode(this.el as HTMLElement);
-  },
-  updated(this: HookContext & { __overviewModeCleanup?: () => void }) {
-    this.__overviewModeCleanup?.();
-    this.__overviewModeCleanup = mountOverviewMode(this.el as HTMLElement);
-  },
-  destroyed(this: HookContext & { __overviewModeCleanup?: () => void }) {
-    this.__overviewModeCleanup?.();
-  },
-};
+  ...createCleanupHook("__overviewModeCleanup", mountOverviewMode),
+} satisfies HooksOptions[string];
 
 const ColorModeToggleHook = {
-  mounted(this: HookContext & { __colorModeCleanup?: () => void }) {
-    this.__colorModeCleanup = mountColorModeToggle(this.el as HTMLElement);
-  },
-  updated(this: HookContext & { __colorModeCleanup?: () => void }) {
-    this.__colorModeCleanup?.();
-    this.__colorModeCleanup = mountColorModeToggle(this.el as HTMLElement);
-  },
-  destroyed(this: HookContext & { __colorModeCleanup?: () => void }) {
-    this.__colorModeCleanup?.();
-  },
-};
+  ...createCleanupHook("__colorModeCleanup", mountColorModeToggle),
+} satisfies HooksOptions[string];
 
 function mountStaticTokenCardRoots() {
   document.querySelectorAll("[data-token-card-root][data-token-card-autoload]").forEach((el) => {

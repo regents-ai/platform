@@ -4,8 +4,8 @@ defmodule PlatformPhxWeb.PlatformComponents do
   use Regent
 
   @bootstrap_command """
-  bunx @regent/cli my-agent
-  cd my-agent && bun run dev
+  pnpm add -g @regentslabs/cli
+  regents techtree start
   """
 
   attr :card, :map, required: true
@@ -111,9 +111,9 @@ defmodule PlatformPhxWeb.PlatformComponents do
       <div class="pp-cli-steps">
         <article class="pp-cli-step">
           <div class="space-y-2">
-            <p class="pp-home-kicker">1. Scaffold + start</p>
+            <p class="pp-home-kicker">1. Install + start</p>
             <p class="pp-panel-copy">
-              Bootstrap a fresh Regent project locally, then bring up the starter flow.
+              Install Regents CLI, then start Techtree on this machine.
             </p>
           </div>
 

@@ -1,7 +1,7 @@
 defmodule PlatformPhxWeb.PublicPageCatalog do
   @moduledoc false
 
-  alias PlatformPhxWeb.RegentCliCatalog
+  alias PlatformPhxWeb.RegentCliPage
 
   @public_entry_paths ["/", "/app", "/cli", "/techtree", "/autolaunch"]
 
@@ -87,66 +87,7 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
   end
 
   def cli_markdown do
-    intro = RegentCliCatalog.intro()
-    quick_start = RegentCliCatalog.quick_start()
-    quick_start_note = RegentCliCatalog.quick_start_note()
-    techtree_start_intro = RegentCliCatalog.techtree_start_intro()
-    techtree_start_steps = RegentCliCatalog.techtree_start_steps()
-    mental_model = RegentCliCatalog.mental_model()
-    common_rules = RegentCliCatalog.common_rules()
-    first_command_groups = RegentCliCatalog.first_command_groups()
-    guidance = RegentCliCatalog.guidance()
-
-    [
-      "# Regents CLI",
-      "",
-      intro,
-      "",
-      "## Quick start",
-      "",
-      "```bash",
-      quick_start,
-      "```",
-      "",
-      quick_start_note,
-      "",
-      "## Best first command",
-      "",
-      "Start with `regents techtree start`.",
-      "",
-      techtree_start_intro,
-      ""
-    ]
-    |> Kernel.++(Enum.map(techtree_start_steps, &"- #{&1}"))
-    |> Kernel.++([
-      "",
-      "## Mental model",
-      "",
-      "Keep the local path simple: run a command, let the work happen, review the result, then run it again.",
-      ""
-    ])
-    |> Kernel.++(Enum.map(mental_model, &"- #{fragments_to_markdown(&1)}"))
-    |> Kernel.++(["", "## Common rules", ""])
-    |> Kernel.++(Enum.map(common_rules, &"- #{fragments_to_markdown(&1)}"))
-    |> Kernel.++(["", "## First commands to know", ""])
-    |> Kernel.++(
-      Enum.flat_map(first_command_groups, fn group ->
-        [
-          "### #{group.title}",
-          "",
-          "```bash",
-          Enum.join(group.commands, "\n"),
-          "```",
-          "",
-          fragments_to_markdown(group.body_fragments),
-          ""
-        ]
-      end)
-    )
-    |> Kernel.++(["## Guidance for humans and agents", ""])
-    |> Kernel.++(Enum.map(guidance, &"- #{fragments_to_markdown(&1)}"))
-    |> List.flatten()
-    |> Enum.join("\n")
+    RegentCliPage.page_markdown()
   end
 
   def techtree_markdown do
@@ -198,7 +139,7 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
       "```bash",
       Enum.join(
         [
-          "regents techtree start",
+          "regents autolaunch plan",
           "regents autolaunch ...",
           "regents shader list",
           "regents shader export w3dfWN --out avatars/shard.png",
@@ -216,7 +157,7 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
   end
 
   def regents_cli_skill_markdown do
-    quick_start = RegentCliCatalog.quick_start()
+    quick_start = PlatformPhxWeb.RegentCliCatalog.quick_start()
 
     [
       "# Regents CLI skill",
@@ -262,18 +203,5 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
 
   def regents_cli_skill_description do
     "Local skill for using Regents CLI for Techtree work, Autolaunch work, automation, and repeatable local runs."
-  end
-
-  defp fragments_to_markdown(fragments) when is_list(fragments) do
-    fragments
-    |> Enum.map(fn fragment ->
-      case fragment.type do
-        :text -> fragment.text
-        :code -> "`#{fragment.text}`"
-        :highlight -> fragment.text
-        :link -> "[#{fragment.label}](#{fragment.href})"
-      end
-    end)
-    |> Enum.join()
   end
 end

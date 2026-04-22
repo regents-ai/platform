@@ -133,6 +133,9 @@ html[data-color-mode="light"] {
       var(--background)
     );
   --demo-shell-background: #024b7a;
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html[data-color-mode="dark"] {
@@ -250,6 +253,9 @@ html[data-color-mode="dark"] {
     color-mix(in oklch, #21486b 74%, var(--brand-ink) 26%),
     color-mix(in oklch, #0b2c47 84%, var(--brand-charcoal) 16%)
   );
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 * {
@@ -329,11 +335,11 @@ body,
 .pp-cli-command-card,
 .pp-command-item {
   transition:
-    background-color 260ms ease,
-    background 260ms ease,
-    color 260ms ease,
-    border-color 260ms ease,
-    box-shadow 260ms ease;
+    background-color 220ms var(--ease-out-quart),
+    background 220ms var(--ease-out-quart),
+    color 180ms var(--ease-out-quart),
+    border-color 180ms var(--ease-out-quart),
+    box-shadow 220ms var(--ease-out-quart);
 }
 
 .pp-platform-content-shell {
@@ -440,6 +446,13 @@ body,
     color 180ms ease,
     background 180ms ease,
     transform 180ms ease;
+}
+
+.pp-mobile-nav-link:hover,
+.pp-mobile-nav-link:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--ring);
+  color: var(--foreground);
 }
 
 .pp-mobile-nav-link-current {
@@ -756,6 +769,11 @@ html[data-color-mode="dark"] .pp-shell-action-icon-moon {
   transform: translateY(-10px);
 }
 
+.pp-wallet-drawer-open .pp-wallet-drawer-inner {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .pp-wallet-drawer-row {
   display: grid;
   gap: 0.55rem;
@@ -884,6 +902,19 @@ html[data-color-mode="dark"] .pp-shell-action-icon-moon {
   border-color: var(--ring);
   background: color-mix(in oklch, var(--accent) 12%, var(--card) 88%);
   transform: translateY(-1px);
+}
+
+.pp-wallet-pill:active,
+.pp-wallet-drawer-action:active,
+.pp-wallet-icon-button:active,
+.pp-mobile-nav-link:active,
+.pp-sidebar-utility-link:active,
+.pp-link-button:active,
+.pp-home-nav-cta:active,
+.pp-home-primary-cta:active,
+.pp-home-secondary-cta:active,
+.pp-entry-link:active {
+  transform: translateY(0) scale(0.98);
 }
 
 html[data-color-mode="dark"] .pp-wallet-pill-primary {
@@ -5318,6 +5349,12 @@ html[data-color-mode="dark"] .pp-heerich-shell-list li {
 .pp-sidebar-utility-link:hover {
   color: var(--foreground);
   transform: translateX(2px);
+}
+
+.pp-sidebar-utility-link:focus-visible {
+  color: var(--foreground);
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
 }
 
 #platform-shell-frame {

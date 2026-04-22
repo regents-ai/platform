@@ -175,8 +175,8 @@ defmodule PlatformPhxWeb.Layouts do
                 data-background-suppress
                 class="relative border-b border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] px-4 py-4 lg:hidden"
               >
-                <div class="space-y-4">
-                  <div class="flex items-center justify-between gap-3">
+                <div class="space-y-5">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <.link
                       navigate={~p"/"}
                       class="flex min-w-0 items-center gap-3 text-[color:var(--foreground)]"
@@ -198,7 +198,7 @@ defmodule PlatformPhxWeb.Layouts do
                       </div>
                     </.link>
 
-                    <div class="flex shrink-0 items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2 sm:justify-end">
                       <.theme_toggle_button mode={:mobile} />
                       <.notification_menu current_human={@current_human} mode={:mobile} />
                       <%= if @show_wallet_control do %>
@@ -322,10 +322,10 @@ defmodule PlatformPhxWeb.Layouts do
       <button
         type="button"
         data-wallet-sign-in
-        class="inline-flex h-11 items-center justify-center rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--brand-ink)_48%,var(--border)_52%)] bg-[color:color-mix(in_oklch,var(--brand-ink)_84%,var(--foreground)_16%)] px-4 text-sm text-white/95 shadow-[0_18px_34px_-28px_color-mix(in_oklch,var(--brand-ink)_60%,transparent)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_42px_-30px_color-mix(in_oklch,var(--brand-ink)_70%,transparent)] disabled:cursor-not-allowed disabled:opacity-45"
+        class="inline-flex h-11 min-w-[10rem] items-center justify-center rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--brand-ink)_48%,var(--border)_52%)] bg-[color:color-mix(in_oklch,var(--brand-ink)_84%,var(--foreground)_16%)] px-4 text-sm text-white/95 shadow-[0_18px_34px_-28px_color-mix(in_oklch,var(--brand-ink)_60%,transparent)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_42px_-30px_color-mix(in_oklch,var(--brand-ink)_70%,transparent)] disabled:cursor-not-allowed disabled:opacity-45"
         disabled={!@wallet_ready?}
       >
-        Connect wallet
+        <span data-wallet-sign-in-label>Connect wallet</span>
       </button>
 
       <div data-wallet-connected class="hidden">
@@ -380,7 +380,7 @@ defmodule PlatformPhxWeb.Layouts do
                 <button
                   type="button"
                   data-wallet-copy
-                  class="inline-flex h-9 w-9 items-center justify-center rounded-[0.85rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_92%,var(--card)_8%)] text-[color:var(--foreground)] transition duration-200 hover:border-[color:var(--ring)] hover:text-[color:var(--brand-ink)]"
+                  class="pp-copy-chip inline-flex h-9 w-9 items-center justify-center rounded-[0.85rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_92%,var(--card)_8%)] text-[color:var(--foreground)] transition duration-200 hover:border-[color:var(--ring)] hover:text-[color:var(--brand-ink)]"
                   aria-label="Copy wallet address"
                   title="Copy full wallet address"
                 >
@@ -391,6 +391,12 @@ defmodule PlatformPhxWeb.Layouts do
                     <.icon name="hero-check" class="size-4" />
                   </span>
                 </button>
+                <span
+                  data-wallet-copy-state
+                  class="hidden text-[0.68rem] uppercase tracking-[0.18em] text-[color:var(--positive)]"
+                >
+                  Copied
+                </span>
               </div>
             </div>
 
