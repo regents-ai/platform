@@ -413,7 +413,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       FORMATION_TEMPLATE_SERVICES=[{"name":"Start plan","summary":"Turn an idea into a plan.","price_label":"$1.05 / call"}]
       FORMATION_TEMPLATE_CONNECTION_DEFAULTS=[{"display_name":"X account","status":"action_required"}]
       FORMATION_TEMPLATE_RECOMMENDED_NETWORK_DOMAINS=["github.com","x.com"]
-      FORMATION_TEMPLATE_CHECKPOINT_MOMENTS=["After Paperclip is reachable"]
+      FORMATION_TEMPLATE_CHECKPOINT_MOMENTS=["After Hermes Workspace is reachable on the Sprite"]
       """
     )
 

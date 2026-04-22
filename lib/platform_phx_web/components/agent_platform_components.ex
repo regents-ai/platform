@@ -53,7 +53,7 @@ defmodule PlatformPhxWeb.AgentPlatformComponents do
           <p class="pp-home-kicker">Operator Rails</p>
           <div class="mt-3 grid gap-2">
             <div class="flex items-center justify-between gap-3 rounded-xl border border-[color:var(--border)] px-3 py-2 text-sm">
-              <span>Sprite + Paperclip</span>
+              <span>Sprite + Workspace</span>
               <span class="text-[color:var(--muted-foreground)]">Regents-managed</span>
             </div>
             <%= for connection <- @agent.connections || [] do %>
