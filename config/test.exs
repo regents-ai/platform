@@ -49,6 +49,10 @@ config :platform_phx, PlatformPhxWeb.Endpoint,
 
 config :platform_phx, PlatformPhxWeb.PrometheusExporter, enabled: false
 
+config :platform_phx, PlatformPhx.OperatorSecrets.SpriteControlSecret,
+  token: "test-sprites-token",
+  validate_permissions?: false
+
 config :platform_phx, Oban,
   repo: PlatformPhx.Repo,
   testing: :manual,

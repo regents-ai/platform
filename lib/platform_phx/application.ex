@@ -20,6 +20,7 @@ defmodule PlatformPhx.Application do
         # Start to serve requests, typically the last entry
         PlatformPhxWeb.Endpoint
       ]
+      |> maybe_add_sprite_control_secret()
       |> maybe_add_prometheus_exporter()
 
     # See https://hexdocs.pm/elixir/Supervisor.html
@@ -51,6 +52,22 @@ defmodule PlatformPhx.Application do
       children ++ [exporter_child]
     else
       children
+    end
+  end
+
+  defp maybe_add_sprite_control_secret(children) do
+    config =
+      Application.get_env(:platform_phx, PlatformPhx.OperatorSecrets.SpriteControlSecret, [])
+
+    cond do
+      is_binary(Keyword.get(config, :token)) and Keyword.get(config, :token) != "" ->
+        [PlatformPhx.OperatorSecrets.SpriteControlSecret | children]
+
+      is_binary(PlatformPhx.RuntimeConfig.sprites_api_token_file()) ->
+        [PlatformPhx.OperatorSecrets.SpriteControlSecret | children]
+
+      true ->
+        children
     end
   end
 end

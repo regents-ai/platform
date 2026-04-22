@@ -1,7 +1,7 @@
 defmodule PlatformPhx.AgentPlatform.SpriteRuntimeClient do
   @moduledoc false
 
-  alias PlatformPhx.RuntimeConfig
+  alias PlatformPhx.OperatorSecrets.SpriteControlSecret
 
   def service_state(sprite_name, service_name) do
     client().service_state(sprite_name, service_name)
@@ -87,10 +87,7 @@ defmodule PlatformPhx.AgentPlatform.SpriteRuntimeClient do
     end
 
     defp fetch_token do
-      case RuntimeConfig.sprites_api_token() do
-        nil -> {:error, {:unavailable, "Server missing SPRITES_API_TOKEN"}}
-        value -> {:ok, value}
-      end
+      SpriteControlSecret.fetch_token()
     end
 
     defp format_error(%{__exception__: true} = error), do: Exception.message(error)
