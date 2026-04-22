@@ -189,7 +189,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Use Regents CLI when the work starts on your machine."
     assert html =~ "Copy page as markdown"
     assert html =~ "pnpm add -g @regentslabs/cli"
-    assert html =~ "regent techtree start"
+    assert html =~ "regents techtree start"
 
     assert html =~
              "Use the website for guided setup. Use the CLI for local work and repeatable runs."
@@ -531,7 +531,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~
              "Start with Regents CLI, then move into Techtree for research, review, and publishing."
 
-    assert html =~ "regent techtree start"
+    assert html =~ "regents techtree start"
     assert html =~ "actual research and publishing work lives"
 
     assert html =~
@@ -552,9 +552,9 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "https://ethereum.org"
     assert html =~ "https://base.org"
     assert html =~ "Techtree is live at techtree.sh."
-    assert html =~ "regent techtree start"
-    assert html =~ "regent techtree autoskill publish skill"
-    assert html =~ "regent techtree bbh capsules list"
+    assert html =~ "regents techtree start"
+    assert html =~ "regents techtree autoskill publish skill"
+    assert html =~ "regents techtree bbh capsules list"
     assert html =~ "Open techtree.sh"
     assert html =~ "https://github.com/regents-ai/techtree"
     assert html =~ "https://techtree.sh"
@@ -581,9 +581,9 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Ethereum"
     assert html =~ "Base"
     assert html =~ "Autolaunch is live at autolaunch.sh."
-    assert html =~ "regent autolaunch prelaunch wizard"
-    assert html =~ "regent autolaunch launch finalize"
-    assert html =~ "regent autolaunch trust x-link --agent &lt;id&gt;"
+    assert html =~ "regents autolaunch prelaunch wizard"
+    assert html =~ "regents autolaunch launch finalize"
+    assert html =~ "regents autolaunch trust x-link --agent &lt;id&gt;"
     assert html =~ "Open autolaunch.sh"
     assert html =~ "https://github.com/regents-ai/autolaunch"
     assert html =~ "https://autolaunch.sh"
@@ -601,7 +601,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     refute html =~ "[Autolaunch skill.md coming soon]"
   end
 
-  test "regent cli route renders", %{conn: conn} do
+  test "regents cli route renders", %{conn: conn} do
     {:ok, _regents_cli, html} = live(conn, "/cli")
 
     assert html =~ "CLI"
@@ -609,17 +609,17 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Copy page as markdown"
     assert html =~ "Use Regents CLI when the work starts on your machine."
     assert html =~ "@regentslabs/cli"
-    assert html =~ "regent create init"
-    assert html =~ "regent create wallet --write-env"
-    assert html =~ "regent techtree start"
-    assert html =~ "regent auth siwa login"
+    assert html =~ "regents create init"
+    assert html =~ "regents create wallet --write-env"
+    assert html =~ "regents techtree start"
+    assert html =~ "regents auth siwa login"
     assert html =~ "The CLI is JSON-first."
     assert html =~ "Use the Regent website for guided account tasks"
-    assert html =~ "regent chatbox history --webapp|--agent"
+    assert html =~ "regents chatbox history --webapp|--agent"
     assert html =~ "CLI posting is agent-room only."
-    assert html =~ "regent autolaunch ..."
-    assert html =~ "regent shader list"
-    assert html =~ "regent shader export w3dfWN --out avatars/shard.png"
+    assert html =~ "regents autolaunch ..."
+    assert html =~ "regents shader list"
+    assert html =~ "regents shader export w3dfWN --out avatars/shard.png"
   end
 
   test "token info route renders", %{conn: conn} do

@@ -44,28 +44,40 @@ defmodule PlatformPhxWeb.App.ProvisioningLive do
         <%= if @company do %>
           <.provisioning_stage company={@company} formation={@formation} />
         <% else %>
-          <section class="space-y-4 rounded-[1.8rem] border border-[color:var(--border)] bg-[color:var(--card)] p-6">
-            <div class="space-y-3">
-              <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
-                Opening company
-              </p>
-              <h2 class="font-display text-[clamp(2rem,4vw,2.8rem)] leading-[0.95] text-[color:var(--foreground)]">
-                We could not find that company opening.
-              </h2>
-              <p class="max-w-[46rem] text-sm leading-6 text-[color:var(--muted-foreground)]">
-                {provisioning_not_found_copy()}
-              </p>
-            </div>
-
-            <div class="flex flex-wrap justify-end gap-3">
-              <.link
-                navigate={~p"/app/formation"}
-                class="pp-link-button pp-link-button-slim"
-              >
-                Back to formation
-              </.link>
-            </div>
-          </section>
+          <.setup_blocked_stage
+            step={4}
+            title="We could not find that company opening."
+            summary="This launch link no longer points at an active company opening."
+            snapshot={setup_snapshot_from_formation(@formation_data)}
+            facts={[
+              %{
+                icon: "hero-sparkles",
+                title: "Launch in progress",
+                copy: "Openings appear here while Regents finishes launch."
+              },
+              %{
+                icon: "hero-globe-alt",
+                title: "Public page next",
+                copy: "The public page opens before the dashboard takes over."
+              },
+              %{
+                icon: "hero-command-line",
+                title: "Controls after launch",
+                copy: "The company dashboard becomes the next stop."
+              }
+            ]}
+            next_steps={[
+              %{
+                number: 4,
+                title: "Return to launch",
+                copy: "Start or reopen a current company launch from the formation step."
+              }
+            ]}
+            blocker_copy={provisioning_not_found_copy()}
+            action_label="Back to formation"
+            action_path={~p"/app/formation"}
+            action_copy="Open the company step again to start a new launch or reopen an active one."
+          />
         <% end %>
       </div>
     </Layouts.app>

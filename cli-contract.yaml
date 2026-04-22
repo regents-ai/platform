@@ -4,7 +4,7 @@ info:
   version: 0.1.0
   description: "Canonical Regents CLI surface for two jobs: local shader work and guided platform account, billing, company, and runtime control from the terminal."
 commands:
-  - name: regent shader list
+  - name: regents shader list
     summary: List the available shader avatars and their editable parameters.
     auth:
       mode: none
@@ -63,7 +63,7 @@ commands:
                         type: number
                       description:
                         type: [string, 'null']
-  - name: regent shader export
+  - name: regents shader export
     summary: Render one shader avatar to a local image file, using defaults or explicit define overrides.
     auth:
       mode: none
@@ -73,7 +73,7 @@ commands:
       - name: shader_id
         type: string
         required: true
-        description: Shader id from `regent shader list`.
+        description: Shader id from `regents shader list`.
     flags:
       - name: --define
         type: string
@@ -167,7 +167,7 @@ commands:
                 type: object
                 additionalProperties:
                   type: string
-  - name: regent platform auth login
+  - name: regents platform auth login
     summary: Sign in to the Regent website from the terminal and save the session for later platform commands.
     auth:
       mode: privy-identity-token
@@ -209,7 +209,7 @@ commands:
           sessionFile: {type: string}
           profile:
             $ref: '#/components/schemas/CurrentHumanProfile'
-  - name: regent platform auth status
+  - name: regents platform auth status
     summary: Show who is signed in through the saved platform session.
     auth:
       mode: session-file
@@ -239,7 +239,7 @@ commands:
           sessionFile: {type: string}
           profile:
             $ref: '#/components/schemas/CurrentHumanProfile'
-  - name: regent platform auth logout
+  - name: regents platform auth logout
     summary: Delete the saved platform session and sign out from platform commands.
     auth:
       mode: session-file
@@ -332,7 +332,7 @@ commands:
         properties:
           ok: {type: boolean}
           result: {type: object, additionalProperties: true}
-  - name: regent platform formation status
+  - name: regents platform formation status
     summary: Show launch readiness from the saved session, including claimed names, billing, and owned companies.
     auth:
       mode: session-file
@@ -361,7 +361,7 @@ commands:
           origin: {type: string}
           formation:
             $ref: '#/components/schemas/AgentFormationResponse'
-  - name: regent platform billing account
+  - name: regents platform billing account
     summary: Show the billing account tied to the saved platform session.
     auth:
       mode: session-file
@@ -395,7 +395,7 @@ commands:
               ok: {type: boolean}
               billing_account:
                 $ref: '#/components/schemas/BillingAccount'
-  - name: regent platform billing usage
+  - name: regents platform billing usage
     summary: Show shared runtime credit and company usage from the saved platform session.
     auth:
       mode: session-file
@@ -429,7 +429,7 @@ commands:
               ok: {type: boolean}
               usage:
                 $ref: '#/components/schemas/BillingUsageSummary'
-  - name: regent platform billing setup
+  - name: regents platform billing setup
     summary: Open billing setup for the saved platform account.
     auth:
       mode: session-file
@@ -468,7 +468,7 @@ commands:
               checkout_url: {type: string}
               billing_account:
                 $ref: '#/components/schemas/BillingAccount'
-  - name: regent platform billing topup
+  - name: regents platform billing topup
     summary: Open runtime credit checkout for the saved platform account.
     auth:
       mode: session-file
@@ -507,7 +507,7 @@ commands:
               checkout_url: {type: string}
               billing_account:
                 $ref: '#/components/schemas/BillingAccount'
-  - name: regent platform company create
+  - name: regents platform company create
     summary: Launch a company for one claimed name from the saved platform account.
     auth:
       mode: session-file
@@ -547,7 +547,7 @@ commands:
                 $ref: '#/components/schemas/AgentRecord'
               formation:
                 $ref: '#/components/schemas/AgentFormation'
-  - name: regent platform company runtime
+  - name: regents platform company runtime
     summary: Show runtime state for one owned company from the saved platform session.
     auth:
       mode: session-file
@@ -580,7 +580,7 @@ commands:
           origin: {type: string}
           runtime:
             $ref: '#/components/schemas/AgentRuntimeResponse'
-  - name: regent platform sprite pause
+  - name: regents platform sprite pause
     summary: Pause one owned company runtime from the saved platform session.
     auth:
       mode: session-file
@@ -618,7 +618,7 @@ commands:
               ok: {type: boolean}
               sprite:
                 $ref: '#/components/schemas/SpriteRuntimeControl'
-  - name: regent platform sprite resume
+  - name: regents platform sprite resume
     summary: Resume one owned company runtime from the saved platform session.
     auth:
       mode: session-file

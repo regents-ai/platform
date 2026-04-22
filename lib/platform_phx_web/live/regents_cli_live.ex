@@ -97,7 +97,7 @@ defmodule PlatformPhxWeb.RegentCliLive do
             <article class="pp-route-panel">
               <p class="pp-home-kicker">Best first command</p>
               <h2 class="pp-route-panel-title">
-                Start with <code>regent techtree start</code>
+                Start with <code>regents techtree start</code>
               </h2>
               <p class="pp-panel-copy">{@techtree_start_intro}</p>
               <ul class="pp-fact-list">

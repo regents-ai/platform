@@ -36,8 +36,8 @@ const VALID_USAGES: readonly ShaderUsage[] = ["avatar", "background", "creator-i
 
 export function shaderUsageLines() {
   return [
-    "regent shader list [--usage avatar|background|creator-inert]",
-    "regent shader export <shader-id> [--define KEY=VALUE ...] [--width 1024] [--height 1024] [--settle-ms 900] [--out ./avatar.png] [--spec-out ./avatar.json] [--browser /path/to/chrome]",
+    "regents shader list [--usage avatar|background|creator-inert]",
+    "regents shader export <shader-id> [--define KEY=VALUE ...] [--width 1024] [--height 1024] [--settle-ms 900] [--out ./avatar.png] [--spec-out ./avatar.json] [--browser /path/to/chrome]",
   ];
 }
 
@@ -48,7 +48,7 @@ export function usageText() {
 export function shaderListPayload(command: ShaderListCommand) {
   return {
     ok: true,
-    command: "regent shader list",
+    command: "regents shader list",
     shaders: listShaders(command.usage).map((shader) => ({
       id: shader.id,
       title: shader.title,
@@ -105,7 +105,7 @@ function parseShaderList(args: string[]): ShaderListCommand {
       continue;
     }
 
-    throw new Error(`Unknown flag "${token}" for regent shader list.`);
+    throw new Error(`Unknown flag "${token}" for regents shader list.`);
   }
 
   return { kind: "shader-list", usage };
@@ -113,13 +113,13 @@ function parseShaderList(args: string[]): ShaderListCommand {
 
 function parseShaderExport(args: string[], cwd: string): ShaderExportCommand {
   if (args.length === 0) {
-    throw new Error("Missing shader id for regent shader export.");
+    throw new Error("Missing shader id for regents shader export.");
   }
 
   const shaderId = args[0]!;
   const shader = getShaderById(shaderId);
   if (!shader) {
-    throw new Error(`Unknown shader "${shaderId}". Run regent shader list first.`);
+    throw new Error(`Unknown shader "${shaderId}". Run regents shader list first.`);
   }
 
   let width = 1024;
@@ -183,7 +183,7 @@ function parseShaderExport(args: string[], cwd: string): ShaderExportCommand {
       continue;
     }
 
-    throw new Error(`Unknown flag "${token}" for regent shader export.`);
+    throw new Error(`Unknown flag "${token}" for regents shader export.`);
   }
 
   return {
@@ -266,7 +266,7 @@ export function exportSummaryPayload(result: {
 }) {
   return {
     ok: true,
-    command: "regent shader export",
+    command: "regents shader export",
     shader: {
       id: result.shaderId,
       title: result.title,

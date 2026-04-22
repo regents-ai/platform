@@ -5,7 +5,7 @@ defmodule PlatformPhxWeb.AppEntryLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, :page_title, "Open app")}
+    {:ok, assign(socket, :page_title, "App")}
   end
 
   @impl true

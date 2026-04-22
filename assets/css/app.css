@@ -367,6 +367,12 @@ body,
   gap: 0.9rem;
 }
 
+.pp-mobile-header-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
 .pp-mobile-home-link {
   display: inline-flex;
   min-width: 0;
@@ -456,29 +462,206 @@ body,
     );
 }
 
-.pp-chrome-eyebrow {
+.pp-shell-header {
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.pp-shell-header-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.pp-shell-search {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex: 1 1 30rem;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3.35rem;
+  border: 1px solid color-mix(in oklch, var(--border) 92%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--card) 97%, var(--background) 3%);
+  padding: 0.4rem 0.45rem 0.4rem 0.95rem;
+  box-shadow: inset 0 1px 0 color-mix(in oklch, white 22%, transparent);
+}
+
+.pp-shell-search-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+}
+
+.pp-shell-search-input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 0.95rem;
+  outline: none;
+}
+
+.pp-shell-search-input::placeholder {
+  color: color-mix(in oklch, var(--muted-foreground) 92%, transparent);
+}
+
+.pp-shell-search-submit,
+.pp-shell-action-button {
+  display: inline-flex;
+  min-height: 2.7rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in oklch, var(--border) 94%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--card-elevated) 92%, var(--background) 8%);
+  color: var(--foreground);
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.pp-shell-search-submit {
+  min-width: 3.65rem;
+  padding: 0 1rem;
+  font-family: "GeistPixel Circle", "GeistPixel Square", sans-serif;
+  font-size: 0.84rem;
+}
+
+.pp-shell-action-button {
+  position: relative;
+  width: 2.7rem;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 color-mix(in oklch, white 16%, transparent);
+}
+
+.pp-shell-action-button-mobile {
+  width: 2.5rem;
+  min-height: 2.5rem;
+}
+
+.pp-shell-search-submit:hover,
+.pp-shell-search-submit:focus-visible,
+.pp-shell-action-button:hover,
+.pp-shell-action-button:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--ring);
+}
+
+.pp-shell-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pp-shell-action-icon-moon {
+  display: none;
+}
+
+html[data-color-mode="dark"] .pp-shell-action-icon-sun {
+  display: none;
+}
+
+html[data-color-mode="dark"] .pp-shell-action-icon-moon {
+  display: inline-flex;
+}
+
+.pp-shell-notification {
+  position: relative;
+}
+
+.pp-shell-notification summary {
+  list-style: none;
+}
+
+.pp-shell-notification summary::-webkit-details-marker {
+  display: none;
+}
+
+.pp-shell-notification-dot {
+  position: absolute;
+  top: 0.72rem;
+  right: 0.7rem;
+  width: 0.46rem;
+  height: 0.46rem;
+  border-radius: 999px;
+  background: var(--positive);
+  box-shadow: 0 0 0 0.14rem color-mix(in oklch, var(--positive) 18%, transparent);
+}
+
+.pp-shell-popover {
+  position: absolute;
+  top: calc(100% + 0.75rem);
+  right: 0;
+  z-index: 25;
+  width: min(18rem, calc(100vw - 2rem));
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 1.35rem;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--card-elevated) 96%, var(--brand-paper) 4%),
+    color-mix(in oklch, var(--card) 98%, var(--background) 2%)
+  );
+  padding: 1rem;
+  box-shadow: 0 24px 50px -36px color-mix(in oklch, var(--brand-ink) 52%, transparent);
+}
+
+.pp-shell-popover-kicker {
   margin: 0;
   color: var(--muted-foreground);
-  font-size: 0.72rem;
-  letter-spacing: 0.26em;
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
 }
 
-.pp-chrome-title {
-  margin: 0.2rem 0 0;
-  max-width: 18ch;
-  font-family: "GeistPixel Circle", "GeistPixel Square", sans-serif;
-  font-size: clamp(2rem, 3.3vw, 2.85rem);
-  line-height: 0.94;
+.pp-shell-popover-links {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.pp-shell-popover-link {
+  display: inline-flex;
+  min-height: 2.9rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in oklch, var(--border) 92%, transparent);
+  border-radius: 1rem;
+  background: color-mix(in oklch, var(--background) 36%, transparent);
   color: var(--foreground);
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    transform 180ms ease;
+}
+
+.pp-shell-popover-link:hover,
+.pp-shell-popover-link:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--ring);
+  background: color-mix(in oklch, var(--accent) 10%, var(--card) 90%);
+}
 }
 
 .pp-wallet-shell {
   position: relative;
+  display: inline-flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 0.55rem;
-  width: min(100%, 20rem);
+  width: auto;
+  max-width: min(100%, 20rem);
   overflow: visible;
 }
 
@@ -499,7 +682,7 @@ body,
   border: 1px solid var(--border);
   padding: 0.72rem 1.15rem;
   font-family: "GeistPixel Circle", "GeistPixel Square", sans-serif;
-  font-size: 0.94rem;
+  font-size: 0.88rem;
   line-height: 1;
   transition:
     transform 180ms ease,
@@ -727,6 +910,15 @@ html[data-color-mode="dark"] .pp-wallet-drawer-action {
 }
 
 @media (max-width: 640px) {
+  .pp-shell-search {
+    min-height: 3rem;
+  }
+
+  .pp-shell-search-submit {
+    min-width: 3.2rem;
+    padding: 0 0.9rem;
+  }
+
   .pp-wallet-shell {
     width: auto;
     max-width: min(100%, 17rem);
@@ -741,6 +933,33 @@ html[data-color-mode="dark"] .pp-wallet-drawer-action {
   .pp-wallet-drawer {
     width: min(17rem, calc(100vw - 1.5rem));
   }
+
+  .pp-mobile-header-controls .pp-wallet-shell {
+    max-width: none;
+  }
+
+  .pp-mobile-header-controls .pp-wallet-pill {
+    min-height: 2.5rem;
+    padding: 0.62rem 0.82rem;
+    font-size: 0.78rem;
+  }
+}
+
+html[data-color-mode="dark"] .pp-shell-search {
+  background: color-mix(in oklch, var(--card-elevated) 88%, var(--background) 12%);
+}
+
+html[data-color-mode="dark"] .pp-shell-action-button,
+html[data-color-mode="dark"] .pp-shell-search-submit {
+  background: color-mix(in oklch, var(--card-elevated) 88%, var(--background) 12%);
+}
+
+html[data-color-mode="dark"] .pp-shell-popover {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--card-elevated) 92%, var(--brand-paper) 8%),
+    color-mix(in oklch, var(--card) 96%, var(--background) 4%)
+  );
 }
 
 .pp-home-shell,

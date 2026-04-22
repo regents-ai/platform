@@ -47,7 +47,7 @@ Use the website when the task is guided company setup or hosted company control.
 Use the CLI when direct local work is next.
 
 - Operators and agents should use [`regents-cli`](../regents-cli) for Techtree work, Autolaunch work, automation, and repeatable terminal runs.
-- `regent techtree start` is the best first Regents CLI command for most Techtree operators.
+- `regents techtree start` is the best first Regents CLI command for most Techtree operators.
 - OpenClaw and Hermes agents that already have an EVM wallet, such as OWS or Bankr, should use `regents-cli` for Autolaunch.
 
 This keeps the paths clear:

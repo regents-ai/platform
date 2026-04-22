@@ -215,6 +215,79 @@ const ClipboardCopyHook = {
   },
 };
 
+type QuickSearchItem = {
+  href: string;
+  label: string;
+};
+
+function normalizeQuickSearchValue(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9/ ]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function resolveQuickSearchTarget(
+  value: string,
+  items: QuickSearchItem[],
+  fallback: string,
+): string {
+  const normalizedValue = normalizeQuickSearchValue(value);
+
+  if (!normalizedValue) {
+    return fallback;
+  }
+
+  const exactMatch = items.find((item) => {
+    const normalizedLabel = normalizeQuickSearchValue(item.label);
+    const normalizedHref = normalizeQuickSearchValue(item.href);
+
+    return (
+      normalizedValue === normalizedLabel ||
+      normalizedValue === normalizedHref ||
+      normalizedValue === normalizedLabel.replace(/\bpage\b/g, "").trim()
+    );
+  });
+
+  if (exactMatch) {
+    return exactMatch.href;
+  }
+
+  const fuzzyMatch = items.find((item) => {
+    const normalizedLabel = normalizeQuickSearchValue(item.label);
+    return (
+      normalizedLabel.includes(normalizedValue) ||
+      normalizedValue.includes(normalizedLabel)
+    );
+  });
+
+  return fuzzyMatch?.href ?? fallback;
+}
+
+const QuickSearchHook = {
+  mounted(this: HookContext & { __quickSearchSubmit?: (event: Event) => void }) {
+    const form = this.el as HTMLFormElement;
+    const input = form.querySelector<HTMLInputElement>("input[name='search']");
+    const fallback = form.dataset.searchDefault ?? "/docs";
+    const items = JSON.parse(form.dataset.searchItems ?? "[]") as QuickSearchItem[];
+
+    this.__quickSearchSubmit = (event: Event) => {
+      event.preventDefault();
+
+      const target = resolveQuickSearchTarget(input?.value ?? "", items, fallback);
+      form.ownerDocument.defaultView?.location.assign(target);
+    };
+
+    form.addEventListener("submit", this.__quickSearchSubmit);
+  },
+  destroyed(this: HookContext & { __quickSearchSubmit?: (event: Event) => void }) {
+    if (this.__quickSearchSubmit) {
+      (this.el as HTMLFormElement).removeEventListener("submit", this.__quickSearchSubmit);
+    }
+  },
+};
+
 function bugReportMotionReduced(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
@@ -723,6 +796,7 @@ const hooks: HooksOptions = {
   FooterVoxel: FooterVoxelHook,
   LogoStudies: LogoStudiesHook,
   ClipboardCopy: ClipboardCopyHook,
+  QuickSearch: QuickSearchHook,
   OverviewMode: OverviewModeHook,
   ColorModeToggle: ColorModeToggleHook,
   VoxelBackground: VoxelBackgroundHook,

@@ -12,10 +12,10 @@ import {
 
 test("usage text mentions shader and platform commands", () => {
   const help = usageText();
-  assert.match(help, /regent shader list/);
-  assert.match(help, /regent shader export/);
-  assert.match(help, /regent platform auth login/);
-  assert.match(help, /regent platform company create/);
+  assert.match(help, /regents shader list/);
+  assert.match(help, /regents shader export/);
+  assert.match(help, /regents platform auth login/);
+  assert.match(help, /regents platform company create/);
 });
 
 test("shader list command still parses usage filter", () => {
@@ -219,7 +219,7 @@ test("platform CLI signs in, reuses the saved session, performs a write action, 
   };
 
   assert.equal(login.ok, true);
-  assert.equal(login.command, "regent platform auth login");
+  assert.equal(login.command, "regents platform auth login");
   assert.equal(login.origin, origin);
 
   const savedSession = JSON.parse(await readFile(sessionFile, "utf8"));
@@ -239,7 +239,7 @@ test("platform CLI signs in, reuses the saved session, performs a write action, 
   };
 
   assert.equal(status.ok, true);
-  assert.equal(status.command, "regent platform auth status");
+  assert.equal(status.command, "regents platform auth status");
   assert.equal(status.origin, origin);
   assert.equal(status.profile.authenticated, true);
 
@@ -262,7 +262,7 @@ test("platform CLI signs in, reuses the saved session, performs a write action, 
   };
 
   assert.equal(company.ok, true);
-  assert.equal(company.command, "regent platform company create");
+  assert.equal(company.command, "regents platform company create");
   assert.equal(company.company.agent.slug, "startline");
 
   const logout = await executeParsedPlatformCommand(
@@ -272,7 +272,7 @@ test("platform CLI signs in, reuses the saved session, performs a write action, 
   );
 
   assert.equal(logout.ok, true);
-  assert.equal(logout.command, "regent platform auth logout");
+  assert.equal(logout.command, "regents platform auth logout");
   await assert.rejects(() => access(sessionFile));
 
   assert.deepEqual(

@@ -32,7 +32,7 @@ defmodule PlatformPhxWeb.DocsLive do
               </p>
               <div class="pp-link-row">
                 <.link navigate={~p"/app"} class="pp-link-button pp-link-button-slim">
-                  Open app <span aria-hidden="true">→</span>
+                  App setup <span aria-hidden="true">→</span>
                 </.link>
                 <.link
                   navigate={~p"/cli"}

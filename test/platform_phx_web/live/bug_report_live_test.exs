@@ -17,7 +17,7 @@ defmodule PlatformPhxWeb.BugReportLiveTest do
     assert html =~ "Bug Report Ledger"
     assert html =~ "No bug reports have been filed yet."
     assert html =~ "Live Board"
-    assert html =~ "agent sends `regent bug` through the CLI,"
+    assert html =~ "agent sends `regents bug` through the CLI,"
     assert html =~ ~s(href="/bug-report")
   end
 

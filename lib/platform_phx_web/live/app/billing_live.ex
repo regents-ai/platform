@@ -79,9 +79,40 @@ defmodule PlatformPhxWeb.App.BillingLive do
       >
         <%= cond do %>
           <% @formation_data == nil -> %>
-            <div class="rounded-[1.6rem] border border-[color:var(--border)] bg-[color:var(--card)] p-6 text-sm text-[color:var(--muted-foreground)]">
-              Billing is unavailable right now.
-            </div>
+            <.setup_blocked_stage
+              step={3}
+              title="Add billing"
+              summary="Billing could not be loaded right now, so this step cannot continue yet."
+              snapshot={setup_snapshot_from_formation(nil)}
+              facts={[
+                %{
+                  icon: "hero-credit-card",
+                  title: "Usage billing",
+                  copy: "Activate payments before launch."
+                },
+                %{
+                  icon: "hero-banknotes",
+                  title: "Stored credit",
+                  copy: "Launch credit appears here when available."
+                },
+                %{
+                  icon: "hero-rocket-launch",
+                  title: "Launch gate",
+                  copy: "Company opening waits on billing."
+                }
+              ]}
+              next_steps={[
+                %{
+                  number: 4,
+                  title: "Open company",
+                  copy: "Launch starts after billing is active."
+                }
+              ]}
+              blocker_copy="Billing details are unavailable right now."
+              action_label="Back to identity"
+              action_path={~p"/app/identity"}
+              action_copy="Return to the previous step, then come back here once billing is available again."
+            />
           <% billing_stage_ready?(@formation_data) -> %>
             <.billing_stage
               formation={@formation_data}
@@ -90,48 +121,40 @@ defmodule PlatformPhxWeb.App.BillingLive do
               billing_notice={@billing_notice}
             />
           <% true -> %>
-            <section class="space-y-6 rounded-[1.8rem] border border-[color:var(--border)] bg-[color:var(--card)] p-6">
-              <div class="space-y-3">
-                <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
-                  Billing
-                </p>
-                <h2 class="font-display text-[clamp(2rem,4vw,2.8rem)] leading-[0.95] text-[color:var(--foreground)]">
-                  Add billing after a name is ready.
-                </h2>
-                <p class="max-w-[46rem] text-sm leading-6 text-[color:var(--muted-foreground)]">
-                  {billing_blocker_copy(@formation_data)}
-                </p>
-              </div>
-
-              <div class="grid gap-4 lg:grid-cols-2">
-                <div class="rounded-[1.4rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_92%,transparent)] p-5">
-                  <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
-                    Current blocker
-                  </p>
-                  <p class="mt-3 text-sm leading-6 text-[color:var(--foreground)]">
-                    {billing_blocker_copy(@formation_data)}
-                  </p>
-                </div>
-
-                <div class="rounded-[1.4rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_92%,transparent)] p-5">
-                  <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
-                    What you can do now
-                  </p>
-                  <p class="mt-3 text-sm leading-6 text-[color:var(--foreground)]">
-                    After you claim a name, come back here to set up billing and move on to company opening.
-                  </p>
-                </div>
-              </div>
-
-              <div class="flex flex-wrap justify-end gap-3">
-                <.link
-                  navigate={billing_next_step_path(@formation_data)}
-                  class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--foreground)] px-4 py-2 text-sm text-[color:var(--background)] transition hover:opacity-90"
-                >
-                  {billing_next_step_label(@formation_data)}
-                </.link>
-              </div>
-            </section>
+            <.setup_blocked_stage
+              step={3}
+              title="Add billing"
+              summary="Add billing after a name is ready."
+              snapshot={setup_snapshot_from_formation(@formation_data)}
+              facts={[
+                %{
+                  icon: "hero-credit-card",
+                  title: "Usage billing",
+                  copy: "Activate payments before launch."
+                },
+                %{
+                  icon: "hero-banknotes",
+                  title: "Stored credit",
+                  copy: "Launch credit appears here when available."
+                },
+                %{
+                  icon: "hero-rocket-launch",
+                  title: "Launch gate",
+                  copy: "Company opening waits on billing."
+                }
+              ]}
+              next_steps={[
+                %{
+                  number: 4,
+                  title: "Open company",
+                  copy: "Launch starts after billing is active."
+                }
+              ]}
+              blocker_copy={billing_blocker_copy(@formation_data)}
+              action_label={billing_next_step_label(@formation_data)}
+              action_path={billing_next_step_path(@formation_data)}
+              action_copy="Finish the missing name step, then return here to activate billing and continue."
+            />
         <% end %>
       </div>
     </Layouts.app>

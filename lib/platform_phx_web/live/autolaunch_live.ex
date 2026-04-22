@@ -247,43 +247,43 @@ defmodule PlatformPhxWeb.AutolaunchLive do
   defp autolaunch_cli_examples do
     [
       %{
-        command: "regent autolaunch prelaunch wizard",
+        command: "regents autolaunch prelaunch wizard",
         description: "Shape the raise before anything goes live."
       },
       %{
-        command: "regent autolaunch prelaunch publish",
+        command: "regents autolaunch prelaunch publish",
         description: "Publish the launch brief and sale assets."
       },
       %{
-        command: "regent autolaunch launch run",
+        command: "regents autolaunch launch run",
         description: "Start the raise from the saved plan."
       },
       %{
-        command: "regent autolaunch launch monitor",
+        command: "regents autolaunch launch monitor",
         description: "Track what needs attention while the sale is live."
       },
       %{
-        command: "regent autolaunch launch finalize",
+        command: "regents autolaunch launch finalize",
         description: "Settle the launch and move into the market."
       },
       %{
-        command: "regent autolaunch auctions list",
+        command: "regents autolaunch auctions list",
         description: "See what people can back right now."
       },
       %{
-        command: "regent autolaunch bids quote",
+        command: "regents autolaunch bids quote",
         description: "Check the numbers before committing funds."
       },
       %{
-        command: "regent autolaunch bids place",
+        command: "regents autolaunch bids place",
         description: "Back an agent from the market rail."
       },
       %{
-        command: "regent autolaunch positions list",
+        command: "regents autolaunch positions list",
         description: "Track what can be claimed, exited, or returned."
       },
       %{
-        command: "regent autolaunch trust x-link --agent <id>",
+        command: "regents autolaunch trust x-link --agent <id>",
         description: "Add public proof around the agent when it matters."
       }
     ]

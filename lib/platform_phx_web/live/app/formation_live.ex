@@ -73,9 +73,40 @@ defmodule PlatformPhxWeb.App.FormationLive do
       >
         <%= cond do %>
           <% @formation_data == nil -> %>
-            <div class="rounded-[1.6rem] border border-[color:var(--border)] bg-[color:var(--card)] p-6 text-sm text-[color:var(--muted-foreground)]">
-              Company creation is unavailable right now.
-            </div>
+            <.setup_blocked_stage
+              step={4}
+              title="Open company"
+              summary="Company opening could not be loaded right now, so launch cannot continue yet."
+              snapshot={setup_snapshot_from_formation(nil)}
+              facts={[
+                %{
+                  icon: "hero-identification",
+                  title: "Chosen identity",
+                  copy: "A ready name becomes the company identity."
+                },
+                %{
+                  icon: "hero-credit-card",
+                  title: "Payments active",
+                  copy: "Billing must already be on."
+                },
+                %{
+                  icon: "hero-building-office-2",
+                  title: "Hosted launch",
+                  copy: "Regents opens the company for you."
+                }
+              ]}
+              next_steps={[
+                %{
+                  number: 4,
+                  title: "Launch progress",
+                  copy: "You move to live progress after opening."
+                }
+              ]}
+              blocker_copy="Company opening is unavailable right now."
+              action_label="Back to billing"
+              action_path={~p"/app/billing"}
+              action_copy="Return to the previous step, then come back here when company opening is available again."
+            />
           <% formation_stage_ready?(@formation_data) -> %>
             <.formation_stage
               formation={@formation_data}
@@ -83,48 +114,40 @@ defmodule PlatformPhxWeb.App.FormationLive do
               setup_form={setup_form(@selected_claimed_label)}
             />
           <% true -> %>
-            <section class="space-y-6 rounded-[1.8rem] border border-[color:var(--border)] bg-[color:var(--card)] p-6">
-              <div class="space-y-3">
-                <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
-                  Formation
-                </p>
-                <h2 class="font-display text-[clamp(2rem,4vw,2.8rem)] leading-[0.95] text-[color:var(--foreground)]">
-                  Open the company once the setup steps are ready.
-                </h2>
-                <p class="max-w-[46rem] text-sm leading-6 text-[color:var(--muted-foreground)]">
-                  {formation_blocker_copy(@formation_data)}
-                </p>
-              </div>
-
-              <div class="grid gap-4 lg:grid-cols-2">
-                <div class="rounded-[1.4rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_92%,transparent)] p-5">
-                  <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
-                    Current blocker
-                  </p>
-                  <p class="mt-3 text-sm leading-6 text-[color:var(--foreground)]">
-                    {formation_blocker_copy(@formation_data)}
-                  </p>
-                </div>
-
-                <div class="rounded-[1.4rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_92%,transparent)] p-5">
-                  <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
-                    What happens next
-                  </p>
-                  <p class="mt-3 text-sm leading-6 text-[color:var(--foreground)]">
-                    Once the missing step is complete, you can open the company and move to the progress page.
-                  </p>
-                </div>
-              </div>
-
-              <div class="flex flex-wrap justify-end gap-3">
-                <.link
-                  navigate={formation_next_step_path(@formation_data)}
-                  class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--foreground)] px-4 py-2 text-sm text-[color:var(--background)] transition hover:opacity-90"
-                >
-                  {formation_next_step_label(@formation_data)}
-                </.link>
-              </div>
-            </section>
+            <.setup_blocked_stage
+              step={4}
+              title="Open company"
+              summary="Company opening becomes available once access, identity, and billing are all ready."
+              snapshot={setup_snapshot_from_formation(@formation_data)}
+              facts={[
+                %{
+                  icon: "hero-identification",
+                  title: "Chosen identity",
+                  copy: "A ready name becomes the company identity."
+                },
+                %{
+                  icon: "hero-credit-card",
+                  title: "Payments active",
+                  copy: "Billing must already be on."
+                },
+                %{
+                  icon: "hero-building-office-2",
+                  title: "Hosted launch",
+                  copy: "Regents opens the company for you."
+                }
+              ]}
+              next_steps={[
+                %{
+                  number: 4,
+                  title: "Launch progress",
+                  copy: "You move to live progress after opening."
+                }
+              ]}
+              blocker_copy={formation_blocker_copy(@formation_data)}
+              action_label={formation_next_step_label(@formation_data)}
+              action_path={formation_next_step_path(@formation_data)}
+              action_copy="Finish the missing setup step, then come back here to launch the company."
+            />
         <% end %>
       </div>
     </Layouts.app>

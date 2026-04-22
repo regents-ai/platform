@@ -325,151 +325,269 @@ defmodule PlatformPhxWeb.TokenInfoLive do
         class="pp-route-shell rg-regent-theme-platform"
         phx-hook="BridgeReveal"
       >
-        <div class="pp-route-stage">
-          <section
-            id="platform-token-economics"
-            class="pp-route-panel pp-token-panel pp-token-economics-shell"
-            data-bridge-block
-          >
-            <div class="pp-token-economics-head">
-              <div class="pp-token-economics-copy">
-                <p class="pp-home-kicker">Token Purpose</p>
-                <div class="pp-token-purpose-block">
-                  <h2 class="pp-route-panel-title pp-token-purpose-title">
-                    <span>$REGENT is staked to earn your share of protocol revenue.</span>
-                    <span class="pp-token-purpose-title-break">
-                      The majority of revenue is used to buyback $REGENT.
-                    </span>
-                  </h2>
-                </div>
-              </div>
-
-              <div class="pp-token-metrics-card" aria-label="Token valuation metrics">
-                <div class="pp-token-metrics-band pp-token-metrics-band-primary">
-                  <p class="pp-token-metrics-line">
-                    <span class="pp-token-metrics-label">Market Cap:</span>
-                    <span class="pp-token-metrics-value">
-                      {@token_market_summary.market_cap_display}
-                    </span>
-                  </p>
-                </div>
-                <div class="pp-token-metrics-divider" aria-hidden="true"></div>
-                <div class="pp-token-metrics-band">
-                  <p class="pp-token-metrics-line">
-                    <span class="pp-token-metrics-label">FDV:</span>
-                    <span class="pp-token-metrics-value">{@token_market_summary.fdv_display}</span>
-                  </p>
-                </div>
-              </div>
-
-              <div class="pp-token-market-callout">
-                <p class="pp-home-kicker">Live Markets</p>
-                <h3 class="pp-token-market-title">$REGENT is live on Base</h3>
-
-                <div class="pp-token-economics-actions">
-                  <a
-                    href="https://app.uniswap.org/explore/tokens/base/0x6f89bca4ea5931edfcb09786267b251dee752b07?inputCurrency=NATIVE"
-                    target="_blank"
-                    rel="noreferrer"
-                    class="pp-token-header-icon"
-                    aria-label="View on Uniswap"
-                    title="View on Uniswap"
-                  >
-                    <img
-                      src={~p"/images/uniswaplogo.png"}
-                      alt="Uniswap"
-                      class="pp-token-header-logo"
-                    />
-                  </a>
-                  <a
-                    href="https://www.geckoterminal.com/base/pools/0x4ed3b69ac263ad86482f609b2c2105f64bcfd3a7e02e8e078ec9fec1f0324bed"
-                    target="_blank"
-                    rel="noreferrer"
-                    class="pp-token-header-icon"
-                    aria-label="View on GeckoTerminal"
-                    title="View on GeckoTerminal"
-                  >
-                    <img
-                      src={~p"/images/geckoterminallogo.png"}
-                      alt="GeckoTerminal"
-                      class="pp-token-header-logo"
-                    />
-                  </a>
-                  <a
-                    href="https://dexscreener.com/base/0x4ed3b69ac263ad86482f609b2c2105f64bcfd3a7e02e8e078ec9fec1f0324bed"
-                    target="_blank"
-                    rel="noreferrer"
-                    class="pp-token-header-icon"
-                    aria-label="View on Dexscreener"
-                    title="View on Dexscreener"
-                  >
-                    <img
-                      src={~p"/images/dexscreenerlogo.png"}
-                      alt="Dexscreener"
-                      class="pp-token-header-logo"
-                    />
-                  </a>
-                </div>
-              </div>
+        <div class="pp-route-stage space-y-6">
+          <section class="pp-route-panel pp-token-panel relative overflow-hidden" data-bridge-block>
+            <div
+              aria-hidden="true"
+              class="pointer-events-none absolute inset-x-0 top-0 h-48 opacity-90"
+              style="background:
+                radial-gradient(circle at top left, color-mix(in oklch, var(--ring) 24%, transparent) 0, transparent 55%),
+                linear-gradient(135deg, color-mix(in oklch, var(--background) 78%, var(--ring) 22%) 0%, transparent 58%);"
+            >
             </div>
 
-            <div class="pp-token-economics-grid">
-              <div class="pp-token-economics-column">
-                <div class="pp-token-economics-column-head">
-                  <p class="pp-home-kicker">Platform fee sources</p>
-                  <h3 class="pp-token-allocation-title">Where revenue enters the system</h3>
+            <div class="relative grid gap-8 xl:grid-cols-[minmax(0,1.18fr)_minmax(21rem,0.82fr)]">
+              <div class="space-y-6">
+                <div class="space-y-4">
+                  <p class="pp-home-kicker">Regent Token</p>
+                  <h1 class="font-display text-[clamp(2.8rem,6vw,5.6rem)] leading-[0.86] tracking-[-0.05em] text-[color:var(--foreground)]">
+                    Revenue that stays legible from source to stake.
+                  </h1>
+                  <p class="max-w-3xl text-[1rem] leading-7 text-[color:var(--muted-foreground)] sm:text-[1.05rem]">
+                    $REGENT is the platform revsplit token. Stakers receive their share of
+                    protocol revenue, and the remaining balance is used to buy back $REGENT.
+                  </p>
+                  <p class="max-w-3xl text-sm leading-6 text-[color:var(--muted-foreground)] sm:text-[0.95rem]">
+                    This page is for holders, operators, and technical evaluators who need a clear
+                    view of where revenue comes from, how staking pays, and what the major token
+                    balances represent.
+                  </p>
                 </div>
 
-                <div class="pp-token-economics-source-list">
-                  <article :for={source <- @economics_sources} class="pp-token-source-card">
-                    <p class="pp-token-source-title">{source.title}</p>
-                    <p class="pp-token-source-short">{source.short}</p>
-                    <p class="pp-panel-copy">
-                      <%= if Map.has_key?(source, :body_lines) do %>
-                        <%= for {line, index} <- Enum.with_index(source.body_lines) do %>
-                          <.rich_fragments fragments={line} />
-                          <br :if={index < length(source.body_lines) - 1} />
-                        <% end %>
-                      <% else %>
-                        {source.body}
-                      <% end %>
-                    </p>
+                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <.hero_metric
+                    label="Market cap"
+                    value={@token_market_summary.market_cap_display}
+                    detail="Live market read"
+                  />
+                  <.hero_metric
+                    label="Fully diluted"
+                    value={@token_market_summary.fdv_display}
+                    detail="Current supply view"
+                  />
+                  <.hero_metric
+                    label="Revenue sources"
+                    value="4"
+                    detail="Product and protocol rails"
+                  />
+                  <.hero_metric
+                    label="Stake rail"
+                    value="Shared"
+                    detail="Platform and Autolaunch"
+                  />
+                </div>
+
+                <div class="grid gap-4 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+                  <article class="rounded-[2rem] border border-[color:color-mix(in_oklch,var(--border)_76%,var(--ring)_24%)] bg-[color:color-mix(in_oklch,var(--background)_92%,transparent)] p-5 shadow-[0_20px_60px_-40px_color-mix(in_oklch,var(--foreground)_30%,transparent)]">
+                    <div class="flex items-center justify-between gap-4">
+                      <div>
+                        <p class="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-[color:var(--muted-foreground)]">
+                          Live markets
+                        </p>
+                        <h2 class="mt-3 font-display text-[1.5rem] leading-none text-[color:var(--foreground)]">
+                          $REGENT on Base
+                        </h2>
+                      </div>
+                      <div class="rounded-full border border-[color:var(--border)] px-3 py-1 text-[0.7rem] uppercase tracking-[0.2em] text-[color:var(--muted-foreground)]">
+                        Base mainnet
+                      </div>
+                    </div>
+
+                    <div class="mt-6 flex flex-wrap gap-3">
+                      <.market_link
+                        href="https://app.uniswap.org/explore/tokens/base/0x6f89bca4ea5931edfcb09786267b251dee752b07?inputCurrency=NATIVE"
+                        label="View on Uniswap"
+                        image_path={~p"/images/uniswaplogo.png"}
+                        image_alt="Uniswap"
+                      />
+                      <.market_link
+                        href="https://www.geckoterminal.com/base/pools/0x4ed3b69ac263ad86482f609b2c2105f64bcfd3a7e02e8e078ec9fec1f0324bed"
+                        label="View on GeckoTerminal"
+                        image_path={~p"/images/geckoterminallogo.png"}
+                        image_alt="GeckoTerminal"
+                      />
+                      <.market_link
+                        href="https://dexscreener.com/base/0x4ed3b69ac263ad86482f609b2c2105f64bcfd3a7e02e8e078ec9fec1f0324bed"
+                        label="View on Dexscreener"
+                        image_path={~p"/images/dexscreenerlogo.png"}
+                        image_alt="Dexscreener"
+                      />
+                    </div>
+                  </article>
+
+                  <article class="rounded-[2rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_94%,transparent)] p-5">
+                    <div class="flex items-center justify-between gap-4">
+                      <div>
+                        <p class="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-[color:var(--muted-foreground)]">
+                          Value path
+                        </p>
+                        <h2 class="mt-3 font-display text-[1.5rem] leading-none text-[color:var(--foreground)]">
+                          Source, split, buyback
+                        </h2>
+                      </div>
+                      <div class="rounded-full bg-[color:color-mix(in_oklch,var(--ring)_14%,transparent)] px-3 py-1 text-[0.7rem] uppercase tracking-[0.18em] text-[color:var(--foreground)]">
+                        Always onchain
+                      </div>
+                    </div>
+
+                    <div class="mt-6 space-y-4">
+                      <.flow_row
+                        title="1. Revenue enters"
+                        body="Autolaunch, Techtree, stablecoin revenue, and Regents Platform feed the token economy."
+                      />
+                      <.flow_row
+                        title="2. Stakers earn"
+                        body="Stake $REGENT in the revsplit contract to receive your share and claim it when you want."
+                      />
+                      <.flow_row
+                        title="3. Buybacks follow"
+                        body="After the staker share is accounted for, the remaining balance is used to buy back $REGENT."
+                      />
+                    </div>
                   </article>
                 </div>
               </div>
 
-              <div class="pp-token-economics-column">
-                <div class="pp-token-economics-column-head">
-                  <p class="pp-home-kicker">Staking flow</p>
-                  <h3 class="pp-token-allocation-title">How fees are split</h3>
+              <aside class="space-y-4">
+                <article class="rounded-[2rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_94%,transparent)] p-5">
+                  <p class="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-[color:var(--muted-foreground)]">
+                    Why the token exists
+                  </p>
+                  <div class="mt-5 space-y-4">
+                    <div class="rounded-[1.5rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4">
+                      <p class="font-display text-[1.15rem] leading-none text-[color:var(--foreground)]">
+                        Share revenue
+                      </p>
+                      <p class="mt-3 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                        Staking turns token ownership into a live claim on protocol revenue.
+                      </p>
+                    </div>
+                    <div class="rounded-[1.5rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4">
+                      <p class="font-display text-[1.15rem] leading-none text-[color:var(--foreground)]">
+                        Support buybacks
+                      </p>
+                      <p class="mt-3 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                        The balance left after the staker share is reserved for buying back
+                        $REGENT.
+                      </p>
+                    </div>
+                    <div class="rounded-[1.5rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4">
+                      <p class="font-display text-[1.15rem] leading-none text-[color:var(--foreground)]">
+                        Reward early staking
+                      </p>
+                      <p class="mt-3 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                        During the first year, stakers also receive a 20% emissions stream.
+                      </p>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="rounded-[2rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_92%,transparent)] p-5">
+                  <p class="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-[color:var(--muted-foreground)]">
+                    Reading guide
+                  </p>
+                  <ul class="mt-5 space-y-3 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                    <li class="rounded-[1.2rem] border border-[color:var(--border)] px-4 py-3">
+                      Use the revenue section to see where money enters the system.
+                    </li>
+                    <li class="rounded-[1.2rem] border border-[color:var(--border)] px-4 py-3">
+                      Use the staking section to check balances, claimable amounts, and wallet
+                      actions.
+                    </li>
+                    <li class="rounded-[1.2rem] border border-[color:var(--border)] px-4 py-3">
+                      Use the holder and allocation sections to understand supply concentration and
+                      lockups.
+                    </li>
+                  </ul>
+                </article>
+              </aside>
+            </div>
+          </section>
+
+          <section
+            id="platform-token-economics"
+            class="pp-route-panel pp-token-panel"
+            data-bridge-block
+          >
+            <div class="grid gap-6 xl:grid-cols-[minmax(0,1.04fr)_minmax(0,0.96fr)]">
+              <div class="space-y-6">
+                <div class="space-y-3">
+                  <p class="pp-home-kicker">Revenue Sources</p>
+                  <h2 class="pp-route-panel-title">Where money enters the Regent system</h2>
+                  <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
+                    These are the four current revenue rails feeding staking and buybacks.
+                  </p>
                 </div>
 
-                <article class="pp-token-economics-detail-card">
-                  <p class="pp-token-source-title">
-                    Stake $REGENT in the protocol revsplit contract.
-                  </p>
-                  <p class="pp-token-source-explainer">
-                    Claim your stablecoin share of Regent Labs revenue anytime.
-                  </p>
-                </article>
+                <div class="grid gap-4">
+                  <.source_card :for={source <- @economics_sources} source={source} />
+                </div>
+              </div>
 
-                <article class="pp-token-economics-detail-card pp-token-economics-detail-card-accent">
-                  <p class="pp-token-source-title">Buyback happens after the staker share</p>
-                  <p class="pp-panel-copy">
-                    After the revenue split owed to stakers is accounted for, the remaining balance
-                    is used to buy back $REGENT. At launch only ~20% of tokens are circulating, so
-                    80% or more of protocol skim will go to buybacks.
+              <div class="space-y-4">
+                <div class="space-y-3">
+                  <p class="pp-home-kicker">Staking Model</p>
+                  <h2 class="pp-route-panel-title">How a dollar moves after it arrives</h2>
+                  <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
+                    The value path is simple on purpose so holders can evaluate it with confidence.
                   </p>
-                </article>
+                </div>
 
-                <article class="pp-token-economics-detail-card">
-                  <p class="pp-token-source-title">$REGENT staking emissions</p>
-                  <p class="pp-token-source-short">20% yield for initial year</p>
-                  <p class="pp-panel-copy">
-                    As the protocol builds this first year, an emissions reward of 20% of staked $REGENT
-                    will be streamed to stakers. Platform and Autolaunch both open the same staking rail and the same emission claims.
-                  </p>
-                </article>
+                <div class="grid gap-4">
+                  <article class="rounded-[2rem] border border-[color:var(--border)] bg-[color:var(--background)] p-5">
+                    <div class="flex items-start justify-between gap-4">
+                      <div>
+                        <p class="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-[color:var(--muted-foreground)]">
+                          Step 1
+                        </p>
+                        <h3 class="mt-3 font-display text-[1.35rem] leading-none text-[color:var(--foreground)]">
+                          Stake into the revsplit contract
+                        </h3>
+                      </div>
+                      <div class="rounded-full border border-[color:var(--border)] px-3 py-1 text-[0.7rem] uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
+                        Claim anytime
+                      </div>
+                    </div>
+                    <p class="mt-4 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                      Stake $REGENT in the protocol revsplit contract to earn your share of stablecoin revenue.
+                    </p>
+                  </article>
+
+                  <article class="rounded-[2rem] border border-[color:color-mix(in_oklch,var(--border)_70%,var(--ring)_30%)] bg-[color:color-mix(in_oklch,var(--background)_90%,var(--ring)_10%)] p-5">
+                    <p class="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-[color:var(--muted-foreground)]">
+                      Step 2
+                    </p>
+                    <h3 class="mt-3 font-display text-[1.35rem] leading-none text-[color:var(--foreground)]">
+                      Buybacks happen after the staker share
+                    </h3>
+                    <p class="mt-4 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                      After the amount owed to stakers is accounted for, the remaining balance is
+                      used to buy back $REGENT. At launch only about 20% of tokens are circulating,
+                      so 80% or more of protocol skim can go to buybacks.
+                    </p>
+                  </article>
+
+                  <article class="rounded-[2rem] border border-[color:var(--border)] bg-[color:var(--background)] p-5">
+                    <div class="flex items-start justify-between gap-4">
+                      <div>
+                        <p class="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-[color:var(--muted-foreground)]">
+                          Step 3
+                        </p>
+                        <h3 class="mt-3 font-display text-[1.35rem] leading-none text-[color:var(--foreground)]">
+                          Early staking also earns emissions
+                        </h3>
+                      </div>
+                      <div class="rounded-full bg-[color:color-mix(in_oklch,var(--ring)_14%,transparent)] px-3 py-1 text-[0.7rem] uppercase tracking-[0.18em] text-[color:var(--foreground)]">
+                        20% first-year stream
+                      </div>
+                    </div>
+                    <p class="mt-4 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                      As the protocol builds during the first year, a 20% staking emissions reward
+                      is streamed to stakers. Platform and Autolaunch open the same staking rail and
+                      the same reward claims.
+                    </p>
+                  </article>
+                </div>
               </div>
             </div>
           </section>
@@ -482,261 +600,348 @@ defmodule PlatformPhxWeb.TokenInfoLive do
             data-base-rpc-url={@base_rpc_url}
             data-base-sepolia-rpc-url={@base_sepolia_rpc_url}
           >
-            <div class="pp-token-section-copy">
-              <p class="pp-home-kicker">Staking</p>
-              <h2 class="pp-route-panel-title">
-                Stake from Platform or Autolaunch. It is the same rail.
-              </h2>
-              <p class="pp-panel-copy">
-                Platform and Autolaunch open the same staking contract, the same reward claims, and the same wallet actions. Use either one. The result is the same.
+            <div class="grid gap-6 xl:grid-cols-[minmax(0,1.06fr)_minmax(0,0.94fr)]">
+              <div class="space-y-5">
+                <div class="space-y-3">
+                  <p class="pp-home-kicker">Staking Console</p>
+                  <h2 class="pp-route-panel-title">
+                    Stake from Platform or Autolaunch. The underlying action is the same.
+                  </h2>
+                  <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
+                    Platform and Autolaunch open the same staking contract, the same reward claims,
+                    and the same wallet actions. Use either one.
+                  </p>
+                </div>
+
+                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  <.staking_metric
+                    label="Network"
+                    value={if(@staking, do: @staking.chain_label, else: "--")}
+                  />
+                  <.staking_metric
+                    label="Total staked"
+                    value={if(@staking, do: staking_value(@staking.total_staked), else: "--")}
+                  />
+                  <.staking_metric
+                    label="Your staked balance"
+                    value={if(@staking, do: staking_value(@staking.wallet_stake_balance), else: "--")}
+                  />
+                  <.staking_metric
+                    label="Wallet balance"
+                    value={if(@staking, do: staking_value(@staking.wallet_token_balance), else: "--")}
+                  />
+                  <.staking_metric
+                    label="Claimable USDC"
+                    value={
+                      if(@staking, do: staking_value(@staking.wallet_claimable_usdc), else: "--")
+                    }
+                  />
+                  <.staking_metric
+                    label="Claimable REGENT"
+                    value={
+                      if(@staking, do: staking_value(@staking.wallet_claimable_regent), else: "--")
+                    }
+                  />
+                </div>
+
+                <div class="grid gap-4 lg:grid-cols-2">
+                  <article class="rounded-[1.8rem] border border-[color:var(--border)] bg-[color:var(--background)] p-5">
+                    <p class="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-[color:var(--muted-foreground)]">
+                      What to expect
+                    </p>
+                    <ul class="mt-4 space-y-3 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                      <li class="rounded-[1rem] border border-[color:var(--border)] px-4 py-3">
+                        Stake and unstake use the amount you enter.
+                      </li>
+                      <li class="rounded-[1rem] border border-[color:var(--border)] px-4 py-3">
+                        Claim actions use your live staking balances automatically.
+                      </li>
+                      <li class="rounded-[1rem] border border-[color:var(--border)] px-4 py-3">
+                        After a successful wallet action, this page refreshes your staking snapshot.
+                      </li>
+                    </ul>
+                  </article>
+
+                  <article class="rounded-[1.8rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_92%,transparent)] p-5">
+                    <p class="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-[color:var(--muted-foreground)]">
+                      Confidence check
+                    </p>
+                    <div class="mt-4 space-y-4">
+                      <div class="rounded-[1rem] border border-[color:var(--border)] px-4 py-3">
+                        <p class="font-display text-[1rem] leading-none text-[color:var(--foreground)]">
+                          Shared rail
+                        </p>
+                        <p class="mt-2 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                          Platform and Autolaunch point to the same staking contract and claims.
+                        </p>
+                      </div>
+                      <div class="rounded-[1rem] border border-[color:var(--border)] px-4 py-3">
+                        <p class="font-display text-[1rem] leading-none text-[color:var(--foreground)]">
+                          Wallet-first confirmation
+                        </p>
+                        <p class="mt-2 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                          Nothing happens until you confirm the action in your wallet.
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+                </div>
+              </div>
+
+              <div class="space-y-4">
+                <section class="rounded-[2rem] border border-[color:color-mix(in_oklch,var(--border)_72%,var(--ring)_28%)] bg-[color:color-mix(in_oklch,var(--background)_92%,var(--ring)_8%)] p-5">
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <p class="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-[color:var(--muted-foreground)]">
+                        Wallet actions
+                      </p>
+                      <h3 class="mt-3 font-display text-[1.5rem] leading-none text-[color:var(--foreground)]">
+                        Stake, unstake, and claim
+                      </h3>
+                    </div>
+                    <div class="rounded-full border border-[color:var(--border)] px-3 py-1 text-[0.7rem] uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
+                      Live balances
+                    </div>
+                  </div>
+
+                  <%= if @staking_notice do %>
+                    <.staking_notice notice={@staking_notice} />
+                  <% end %>
+
+                  <%= if @staking do %>
+                    <.form
+                      for={@staking_form}
+                      id="platform-token-staking-form"
+                      phx-change="change_staking_amount"
+                      class="mt-6 space-y-5"
+                    >
+                      <div class="space-y-2">
+                        <label
+                          for="platform-token-staking-amount"
+                          class="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]"
+                        >
+                          Amount
+                        </label>
+                        <.input
+                          id="platform-token-staking-amount"
+                          field={@staking_form[:amount]}
+                          type="text"
+                          placeholder="Amount of REGENT"
+                          autocomplete="off"
+                          class="w-full rounded-[1.25rem] border border-[color:var(--border)] bg-[color:var(--background)] px-4 py-4 text-base text-[color:var(--foreground)] shadow-none"
+                        />
+                      </div>
+
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        <.staking_action_button
+                          id="platform-token-stake-button"
+                          action="stake"
+                          label="Stake on Platform"
+                          tone={:primary}
+                        />
+                        <.staking_action_button
+                          id="platform-token-unstake-button"
+                          action="unstake"
+                          label="Unstake"
+                        />
+                        <.staking_action_button
+                          id="platform-token-claim-usdc-button"
+                          action="claim_usdc"
+                          label="Claim USDC"
+                        />
+                        <.staking_action_button
+                          id="platform-token-claim-regent-button"
+                          action="claim_regent"
+                          label="Claim REGENT"
+                        />
+                      </div>
+
+                      <.staking_action_button
+                        id="platform-token-restake-button"
+                        action="claim_and_restake_regent"
+                        label="Claim and restake REGENT"
+                        wide={true}
+                      />
+                    </.form>
+
+                    <p class="mt-5 text-sm leading-6 text-[color:var(--muted-foreground)]">
+                      Prefer the launch surface? Autolaunch opens the same staking rail and the same
+                      wallet calls.
+                    </p>
+                  <% else %>
+                    <div class="mt-6 rounded-[1.4rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4">
+                      <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
+                        Staking details are unavailable right now.
+                      </p>
+                    </div>
+                  <% end %>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <section class="pp-route-panel pp-token-panel" data-bridge-block>
+            <div class="space-y-3">
+              <p class="pp-home-kicker">Token Holders</p>
+              <h2 class="pp-route-panel-title">Largest token balances and lockups</h2>
+              <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
+                As of April 1, 2026, most tokens are locked or held by the six addresses below.
+                Open any row to see what that wallet or contract is doing.
               </p>
             </div>
 
-            <%= if @staking_notice do %>
-              <.staking_notice notice={@staking_notice} />
-            <% end %>
-
-            <%= if @staking do %>
-              <div class="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-                <section class="rounded-[1.4rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_92%,transparent)] p-5">
-                  <div class="grid gap-3 sm:grid-cols-2">
-                    <.staking_metric label="Network" value={@staking.chain_label} />
-                    <.staking_metric
-                      label="Total staked"
-                      value={staking_value(@staking.total_staked)}
-                    />
-                    <.staking_metric
-                      label="Your staked balance"
-                      value={staking_value(@staking.wallet_stake_balance)}
-                    />
-                    <.staking_metric
-                      label="Wallet balance"
-                      value={staking_value(@staking.wallet_token_balance)}
-                    />
-                    <.staking_metric
-                      label="Claimable USDC"
-                      value={staking_value(@staking.wallet_claimable_usdc)}
-                    />
-                    <.staking_metric
-                      label="Claimable REGENT"
-                      value={staking_value(@staking.wallet_claimable_regent)}
-                    />
-                  </div>
-                </section>
-
-                <section class="rounded-[1.4rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_92%,transparent)] p-5">
-                  <div class="space-y-3">
-                    <p class="text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
-                      Wallet actions
-                    </p>
-                    <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
-                      Enter an amount for stake or unstake, then send the wallet action. Claim buttons use your live staking balance automatically.
-                    </p>
-                  </div>
-
-                  <.form
-                    for={@staking_form}
-                    id="platform-token-staking-form"
-                    phx-change="change_staking_amount"
-                    class="mt-4 space-y-4"
-                  >
-                    <.input
-                      id="platform-token-staking-amount"
-                      field={@staking_form[:amount]}
-                      type="text"
-                      placeholder="Amount of REGENT"
-                      autocomplete="off"
-                      class="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--background)] px-4 py-3 text-sm text-[color:var(--foreground)]"
-                    />
-
-                    <div class="grid gap-3 sm:grid-cols-2">
-                      <button
-                        id="platform-token-stake-button"
-                        type="button"
-                        phx-click="submit_staking"
-                        phx-value-action="stake"
-                        class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--foreground)] px-4 py-2 text-sm text-[color:var(--background)] transition hover:opacity-90"
-                      >
-                        Stake on Platform
-                      </button>
-                      <button
-                        id="platform-token-unstake-button"
-                        type="button"
-                        phx-click="submit_staking"
-                        phx-value-action="unstake"
-                        class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
-                      >
-                        Unstake
-                      </button>
-                      <button
-                        id="platform-token-claim-usdc-button"
-                        type="button"
-                        phx-click="submit_staking"
-                        phx-value-action="claim_usdc"
-                        class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
-                      >
-                        Claim USDC
-                      </button>
-                      <button
-                        id="platform-token-claim-regent-button"
-                        type="button"
-                        phx-click="submit_staking"
-                        phx-value-action="claim_regent"
-                        class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
-                      >
-                        Claim REGENT
-                      </button>
+            <div class="mt-6 space-y-3">
+              <%= for holder <- @holders do %>
+                <article class="overflow-hidden rounded-[1.8rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_94%,transparent)]">
+                  <div class="grid gap-4 px-5 py-5 lg:grid-cols-[4.5rem_minmax(0,1.15fr)_minmax(8rem,0.45fr)_minmax(11rem,0.62fr)_auto] lg:items-center">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-[1.1rem] border border-[color:var(--border)] bg-[color:var(--background)] font-display text-[1.05rem] text-[color:var(--foreground)]">
+                      {holder.rank}
                     </div>
 
-                    <button
-                      id="platform-token-restake-button"
-                      type="button"
-                      phx-click="submit_staking"
-                      phx-value-action="claim_and_restake_regent"
-                      class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
-                    >
-                      Claim and restake REGENT
-                    </button>
-                  </.form>
+                    <div class="min-w-0">
+                      <p class="font-display text-[1.1rem] leading-none text-[color:var(--foreground)]">
+                        {holder.label}
+                      </p>
+                      <a
+                        href={"https://basescan.org/address/#{holder.address}"}
+                        target="_blank"
+                        rel="noreferrer"
+                        class="mt-3 inline-flex max-w-full items-center gap-2 truncate text-sm text-[color:var(--muted-foreground)] transition hover:text-[color:var(--foreground)]"
+                      >
+                        <span class="truncate">{holder.short}</span>
+                        <span aria-hidden="true">↗</span>
+                      </a>
+                    </div>
 
-                  <p class="mt-4 text-sm leading-6 text-[color:var(--muted-foreground)]">
-                    Prefer the launch surface? Autolaunch opens the same staking rail and the same wallet calls.
-                  </p>
-                </section>
-              </div>
-            <% else %>
-              <div class="mt-6 rounded-[1.4rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_92%,transparent)] p-5">
-                <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
-                  Staking details are unavailable right now.
-                </p>
-              </div>
-            <% end %>
+                    <div>
+                      <p class="text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
+                        Share
+                      </p>
+                      <p class="mt-2 font-display text-[1.15rem] leading-none text-[color:var(--foreground)]">
+                        {holder.percent}
+                      </p>
+                    </div>
+
+                    <div>
+                      <div class="flex items-center justify-between gap-3">
+                        <p class="text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
+                          Amount
+                        </p>
+                        <p class="font-display text-[1rem] leading-none text-[color:var(--foreground)]">
+                          {holder.amount}
+                        </p>
+                      </div>
+                      <div class="mt-3 h-2 rounded-full bg-[color:color-mix(in_oklch,var(--foreground)_7%,transparent)]">
+                        <div
+                          class="h-full rounded-full bg-[color:var(--foreground)] transition-all duration-500"
+                          style={"width: #{holder_percent_width(holder.percent)}"}
+                        >
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="lg:justify-self-end">
+                      <button
+                        type="button"
+                        class="inline-flex min-w-[8.5rem] items-center justify-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)] hover:bg-[color:color-mix(in_oklch,var(--ring)_10%,transparent)]"
+                        phx-click="toggle_holder"
+                        phx-value-rank={holder.rank}
+                      >
+                        {if @open_holder == holder.rank, do: "Hide details", else: "View details"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    :if={@open_holder == holder.rank}
+                    class="border-t border-[color:var(--border)] px-5 py-5"
+                  >
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                      <div>
+                        <p class="text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
+                          What this balance represents
+                        </p>
+                        <p class="mt-3 max-w-3xl text-sm leading-6 text-[color:var(--muted-foreground)]">
+                          {holder.description}
+                        </p>
+                      </div>
+                      <a
+                        :if={Map.has_key?(holder, :link_url)}
+                        href={holder.link_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--background)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
+                      >
+                        {holder.link_label} <span aria-hidden="true" class="ml-2">↗</span>
+                      </a>
+                    </div>
+                  </div>
+                </article>
+              <% end %>
+            </div>
+
+            <p class="mt-5 text-sm leading-6 text-[color:var(--muted-foreground)]">
+              7th through 2,208th: Regent community members.
+            </p>
           </section>
 
           <section class="pp-route-panel pp-token-panel" data-bridge-block>
-            <div class="pp-token-section-copy">
-              <p class="pp-home-kicker">Token Holders</p>
-              <h2 class="pp-route-panel-title">
-                Snapshot of largest token locks, pools, and holders
-              </h2>
-              <p class="pp-panel-copy">
-                As of 4/1/2026 the large majority of tokens are locked or held by the following 6 addresses. View the details to see what each address or smart contract is doing.
+            <div class="space-y-3">
+              <p class="pp-home-kicker">Token Allocations</p>
+              <h2 class="pp-route-panel-title">How the full token supply is assigned</h2>
+              <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
+                At Clanker token deployment, the following extensions were configured: 20% Clanker
+                public, 40% growth emissions, and 40% long-term incentives.
               </p>
             </div>
 
-            <div class="pp-token-table-wrap">
-              <table class="pp-token-table" aria-label="Top $REGENT holders">
-                <thead>
-                  <tr>
-                    <th>Rank</th>
-                    <th>Address</th>
-                    <th>%</th>
-                    <th>Amount</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <%= for holder <- @holders do %>
-                    <tr class="pp-token-row">
-                      <td class="pp-token-rank" data-label="Rank">#{holder.rank}</td>
-                      <td data-label="Address">
-                        <div class="pp-token-address-cell">
-                          <p class="pp-token-label">{holder.label}</p>
-                          <a
-                            href={"https://basescan.org/address/#{holder.address}"}
-                            target="_blank"
-                            rel="noreferrer"
-                            class="pp-token-address"
-                          >
-                            {holder.short} <span aria-hidden="true">↗</span>
-                          </a>
-                        </div>
-                      </td>
-                      <td class="pp-token-metric" data-label="Share">{holder.percent}</td>
-                      <td data-label="Amount">
-                        <div class="pp-token-amount-cell">
-                          <span class="pp-token-metric">{holder.amount}</span>
-                          <div class="pp-token-bar">
-                            <div
-                              class="pp-token-bar-fill"
-                              style={"width: #{String.trim_trailing(holder.percent, "%")}%"}
-                            >
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td class="pp-token-action" data-label="Details">
-                        <button
-                          type="button"
-                          class="pp-token-toggle"
-                          phx-click="toggle_holder"
-                          phx-value-rank={holder.rank}
-                        >
-                          {if @open_holder == holder.rank, do: "Hide", else: "Details"}
-                        </button>
-                      </td>
-                    </tr>
-                    <tr :if={@open_holder == holder.rank} class="pp-token-drawer-row">
-                      <td colspan="5">
-                        <div class="pp-token-drawer">
-                          <p class="pp-token-drawer-title">What this address is</p>
-                          <p class="pp-panel-copy">{holder.description}</p>
-                          <a
-                            :if={Map.has_key?(holder, :link_url)}
-                            href={holder.link_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            class="pp-link-button"
-                          >
-                            {holder.link_label} <span aria-hidden="true">↗</span>
-                          </a>
-                        </div>
-                      </td>
-                    </tr>
-                  <% end %>
-                </tbody>
-              </table>
-            </div>
-
-            <p class="pp-token-community-note">7th through 2,208th: Regent Community Members!</p>
-          </section>
-
-          <section class="pp-route-panel pp-token-panel" data-bridge-block>
-            <p class="pp-home-kicker">Token Allocations</p>
-            <h2 class="pp-route-panel-title">Regent Token Allocations and Uses</h2>
-            <p class="pp-panel-copy">
-              At Clanker token deployment, the following extensions were configured: 20% Clanker public + 40% growth emissions + 40% long-term incentives.
-            </p>
-
-            <div class="pp-token-allocation-stack">
+            <div class="mt-6 grid gap-4 xl:grid-cols-3">
               <%= for block <- @allocations do %>
-                <section class="pp-token-allocation-block">
-                  <h3 class="pp-token-allocation-title">{block.title}</h3>
+                <section class="rounded-[2rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_94%,transparent)] p-5">
+                  <div class="space-y-4">
+                    <div class="space-y-3">
+                      <p class="text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
+                        Allocation block
+                      </p>
+                      <h3 class="font-display text-[1.35rem] leading-[0.94] text-[color:var(--foreground)]">
+                        {block.title}
+                      </h3>
+                    </div>
 
-                  <div :if={Map.has_key?(block, :body)} class="pp-token-prose">
-                    <%= for paragraph <- block.body do %>
-                      <p>{paragraph}</p>
-                    <% end %>
+                    <div
+                      :if={Map.has_key?(block, :body)}
+                      class="space-y-3 text-sm leading-6 text-[color:var(--muted-foreground)]"
+                    >
+                      <p :for={paragraph <- block.body}>{paragraph}</p>
+                    </div>
+
+                    <div :if={Map.has_key?(block, :bullets)} class="space-y-3">
+                      <article
+                        :for={entry <- block.bullets}
+                        class="rounded-[1.4rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4"
+                      >
+                        <p class="font-display text-[1rem] leading-none text-[color:var(--foreground)]">
+                          {entry.label}
+                        </p>
+                        <ul
+                          :if={entry.details != []}
+                          class="mt-3 space-y-2 text-sm leading-6 text-[color:var(--muted-foreground)]"
+                        >
+                          <li :for={detail <- entry.details}>{detail}</li>
+                        </ul>
+                      </article>
+                    </div>
+
+                    <a
+                      :if={Map.has_key?(block, :link_url)}
+                      href={block.link_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      class="inline-flex items-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
+                    >
+                      {block.link_label} <span aria-hidden="true" class="ml-2">↗</span>
+                    </a>
                   </div>
-
-                  <div :if={Map.has_key?(block, :bullets)} class="pp-token-bullet-stack">
-                    <article :for={entry <- block.bullets} class="pp-token-bullet-card">
-                      <p class="pp-token-bullet-title">{entry.label}</p>
-                      <ul :if={entry.details != []} class="pp-token-detail-list">
-                        <li :for={detail <- entry.details}>{detail}</li>
-                      </ul>
-                    </article>
-                  </div>
-
-                  <a
-                    :if={Map.has_key?(block, :link_url)}
-                    href={block.link_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    class="pp-link-button"
-                  >
-                    {block.link_label} <span aria-hidden="true">↗</span>
-                  </a>
                 </section>
               <% end %>
             </div>
@@ -749,15 +954,132 @@ defmodule PlatformPhxWeb.TokenInfoLive do
 
   attr :label, :string, required: true
   attr :value, :string, required: true
+  attr :detail, :string, required: true
+
+  defp hero_metric(assigns) do
+    ~H"""
+    <article class="rounded-[1.45rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_95%,transparent)] px-4 py-4">
+      <p class="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
+        {@label}
+      </p>
+      <p class="mt-3 font-display text-[1.45rem] leading-none text-[color:var(--foreground)]">
+        {@value}
+      </p>
+      <p class="mt-2 text-xs leading-5 text-[color:var(--muted-foreground)]">
+        {@detail}
+      </p>
+    </article>
+    """
+  end
+
+  attr :href, :string, required: true
+  attr :label, :string, required: true
+  attr :image_path, :string, required: true
+  attr :image_alt, :string, required: true
+
+  defp market_link(assigns) do
+    ~H"""
+    <a
+      href={@href}
+      target="_blank"
+      rel="noreferrer"
+      class="inline-flex items-center gap-3 rounded-full border border-[color:var(--border)] bg-[color:var(--background)] px-4 py-3 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)] hover:bg-[color:color-mix(in_oklch,var(--ring)_8%,transparent)]"
+      aria-label={@label}
+      title={@label}
+    >
+      <img src={@image_path} alt={@image_alt} class="h-5 w-5 object-contain" />
+      <span>{@image_alt}</span>
+    </a>
+    """
+  end
+
+  attr :title, :string, required: true
+  attr :body, :string, required: true
+
+  defp flow_row(assigns) do
+    ~H"""
+    <div class="grid gap-3 rounded-[1.35rem] border border-[color:var(--border)] bg-[color:var(--background)] px-4 py-4 sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-start">
+      <p class="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
+        {@title}
+      </p>
+      <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
+        {@body}
+      </p>
+    </div>
+    """
+  end
+
+  attr :source, :map, required: true
+
+  defp source_card(assigns) do
+    ~H"""
+    <article class="rounded-[1.8rem] border border-[color:var(--border)] bg-[color:var(--background)] p-5">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p class="font-display text-[1.2rem] leading-none text-[color:var(--foreground)]">
+            {@source.title}
+          </p>
+          <p class="mt-3 text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
+            {@source.short}
+          </p>
+        </div>
+      </div>
+      <div class="mt-4 text-sm leading-6 text-[color:var(--muted-foreground)]">
+        <%= if Map.has_key?(@source, :body_lines) do %>
+          <%= for {line, index} <- Enum.with_index(@source.body_lines) do %>
+            <.rich_fragments fragments={line} />
+            <br :if={index < length(@source.body_lines) - 1} />
+          <% end %>
+        <% else %>
+          {@source.body}
+        <% end %>
+      </div>
+    </article>
+    """
+  end
+
+  attr :label, :string, required: true
+  attr :value, :string, required: true
 
   defp staking_metric(assigns) do
     ~H"""
-    <div class="rounded-[1rem] border border-[color:var(--border)] bg-[color:var(--background)] px-4 py-4">
-      <p class="text-xs uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
+    <div class="rounded-[1.35rem] border border-[color:var(--border)] bg-[color:var(--background)] px-4 py-4">
+      <p class="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
         {@label}
       </p>
-      <p class="mt-3 font-display text-[1.25rem] text-[color:var(--foreground)]">{@value}</p>
+      <p class="mt-3 font-display text-[1.28rem] leading-none text-[color:var(--foreground)]">
+        {@value}
+      </p>
     </div>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :action, :string, required: true
+  attr :label, :string, required: true
+  attr :tone, :atom, default: :secondary
+  attr :wide, :boolean, default: false
+
+  defp staking_action_button(assigns) do
+    ~H"""
+    <button
+      id={@id}
+      type="button"
+      phx-click="submit_staking"
+      phx-value-action={@action}
+      class={[
+        "inline-flex items-center justify-center rounded-full border px-4 py-3 text-sm transition",
+        @wide && "w-full",
+        if(@tone == :primary,
+          do:
+            "border-[color:var(--foreground)] bg-[color:var(--foreground)] text-[color:var(--background)] hover:opacity-90",
+          else:
+            "border-[color:var(--border)] bg-[color:var(--background)] text-[color:var(--foreground)] hover:border-[color:var(--ring)] hover:bg-[color:color-mix(in_oklch,var(--ring)_8%,transparent)]"
+        )
+      ]}
+    >
+      {@label}
+    </button>
     """
   end
 
@@ -838,6 +1160,12 @@ defmodule PlatformPhxWeb.TokenInfoLive do
   defp staking_value(nil), do: "--"
   defp staking_value(value) when is_binary(value), do: value
   defp staking_value(value), do: to_string(value)
+
+  defp holder_percent_width(percent) when is_binary(percent) do
+    String.trim_trailing(percent, "%") <> "%"
+  end
+
+  defp holder_percent_width(_percent), do: "0%"
 
   defp staking_notice_class(:success) do
     "border-[color:color-mix(in_oklch,var(--positive)_55%,var(--border)_45%)] bg-[color:color-mix(in_oklch,var(--positive)_10%,transparent)] text-[color:var(--foreground)]"

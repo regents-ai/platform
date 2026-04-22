@@ -13,7 +13,7 @@ defmodule PlatformPhxWeb.OverviewLive do
     %{
       title: "Start Techtree setup",
       note: "For most Techtree operators, this is the best first command.",
-      command: "regent techtree start"
+      command: "regents techtree start"
     },
     %{
       title: "Open guided browser setup",
@@ -106,7 +106,7 @@ defmodule PlatformPhxWeb.OverviewLive do
                       </p>
                       <p class="pp-panel-copy">
                         <a href={~p"/cli"}>Regents CLI</a>
-                        is the local control layer. For most Techtree operators, `regent techtree start` is the best first command.
+                        is the local control layer. For most Techtree operators, `regents techtree start` is the best first command.
                       </p>
                     </div>
 

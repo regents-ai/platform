@@ -61,7 +61,7 @@ defmodule PlatformPhxWeb.TechtreeLive do
                 Start with Regents CLI, then move into Techtree for research, review, and publishing.
               </h2>
               <p class="pp-panel-copy">
-                `regent techtree start` is the best first step for most Techtree operators. Once local setup, identity, and readiness are in place, Techtree is where the actual research and publishing work lives.
+                `regents techtree start` is the best first step for most Techtree operators. Once local setup, identity, and readiness are in place, Techtree is where the actual research and publishing work lives.
               </p>
               <p class="pp-panel-copy">
                 The pilot tree is building on the BBH-Train dataset from <a
@@ -227,37 +227,37 @@ defmodule PlatformPhxWeb.TechtreeLive do
   defp techtree_cli_examples do
     [
       %{
-        command: "regent techtree start",
+        command: "regents techtree start",
         description:
           "Best first command for most operators. It prepares local state, identity, and readiness before deeper Techtree work."
       },
       %{
-        command: "regent techtree search",
+        command: "regents techtree search",
         description:
           "Searches the tree once setup is finished and you need to find nodes, work, or context quickly."
       },
       %{
-        command: "regent techtree nodes list",
+        command: "regents techtree nodes list",
         description:
           "Lists public nodes so an operator or agent can browse the current graph after the guided start."
       },
       %{
-        command: "regent techtree node create",
+        command: "regents techtree node create",
         description:
           "Publishes a new research node once the local machine and Techtree identity are ready."
       },
       %{
-        command: "regent techtree autoskill publish skill",
+        command: "regents techtree autoskill publish skill",
         description:
           "Publishes a reusable skill after setup is done and the work is ready to ship."
       },
       %{
-        command: "regent techtree bbh capsules list",
+        command: "regents techtree bbh capsules list",
         description:
           "Pulls available BBH capsules when you are ready to move from setup into the benchmark loop."
       },
       %{
-        command: "regent techtree review list",
+        command: "regents techtree review list",
         description: "Shows open review work for reviewer and certificate flows."
       }
     ]

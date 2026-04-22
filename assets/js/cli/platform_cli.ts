@@ -97,18 +97,18 @@ type FetchLike = typeof fetch;
 
 export function platformUsageLines() {
   return [
-    "regent platform auth login [--identity-token <token> | --identity-token-env REGENT_PLATFORM_IDENTITY_TOKEN] [--display-name \"Regent Operator\"] [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
-    "regent platform auth status [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
-    "regent platform auth logout [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
-    "regent platform formation status [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
-    "regent platform billing account [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
-    "regent platform billing usage [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
-    "regent platform billing setup [--claimed-label tempo] [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
-    "regent platform billing topup --amount-usd-cents 800 [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
-    "regent platform company create --claimed-label tempo [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
-    "regent platform company runtime --slug tempo [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
-    "regent platform sprite pause --slug tempo [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
-    "regent platform sprite resume --slug tempo [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
+    "regents platform auth login [--identity-token <token> | --identity-token-env REGENT_PLATFORM_IDENTITY_TOKEN] [--display-name \"Regent Operator\"] [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
+    "regents platform auth status [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
+    "regents platform auth logout [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
+    "regents platform formation status [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
+    "regents platform billing account [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
+    "regents platform billing usage [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
+    "regents platform billing setup [--claimed-label tempo] [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
+    "regents platform billing topup --amount-usd-cents 800 [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
+    "regents platform company create --claimed-label tempo [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
+    "regents platform company runtime --slug tempo [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
+    "regents platform sprite pause --slug tempo [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
+    "regents platform sprite resume --slug tempo [--origin https://regents.sh] [--session-file ~/.regent/platform/session.json]",
   ];
 }
 
@@ -132,7 +132,7 @@ export function parsePlatformCommand(
 
     return {
       kind: "platform-formation-status",
-      ...parseCommonOnlyPlatformOptions(rest, cwd, "regent platform formation status"),
+      ...parseCommonOnlyPlatformOptions(rest, cwd, "regents platform formation status"),
     };
   }
 
@@ -163,14 +163,14 @@ function parsePlatformAuthCommand(
   if (command === "status") {
     return {
       kind: "platform-auth-status",
-      ...parseCommonOnlyPlatformOptions(args, cwd, "regent platform auth status"),
+      ...parseCommonOnlyPlatformOptions(args, cwd, "regents platform auth status"),
     };
   }
 
   if (command === "logout") {
     return {
       kind: "platform-auth-logout",
-      ...parseCommonOnlyPlatformOptions(args, cwd, "regent platform auth logout"),
+      ...parseCommonOnlyPlatformOptions(args, cwd, "regents platform auth logout"),
     };
   }
 
@@ -215,7 +215,7 @@ function parsePlatformAuthCommand(
       continue;
     }
 
-    throw new Error(`Unknown flag "${token}" for regent platform auth login.`);
+    throw new Error(`Unknown flag "${token}" for regents platform auth login.`);
   }
 
   if (!identityToken) {
@@ -241,14 +241,14 @@ function parsePlatformBillingCommand(
   if (command === "account") {
     return {
       kind: "platform-billing-account",
-      ...parseCommonOnlyPlatformOptions(args, cwd, "regent platform billing account"),
+      ...parseCommonOnlyPlatformOptions(args, cwd, "regents platform billing account"),
     };
   }
 
   if (command === "usage") {
     return {
       kind: "platform-billing-usage",
-      ...parseCommonOnlyPlatformOptions(args, cwd, "regent platform billing usage"),
+      ...parseCommonOnlyPlatformOptions(args, cwd, "regents platform billing usage"),
     };
   }
 
@@ -271,7 +271,7 @@ function parsePlatformBillingCommand(
         continue;
       }
 
-      throw new Error(`Unknown flag "${token}" for regent platform billing setup.`);
+      throw new Error(`Unknown flag "${token}" for regents platform billing setup.`);
     }
 
     return {
@@ -300,11 +300,11 @@ function parsePlatformBillingCommand(
         continue;
       }
 
-      throw new Error(`Unknown flag "${token}" for regent platform billing topup.`);
+      throw new Error(`Unknown flag "${token}" for regents platform billing topup.`);
     }
 
     if (amountUsdCents === null) {
-      throw new Error("Missing required --amount-usd-cents for regent platform billing topup.");
+      throw new Error("Missing required --amount-usd-cents for regents platform billing topup.");
     }
 
     return {
@@ -342,11 +342,11 @@ function parsePlatformCompanyCommand(
         continue;
       }
 
-      throw new Error(`Unknown flag "${token}" for regent platform company create.`);
+      throw new Error(`Unknown flag "${token}" for regents platform company create.`);
     }
 
     if (!claimedLabel) {
-      throw new Error("Missing required --claimed-label for regent platform company create.");
+      throw new Error("Missing required --claimed-label for regents platform company create.");
     }
 
     return {
@@ -375,11 +375,11 @@ function parsePlatformCompanyCommand(
         continue;
       }
 
-      throw new Error(`Unknown flag "${token}" for regent platform company runtime.`);
+      throw new Error(`Unknown flag "${token}" for regents platform company runtime.`);
     }
 
     if (!slug) {
-      throw new Error("Missing required --slug for regent platform company runtime.");
+      throw new Error("Missing required --slug for regents platform company runtime.");
     }
 
     return {
@@ -420,11 +420,11 @@ function parsePlatformSpriteCommand(
       continue;
     }
 
-    throw new Error(`Unknown flag "${token}" for regent platform sprite ${command}.`);
+    throw new Error(`Unknown flag "${token}" for regents platform sprite ${command}.`);
   }
 
   if (!slug) {
-    throw new Error(`Missing required --slug for regent platform sprite ${command}.`);
+    throw new Error(`Missing required --slug for regents platform sprite ${command}.`);
   }
 
   if (command === "pause") {
@@ -575,7 +575,7 @@ async function login(command: PlatformAuthLoginCommand, fetchImpl: FetchLike): P
 
   return {
     ok: true,
-    command: "regent platform auth login",
+    command: "regents platform auth login",
     origin,
     sessionFile: command.sessionFile,
     profile: data,
@@ -597,7 +597,7 @@ async function readProfile(
 
   return {
     ok: true,
-    command: "regent platform auth status",
+    command: "regents platform auth status",
     origin: resolved.origin,
     sessionFile: command.sessionFile,
     profile: data,
@@ -622,7 +622,7 @@ async function logout(
 
   return {
     ok: true,
-    command: "regent platform auth logout",
+    command: "regents platform auth logout",
     origin: resolved.origin,
     sessionFile: command.sessionFile,
   };
@@ -643,7 +643,7 @@ async function readFormation(
 
   return {
     ok: true,
-    command: "regent platform formation status",
+    command: "regents platform formation status",
     origin: resolved.origin,
     formation: data,
   };
@@ -664,7 +664,7 @@ async function readBillingAccount(
 
   return {
     ok: true,
-    command: "regent platform billing account",
+    command: "regents platform billing account",
     origin: resolved.origin,
     billing: data,
   };
@@ -685,7 +685,7 @@ async function readBillingUsage(
 
   return {
     ok: true,
-    command: "regent platform billing usage",
+    command: "regents platform billing usage",
     origin: resolved.origin,
     usage: data,
   };
@@ -708,7 +708,7 @@ async function startBillingSetup(
 
   return {
     ok: true,
-    command: "regent platform billing setup",
+    command: "regents platform billing setup",
     origin: resolved.origin,
     checkout: data,
   };
@@ -730,7 +730,7 @@ async function startBillingTopup(
 
   return {
     ok: true,
-    command: "regent platform billing topup",
+    command: "regents platform billing topup",
     origin: resolved.origin,
     checkout: data,
   };
@@ -752,7 +752,7 @@ async function createCompany(
 
   return {
     ok: true,
-    command: "regent platform company create",
+    command: "regents platform company create",
     origin: resolved.origin,
     company: data,
   };
@@ -773,7 +773,7 @@ async function readCompanyRuntime(
 
   return {
     ok: true,
-    command: "regent platform company runtime",
+    command: "regents platform company runtime",
     origin: resolved.origin,
     runtime: data,
   };
@@ -795,7 +795,7 @@ async function pauseSprite(
 
   return {
     ok: true,
-    command: "regent platform sprite pause",
+    command: "regents platform sprite pause",
     origin: resolved.origin,
     sprite: data,
   };
@@ -817,7 +817,7 @@ async function resumeSprite(
 
   return {
     ok: true,
-    command: "regent platform sprite resume",
+    command: "regents platform sprite resume",
     origin: resolved.origin,
     sprite: data,
   };
@@ -938,7 +938,7 @@ async function loadSession(sessionFile: string): Promise<PlatformSessionState> {
     raw = await readFile(sessionFile, "utf8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new Error(`No saved platform session found at ${sessionFile}. Run regent platform auth login first.`);
+      throw new Error(`No saved platform session found at ${sessionFile}. Run regents platform auth login first.`);
     }
 
     throw error;

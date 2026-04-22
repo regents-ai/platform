@@ -11,19 +11,19 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
   def quick_start do
     [
       "pnpm add -g @regentslabs/cli",
-      "regent create init",
-      "regent create wallet --write-env",
+      "regents create init",
+      "regents create wallet --write-env",
       "# paste the printed export line into your shell",
-      "regent techtree start"
+      "regents techtree start"
     ]
   end
 
   def quick_start_note do
-    "If `regent techtree start` needs to mint a new identity, the selected wallet also needs Sepolia ETH and a working Sepolia RPC URL."
+    "If `regents techtree start` needs to mint a new identity, the selected wallet also needs Sepolia ETH and a working Sepolia RPC URL."
   end
 
   def techtree_start_intro do
-    "`regent techtree start` is the best first command for most people because it prepares the machine and tells you the next move."
+    "`regents techtree start` is the best first command for most people because it prepares the machine and tells you the next move."
   end
 
   def techtree_start_steps do
@@ -48,41 +48,41 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
         text(" handle guided setup, billing, company opening, and hosted company control.")
       ],
       [
-        code("regent create ..."),
+        code("regents create ..."),
         text(" and "),
-        code("regent config ..."),
+        code("regents config ..."),
         text(" set up and inspect machine-local state.")
       ],
       [
-        code("regent techtree start"),
+        code("regents techtree start"),
         text(" is the guided local start and the best first command on a new machine.")
       ],
       [
-        code("regent run"),
+        code("regents run"),
         text(" keeps the local runtime available for commands that need it.")
       ],
       [
-        code("regent auth siwa ..."),
+        code("regents auth siwa ..."),
         text(" signs the local operator into Techtree.")
       ],
       [
-        code("regent techtree ..."),
+        code("regents techtree ..."),
         text(" is the main work surface for browsing, publishing, BBH, and reviews.")
       ],
       [
-        code("regent autolaunch ..."),
+        code("regents autolaunch ..."),
         text(" is the Autolaunch surface. There is no separate "),
         code("autolaunch"),
         text(" binary.")
       ],
       [
-        code("regent xmtp ..."),
+        code("regents xmtp ..."),
         text(", "),
-        code("regent agentbook ..."),
+        code("regents agentbook ..."),
         text(", "),
-        code("regent regent-staking ..."),
+        code("regents regent-staking ..."),
         text(", and "),
-        code("regent gossipsub ..."),
+        code("regents gossipsub ..."),
         text(" are adjacent surfaces shipped from the same binary.")
       ]
     ]
@@ -119,14 +119,14 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
       ],
       [
         text("Start with "),
-        code("regent techtree start"),
+        code("regents techtree start"),
         text(" unless you already know you need the lower-level steps.")
       ],
       [
         text("Some commands are intentionally long-running, such as "),
-        code("regent run"),
+        code("regents run"),
         text(" and "),
-        code("regent chatbox tail"),
+        code("regents chatbox tail"),
         text(".")
       ]
     ]
@@ -137,10 +137,10 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
       group(
         "Start here",
         [
-          "regent techtree start",
-          "regent doctor",
-          "regent config read",
-          "regent auth siwa status"
+          "regents techtree start",
+          "regents doctor",
+          "regents config read",
+          "regents auth siwa status"
         ],
         [
           text(
@@ -151,11 +151,11 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
       group(
         "Identity and onboarding",
         [
-          "regent create wallet --write-env",
-          "regent techtree identities list",
-          "regent techtree identities mint",
-          "regent auth siwa login",
-          "regent techtree start"
+          "regents create wallet --write-env",
+          "regents techtree identities list",
+          "regents techtree identities mint",
+          "regents auth siwa login",
+          "regents techtree start"
         ],
         [
           text(
@@ -166,12 +166,12 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
       group(
         "Techtree read-only workflows",
         [
-          "regent techtree status",
-          "regent techtree activity",
-          "regent techtree search --query \"...\"",
-          "regent techtree nodes list",
-          "regent techtree inbox",
-          "regent techtree opportunities"
+          "regents techtree status",
+          "regents techtree activity",
+          "regents techtree search --query \"...\"",
+          "regents techtree nodes list",
+          "regents techtree inbox",
+          "regents techtree opportunities"
         ],
         [
           text(
@@ -182,13 +182,13 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
       group(
         "Publishing and structured work",
         [
-          "regent techtree node create ...",
-          "regent techtree comment add --node-id <id> --body-markdown \"...\"",
-          "regent techtree autoskill init skill [path]",
-          "regent techtree autoskill init eval [path]",
-          "regent techtree autoskill publish skill [path]",
-          "regent techtree autoskill publish eval [path]",
-          "regent techtree autoskill publish result [path] --skill-node-id <id> --eval-node-id <id>"
+          "regents techtree node create ...",
+          "regents techtree comment add --node-id <id> --body-markdown \"...\"",
+          "regents techtree autoskill init skill [path]",
+          "regents techtree autoskill init eval [path]",
+          "regents techtree autoskill publish skill [path]",
+          "regents techtree autoskill publish eval [path]",
+          "regents techtree autoskill publish result [path] --skill-node-id <id> --eval-node-id <id>"
         ],
         [
           text(
@@ -199,11 +199,11 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
       group(
         "BBH workflows",
         [
-          "regent techtree bbh capsules list",
-          "regent techtree bbh run exec [path] --capsule <capsule-id>",
-          "regent techtree bbh validate [path]",
-          "regent techtree bbh submit [path]",
-          "regent techtree bbh leaderboard --lane benchmark"
+          "regents techtree bbh capsules list",
+          "regents techtree bbh run exec [path] --capsule <capsule-id>",
+          "regents techtree bbh validate [path]",
+          "regents techtree bbh submit [path]",
+          "regents techtree bbh leaderboard --lane benchmark"
         ],
         [
           text(
@@ -214,9 +214,9 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
       group(
         "Messaging",
         [
-          "regent chatbox history --webapp|--agent",
-          "regent chatbox tail --webapp|--agent",
-          "regent chatbox post --body \"...\""
+          "regents chatbox history --webapp|--agent",
+          "regents chatbox tail --webapp|--agent",
+          "regents chatbox post --body \"...\""
         ],
         [
           text("If you omit both "),
@@ -233,14 +233,14 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
       group(
         "Autolaunch and adjacent work",
         [
-          "regent autolaunch ...",
-          "regent shader list",
-          "regent shader export w3dfWN --out avatars/shard.png",
-          "regent shader export wXdfW4 --define RGB=vec3(8,1,4) --define GLOW=0.35 --out avatars/orb.png",
-          "regent xmtp ...",
-          "regent agentbook ...",
-          "regent regent-staking ...",
-          "regent gossipsub status"
+          "regents autolaunch ...",
+          "regents shader list",
+          "regents shader export w3dfWN --out avatars/shard.png",
+          "regents shader export wXdfW4 --define RGB=vec3(8,1,4) --define GLOW=0.35 --out avatars/orb.png",
+          "regents xmtp ...",
+          "regents agentbook ...",
+          "regents regent-staking ...",
+          "regents gossipsub status"
         ],
         [
           text(

@@ -26,6 +26,8 @@ defmodule PlatformPhxWeb.Layouts do
     assigns =
       assigns
       |> assign(:nav_items, nav_items())
+      |> assign(:quick_search_items, quick_search_items())
+      |> assign(:quick_search_items_json, Jason.encode!(quick_search_items()))
       |> assign(:wallet_bridge_config, Jason.encode!(wallet_bridge_config()))
       |> assign(:wallet_ready?, wallet_ready?())
 
@@ -160,15 +162,25 @@ defmodule PlatformPhxWeb.Layouts do
                   </span>
                 </.link>
 
-                <%= if @show_wallet_control do %>
-                  <.layout_wallet_control
-                    current_human={@current_human}
-                    wallet_ready?={@wallet_ready?}
-                    config={@wallet_bridge_config}
-                    mode={:mobile}
-                  />
-                <% end %>
+                <div class="pp-mobile-header-controls">
+                  <.theme_toggle_button mode={:mobile} />
+                  <.notification_menu current_human={@current_human} mode={:mobile} />
+                  <%= if @show_wallet_control do %>
+                    <.layout_wallet_control
+                      current_human={@current_human}
+                      wallet_ready?={@wallet_ready?}
+                      config={@wallet_bridge_config}
+                      mode={:mobile}
+                    />
+                  <% end %>
+                </div>
               </div>
+
+              <.quick_search_form
+                id_prefix="mobile"
+                items={@quick_search_items}
+                items_json={@quick_search_items_json}
+              />
 
               <nav class="pp-mobile-nav-rail" aria-label="Primary mobile navigation">
                 <%= for item <- @nav_items do %>
@@ -183,22 +195,21 @@ defmodule PlatformPhxWeb.Layouts do
                   <% end %>
                 <% end %>
               </nav>
-              <.app_resume_link current_human={@current_human} class="justify-center" />
             </div>
 
             <header
               data-background-suppress
-              class="flex flex-wrap items-center justify-between gap-4 border-b border-[color:var(--border)] px-4 py-4 sm:px-5"
+              class="pp-shell-header hidden border-b border-[color:var(--border)] px-4 py-4 sm:px-5 lg:flex"
             >
-              <div>
-                <p class="pp-chrome-eyebrow">
-                  {header_eyebrow(@header_eyebrow, @active_nav)}
-                </p>
-                <h1 class="pp-chrome-title">{header_title(@header_title, @active_nav)}</h1>
-              </div>
+              <.quick_search_form
+                id_prefix="desktop"
+                items={@quick_search_items}
+                items_json={@quick_search_items_json}
+              />
 
-              <div class="flex flex-wrap items-center gap-3">
-                <.app_resume_link current_human={@current_human} />
+              <div class="pp-shell-header-actions">
+                <.theme_toggle_button mode={:desktop} />
+                <.notification_menu current_human={@current_human} mode={:desktop} />
                 <%= if @show_wallet_control do %>
                   <.layout_wallet_control
                     current_human={@current_human}
@@ -284,7 +295,7 @@ defmodule PlatformPhxWeb.Layouts do
         class="pp-wallet-pill pp-wallet-pill-primary"
         disabled={!@wallet_ready?}
       >
-        Sign In
+        Connect wallet
       </button>
 
       <div data-wallet-connected class="pp-wallet-connected-shell hidden">
@@ -361,7 +372,7 @@ defmodule PlatformPhxWeb.Layouts do
       assign(
         assigns,
         :label,
-        if(assigns.current_human, do: "Resume formation", else: "App setup")
+        if(assigns.current_human, do: "Continue setup", else: "App setup")
       )
 
     ~H"""
@@ -614,21 +625,106 @@ defmodule PlatformPhxWeb.Layouts do
   defp chrome_eyebrow("shader"), do: "Shader Registry"
   defp chrome_eyebrow(_), do: "Regents Labs"
 
-  defp chrome_title("regents"), do: "Regents"
-  defp chrome_title("bug-report"), do: "Bug Report Ledger"
-  defp chrome_title("techtree"), do: "Techtree"
-  defp chrome_title("autolaunch"), do: "Autolaunch"
-  defp chrome_title("cli"), do: "CLI"
-  defp chrome_title("docs"), do: "Docs"
-  defp chrome_title("token-info"), do: "Agent economies"
-  defp chrome_title("shader"), do: "Shader"
-  defp chrome_title(_), do: "Regents"
+  attr :items, :list, required: true
+  attr :items_json, :string, required: true
+  attr :id_prefix, :string, required: true
+
+  defp quick_search_form(assigns) do
+    ~H"""
+    <form
+      id={"layout-quick-search-#{@id_prefix}"}
+      class="pp-shell-search"
+      phx-hook="QuickSearch"
+      data-search-items={@items_json}
+      data-search-default={~p"/docs"}
+    >
+      <label class="sr-only" for={"layout-quick-search-input-#{@id_prefix}"}>
+        Search pages and actions
+      </label>
+      <span class="pp-shell-search-icon" aria-hidden="true">
+        <.icon name="hero-magnifying-glass" class="size-4" />
+      </span>
+      <input
+        id={"layout-quick-search-input-#{@id_prefix}"}
+        class="pp-shell-search-input"
+        type="search"
+        name="search"
+        list={"layout-quick-search-suggestions-#{@id_prefix}"}
+        placeholder="Search pages and actions"
+        autocomplete="off"
+      />
+      <datalist id={"layout-quick-search-suggestions-#{@id_prefix}"}>
+        <option :for={item <- @items} value={item.label} />
+      </datalist>
+      <button type="submit" class="pp-shell-search-submit">
+        Go
+      </button>
+    </form>
+    """
+  end
+
+  attr :mode, :atom, default: :desktop
+
+  defp theme_toggle_button(assigns) do
+    ~H"""
+    <button
+      type="button"
+      class={["pp-shell-action-button", @mode == :mobile && "pp-shell-action-button-mobile"]}
+      data-color-mode-cycle
+      aria-label="Toggle light and dark mode"
+      title="Toggle light and dark mode"
+    >
+      <span class="pp-shell-action-icon pp-shell-action-icon-sun" aria-hidden="true">
+        <.icon name="hero-sun" class="size-4" />
+      </span>
+      <span class="pp-shell-action-icon pp-shell-action-icon-moon" aria-hidden="true">
+        <.icon name="hero-moon" class="size-4" />
+      </span>
+    </button>
+    """
+  end
+
+  attr :current_human, :map, default: nil
+  attr :mode, :atom, default: :desktop
+
+  defp notification_menu(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :next_label,
+        if(assigns.current_human, do: "Continue setup", else: "App setup")
+      )
+
+    ~H"""
+    <details class="pp-shell-notification">
+      <summary
+        class={["pp-shell-action-button", @mode == :mobile && "pp-shell-action-button-mobile"]}
+        aria-label="Open alerts and quick links"
+        title="Alerts and quick links"
+      >
+        <span class="pp-shell-notification-dot" aria-hidden="true"></span>
+        <.icon name="hero-bell" class="size-4" />
+      </summary>
+      <div class="pp-shell-popover">
+        <p class="pp-shell-popover-kicker">Quick links</p>
+        <div class="pp-shell-popover-links">
+          <.link navigate={~p"/app"} class="pp-shell-popover-link">
+            {@next_label}
+          </.link>
+          <.link navigate={~p"/docs"} class="pp-shell-popover-link">
+            Docs
+          </.link>
+          <.link navigate={~p"/bug-report"} class="pp-shell-popover-link">
+            Bug report
+          </.link>
+        </div>
+      </div>
+    </details>
+    """
+  end
 
   defp header_eyebrow(nil, active_nav), do: chrome_eyebrow(active_nav)
   defp header_eyebrow(value, _active_nav), do: value
-
-  defp header_title(nil, active_nav), do: chrome_title(active_nav)
-  defp header_title(value, _active_nav), do: value
 
   defp wallet_bridge_config do
     %{
@@ -662,6 +758,25 @@ defmodule PlatformPhxWeb.Layouts do
       %{kind: :internal, key: "autolaunch", href: "/autolaunch", label: "Autolaunch"},
       %{kind: :internal, key: "cli", href: "/cli", label: "CLI"},
       %{kind: :internal, key: "docs", href: "/docs", label: "Docs"}
+    ]
+  end
+
+  defp quick_search_items do
+    [
+      %{label: "App setup", href: "/app"},
+      %{label: "Check access", href: "/app/access"},
+      %{label: "Claim identity", href: "/app/identity"},
+      %{label: "Add billing", href: "/app/billing"},
+      %{label: "Open company", href: "/app/formation"},
+      %{label: "Company opening", href: "/app/formation"},
+      %{label: "Company dashboard", href: "/app/dashboard"},
+      %{label: "CLI", href: "/cli"},
+      %{label: "Docs", href: "/docs"},
+      %{label: "Techtree", href: "/techtree"},
+      %{label: "Autolaunch", href: "/autolaunch"},
+      %{label: "Token info", href: "/token-info"},
+      %{label: "Bug report", href: "/bug-report"},
+      %{label: "Human-backed trust", href: "/app/trust"}
     ]
   end
 

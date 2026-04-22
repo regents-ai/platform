@@ -70,7 +70,7 @@ defmodule PlatformPhxWeb.App.DashboardLive do
       current_human={assigns[:current_human]}
       chrome={:app}
       active_nav="regents"
-      header_eyebrow="Open app"
+      header_eyebrow="App"
       header_title="Company dashboard"
       theme_class="rg-regent-theme-platform"
     >
@@ -90,9 +90,44 @@ defmodule PlatformPhxWeb.App.DashboardLive do
             avatar_save_notice={@avatar_save_notice}
           />
         <% else %>
-          <.dashboard_not_ready_stage
-            formation={@formation_data}
-            notice={@formation_notice}
+          <.setup_blocked_stage
+            step={4}
+            title="Open a company to make this your home."
+            summary="The dashboard becomes available after a company has been opened."
+            snapshot={setup_snapshot_from_formation(@formation_data)}
+            facts={[
+              %{
+                icon: "hero-building-office-2",
+                title: "Company live",
+                copy: "The dashboard appears after the hosted company is opened."
+              },
+              %{
+                icon: "hero-credit-card",
+                title: "Billing visible",
+                copy: "Credit and spend show up after launch."
+              },
+              %{
+                icon: "hero-paint-brush",
+                title: "Public look",
+                copy: "Saved avatar choices appear here after launch."
+              }
+            ]}
+            next_steps={[
+              %{
+                number: "Docs",
+                title: "Use Docs",
+                copy: "Review the reference surface while the company is still being set up."
+              },
+              %{
+                number: "CLI",
+                title: "Use Regents CLI",
+                copy: "Move into the CLI when work starts on a machine or inside an agent."
+              }
+            ]}
+            blocker_copy={dashboard_not_ready_copy(@formation_data)}
+            action_label="Open Agent Formation"
+            action_path={~p"/app/formation"}
+            action_copy="Finish company setup first, then come back here to manage the live company."
           />
         <% end %>
       </div>
@@ -157,53 +192,6 @@ defmodule PlatformPhxWeb.App.DashboardLive do
 
   defp dashboard_not_ready_copy(_formation) do
     "We could not load your company details right now. Open Agent Formation to keep going."
-  end
-
-  attr :formation, :map, required: true
-  attr :notice, :map, default: nil
-
-  defp dashboard_not_ready_stage(assigns) do
-    ~H"""
-    <section class="rounded-[1.7rem] border border-[color:var(--border)] bg-[color:var(--card)] p-6 shadow-[0_20px_60px_-40px_color-mix(in_oklch,var(--brand-ink)_40%,transparent)]">
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div class="space-y-3">
-          <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
-            Dashboard
-          </p>
-          <h2 class="font-display text-[clamp(2rem,4vw,2.8rem)] leading-[0.95] text-[color:var(--foreground)]">
-            Open a company to make this your home.
-          </h2>
-          <p class="max-w-[46rem] text-sm leading-6 text-[color:var(--muted-foreground)]">
-            {dashboard_not_ready_copy(@formation)}
-          </p>
-        </div>
-
-        <.link
-          navigate={~p"/app/formation"}
-          class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
-        >
-          Open Agent Formation
-        </.link>
-      </div>
-
-      <%= if @notice do %>
-        <.inline_notice notice={@notice} class="mt-6" />
-      <% end %>
-
-      <div class="mt-6 space-y-4">
-        <div class="max-w-[46rem]">
-          <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
-            Next steps
-          </p>
-          <p class="mt-3 text-sm leading-6 text-[color:var(--muted-foreground)]">
-            Techtree is where you improve the agent. Autolaunch is where you go when you are ready to raise and grow.
-          </p>
-        </div>
-
-        <.sister_project_cards />
-      </div>
-    </section>
-    """
   end
 
   defp empty_usage do

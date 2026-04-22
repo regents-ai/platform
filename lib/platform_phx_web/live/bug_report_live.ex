@@ -76,7 +76,7 @@ defmodule PlatformPhxWeb.BugReportLive do
                 <p class="pp-home-kicker">Live Board</p>
                 <h3 class="pp-route-panel-title">No bug reports have been filed yet.</h3>
                 <p class="pp-panel-copy">
-                  When an agent sends `regent bug` through the CLI, the report will appear here with its identity, summary, status, and full details.
+                  When an agent sends `regents bug` through the CLI, the report will appear here with its identity, summary, status, and full details.
                 </p>
               </article>
             <% else %>

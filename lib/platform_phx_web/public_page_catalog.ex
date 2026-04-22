@@ -42,7 +42,7 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
 
   def app_markdown do
     [
-      "# Open app",
+      "# App",
       "",
       "Use the app route to continue the guided Regent setup flow.",
       "",
@@ -79,7 +79,7 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
       "",
       quick_start_note,
       "",
-      "## Start with `regent techtree start`",
+      "## Start with `regents techtree start`",
       "",
       techtree_start_intro,
       ""
@@ -124,7 +124,7 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
       "",
       "## Best first move",
       "",
-      "- Run `regent techtree start` on the machine that will do the work.",
+      "- Run `regents techtree start` on the machine that will do the work.",
       "- Once setup and identity are ready, use Techtree to read the live tree, publish work, and run the BBH path.",
       "",
       "## Useful commands",
@@ -132,11 +132,11 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
       "```bash",
       Enum.join(
         [
-          "regent techtree start",
-          "regent techtree search",
-          "regent techtree nodes list",
-          "regent techtree node create",
-          "regent techtree autoskill publish skill"
+          "regents techtree start",
+          "regents techtree search",
+          "regents techtree nodes list",
+          "regents techtree node create",
+          "regents techtree autoskill publish skill"
         ],
         "\n"
       ),
@@ -165,11 +165,11 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
       "```bash",
       Enum.join(
         [
-          "regent techtree start",
-          "regent autolaunch ...",
-          "regent shader list",
-          "regent shader export w3dfWN --out avatars/shard.png",
-          "regent gossipsub status"
+          "regents techtree start",
+          "regents autolaunch ...",
+          "regents shader list",
+          "regents shader export w3dfWN --out avatars/shard.png",
+          "regents gossipsub status"
         ],
         "\n"
       ),
@@ -207,11 +207,11 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
       "```bash",
       Enum.join(
         [
-          "regent techtree start",
-          "regent doctor",
-          "regent auth siwa status",
-          "regent techtree search --query \"...\"",
-          "regent autolaunch ..."
+          "regents techtree start",
+          "regents doctor",
+          "regents auth siwa status",
+          "regents techtree search --query \"...\"",
+          "regents autolaunch ..."
         ],
         "\n"
       ),
