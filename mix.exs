@@ -27,7 +27,7 @@ defmodule PlatformPhx.MixProject do
 
   def cli do
     [
-      preferred_envs: [precommit: :test]
+      preferred_envs: [precommit: :test, "contract.validate": :test]
     ]
   end
 
@@ -74,6 +74,7 @@ defmodule PlatformPhx.MixProject do
       {:oban, "~> 2.19"},
       {:ens_elixir, path: "../elixir-utils/ens"},
       {:agent_world, path: "../elixir-utils/world/agentbook"},
+      {:yamerl, "~> 0.10", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
@@ -105,8 +106,22 @@ defmodule PlatformPhx.MixProject do
         "esbuild platform_phx --minify",
         "phx.digest"
       ],
-      precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+      "contract.validate": [
+        "test --max-cases 1 test/platform_phx_web/controllers/contract_validation_test.exs"
+      ],
+      precommit: [
+        "compile --warnings-as-errors",
+        "deps.unlock --unused",
+        "format",
+        "contract.validate",
+        &reenable_test_task/1,
+        "test"
+      ]
     ]
+  end
+
+  defp reenable_test_task(_args) do
+    Mix.Task.reenable("test")
   end
 
   defp sync_public_assets(_args) do
