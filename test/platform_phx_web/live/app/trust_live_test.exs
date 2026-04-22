@@ -1,6 +1,7 @@
 defmodule PlatformPhxWeb.App.TrustLiveTest do
   use PlatformPhxWeb.ConnCase, async: false
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
 
   alias PlatformPhx.Accounts.HumanUser
@@ -67,7 +68,7 @@ defmodule PlatformPhxWeb.App.TrustLiveTest do
     {:ok, _view, html} = live(conn, "/app/trust?session_id=#{session_id}&token=#{token}")
 
     assert html =~ "Sign in before you continue."
-    assert html =~ "Open app"
+    assert html =~ "Continue setup"
     refute html =~ "phx-hook=\"AgentbookTrustFlow\""
   end
 
@@ -95,5 +96,21 @@ defmodule PlatformPhxWeb.App.TrustLiveTest do
     assert html =~ "Open World App"
     assert html =~ "phx-hook=\"AgentbookTrustFlow\""
     assert html =~ "data-session="
+  end
+
+  test "expired approval link no longer opens the trust flow", %{
+    conn: conn,
+    session_id: session_id,
+    token: token
+  } do
+    Repo.update_all(
+      from(session in "platform_agentbook_sessions", where: session.session_id == ^session_id),
+      set: [expires_at: ~U[2020-01-01 00:00:00Z]]
+    )
+
+    {:ok, _view, html} = live(conn, "/app/trust?session_id=#{session_id}&token=#{token}")
+
+    assert html =~ "We could not finish this approval."
+    refute html =~ "phx-hook=\"AgentbookTrustFlow\""
   end
 end

@@ -120,10 +120,12 @@ defmodule PlatformPhxWeb.App.TrustLive do
             <% is_nil(@current_human) -> %>
               <div class="pp-inline-banner">
                 <strong>Sign in before you continue.</strong>
-                <p>Open the app, sign in, then come back to this page to finish the approval.</p>
+                <p>Open setup, sign in, then come back to this page to finish the approval.</p>
               </div>
               <div class="pp-action-row">
-                <.link navigate="/app/access" class="pp-button pp-button-primary">Open app</.link>
+                <.link navigate="/app/access" class="pp-button pp-button-primary">
+                  Continue setup
+                </.link>
               </div>
             <% @trust_session.status == "registered" -> %>
               <div class="pp-inline-banner pp-inline-banner-success">

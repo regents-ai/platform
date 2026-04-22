@@ -52,6 +52,21 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
     end
   end
 
+  defmodule ManualRegistrationStub do
+    def create_session(attrs), do: RegistrationStub.create_session(attrs)
+
+    def submit_proof(session, _proof_payload, _options) do
+      {:ok,
+       session
+       |> Map.put(:status, :proof_ready)
+       |> Map.put(:error_text, "manual submission requested")
+       |> Map.put(:tx_request, %{
+         to: "0x8b3f4f36c4564ab38c067ca0d7e2ed7d0d16f987",
+         data: "0x1234"
+       })}
+    end
+  end
+
   defmodule AgentBookStub do
     def lookup_human(_wallet_address, "world", _options), do: {:ok, "0x1234"}
   end
@@ -224,6 +239,142 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
     assert second_lookup["result"]["connected"] == true
     assert second_lookup["result"]["world_human_id"] == "0x1234"
     assert second_lookup["result"]["unique_agent_count"] == 2
+  end
+
+  test "a second signed-in person cannot claim the same human-backed trust record", %{conn: conn} do
+    first_human =
+      %HumanUser{}
+      |> HumanUser.changeset(%{
+        privy_user_id: "did:privy:first-trust",
+        wallet_address: "0x1111111111111111111111111111111111111111",
+        wallet_addresses: ["0x1111111111111111111111111111111111111111"],
+        display_name: "First Trust"
+      })
+      |> Repo.insert!()
+
+    second_human =
+      %HumanUser{}
+      |> HumanUser.changeset(%{
+        privy_user_id: "did:privy:second-trust",
+        wallet_address: "0x2222222222222222222222222222222222222222",
+        wallet_addresses: ["0x2222222222222222222222222222222222222222"],
+        display_name: "Second Trust"
+      })
+      |> Repo.insert!()
+
+    first_create =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_headers(agent_headers("/api/agentbook/sessions", Jason.encode!(%{"source" => "regents-cli"})))
+      |> post("/api/agentbook/sessions", Jason.encode!(%{"source" => "regents-cli"}))
+      |> json_response(200)
+
+    complete_session_for_human(
+      first_human.id,
+      first_create["session"]["session_id"],
+      approval_token(first_create["session"]["approval_url"])
+    )
+
+    second_token = "second-token"
+    second_token_hash = :crypto.hash(:sha256, second_token) |> Base.encode16(case: :lower)
+
+    Repo.insert_all("platform_agentbook_sessions", [
+      %{
+        session_id: "sess-second-person",
+        wallet_address: @signed_wallet_address,
+        chain_id: @signed_chain_id,
+        registry_address: @signed_registry_address,
+        token_id: @signed_token_id,
+        network: "world",
+        source: "regents-cli",
+        contract_address: "0x8b3f4f36c4564ab38c067ca0d7e2ed7d0d16f987",
+        relay_url: "https://relay.example.com",
+        nonce: 18,
+        approval_token_hash: second_token_hash,
+        app_id: "app_test",
+        action: "agentbook-registration",
+        rp_id: "app_test",
+        signal: "0xfeed",
+        rp_context: %{
+          "rp_id" => "app_test",
+          "nonce" => "nonce-456",
+          "created_at" => 1_712_000_000,
+          "expires_at" => 4_070_908_800,
+          "signature" => "0xsig"
+        },
+        allow_legacy_proofs: false,
+        status: "pending",
+        expires_at: ~U[2099-01-01 00:00:00Z],
+        inserted_at: DateTime.utc_now(),
+        updated_at: DateTime.utc_now()
+      }
+    ])
+
+    conflict_response =
+      build_conn()
+      |> init_test_session(%{current_human_id: second_human.id})
+      |> put_csrf_token()
+      |> post("/api/agentbook/sessions/sess-second-person/submit", %{
+        "token" => second_token,
+        "proof" => %{
+          "merkle_root" => "0x01",
+          "nullifier_hash" => "0x02",
+          "proof" => Enum.map(1..8, &"0x#{&1}")
+        }
+      })
+      |> json_response(409)
+
+    assert conflict_response["statusMessage"] =~ "already attached to another signed-in person"
+  end
+
+  test "manual wallet-only follow-up is converted into a failed hosted trust session", %{conn: conn} do
+    previous_agentbook = Application.get_env(:platform_phx, :agentbook, [])
+
+    Application.put_env(
+      :platform_phx,
+      :agentbook,
+      registration_module: ManualRegistrationStub,
+      agent_book_module: AgentBookStub
+    )
+
+    on_exit(fn ->
+      Application.put_env(:platform_phx, :agentbook, previous_agentbook)
+    end)
+
+    human =
+      %HumanUser{}
+      |> HumanUser.changeset(%{
+        privy_user_id: "did:privy:manual-trust",
+        wallet_address: "0x1111111111111111111111111111111111111111",
+        wallet_addresses: ["0x1111111111111111111111111111111111111111"],
+        display_name: "Manual Trust"
+      })
+      |> Repo.insert!()
+
+    create_response =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_headers(agent_headers("/api/agentbook/sessions", Jason.encode!(%{"source" => "regents-cli"})))
+      |> post("/api/agentbook/sessions", Jason.encode!(%{"source" => "regents-cli"}))
+      |> json_response(200)
+
+    submit_response =
+      build_conn()
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
+      |> post("/api/agentbook/sessions/#{create_response["session"]["session_id"]}/submit", %{
+        "token" => approval_token(create_response["session"]["approval_url"]),
+        "proof" => %{
+          "merkle_root" => "0x01",
+          "nullifier_hash" => "0x02",
+          "proof" => Enum.map(1..8, &"0x#{&1}")
+        }
+      })
+      |> json_response(200)
+
+    assert submit_response["session"]["status"] == "failed"
+    assert submit_response["session"]["tx_request"] == nil
+    assert submit_response["session"]["error_text"] =~ "wallet step"
   end
 
   defp complete_session_for_human(human_id, session_id, token) do

@@ -27,8 +27,6 @@ defmodule PlatformPhx.Agentbook.Session do
     field :allow_legacy_proofs, :boolean, default: false
     field :connector_uri, :string
     field :deep_link_uri, :string
-    field :proof_payload, :map
-    field :tx_request, :map
     field :status, :string
     field :world_human_id, :string
     field :error_text, :string
@@ -61,8 +59,6 @@ defmodule PlatformPhx.Agentbook.Session do
       :allow_legacy_proofs,
       :connector_uri,
       :deep_link_uri,
-      :proof_payload,
-      :tx_request,
       :status,
       :world_human_id,
       :platform_human_user_id,
@@ -88,8 +84,6 @@ defmodule PlatformPhx.Agentbook.Session do
     |> cast(attrs, [
       :connector_uri,
       :deep_link_uri,
-      :proof_payload,
-      :tx_request,
       :status,
       :world_human_id,
       :platform_human_user_id,

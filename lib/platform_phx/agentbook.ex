@@ -3,8 +3,8 @@ defmodule PlatformPhx.Agentbook do
 
   import Ecto.Query, warn: false
 
+  alias Ecto.Multi
   alias AgentWorld.Error
-  alias PlatformPhx.Accounts
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.Agentbook.Link
   alias PlatformPhx.Agentbook.Session
@@ -91,11 +91,13 @@ defmodule PlatformPhx.Agentbook do
   def get_browser_session(session_id, session_token)
       when is_binary(session_id) and is_binary(session_token) do
     with %Session{} = session <- Repo.get(Session, session_id),
-         true <- valid_approval_token?(session, session_token) do
+         true <- valid_approval_token?(session, session_token),
+         :ok <- ensure_session_not_expired(session) do
       {:ok, serialize_session(session)}
     else
       nil -> {:error, {:not_found, "Trust session not found"}}
       false -> {:error, {:not_found, "Trust session not found"}}
+      {:error, _} = error -> error
     end
   end
 
@@ -230,8 +232,6 @@ defmodule PlatformPhx.Agentbook do
     session
     |> Session.update_changeset(%{
       status: normalized.status,
-      proof_payload: normalized.proof_payload || session.proof_payload,
-      tx_request: normalized.tx_request || session.tx_request,
       world_human_id: normalized.world_human_id || session.world_human_id,
       error_text: normalized.error_text,
       connector_uri: normalized.connector_uri || session.connector_uri,
@@ -246,10 +246,7 @@ defmodule PlatformPhx.Agentbook do
        ) do
     with {:ok, world_human_id} <- fetch_world_human_id(session),
          :ok <- ensure_human_can_claim_world_id(human, world_human_id),
-         :ok <- ensure_world_id_not_claimed_by_other_human(human, world_human_id),
-         {:ok, _updated_human} <- attach_world_id_to_human(human, world_human_id),
-         {:ok, _link} <- upsert_link(session, human, world_human_id),
-         {:ok, finalized} <- attach_session_world_identity(session, human, world_human_id) do
+         {:ok, finalized} <- finalize_registered_session(session, human, world_human_id) do
       {:ok, finalized}
     end
   end
@@ -279,13 +276,24 @@ defmodule PlatformPhx.Agentbook do
        {:conflict,
         "This signed-in person is already linked to a different human-backed trust record"}}
 
-  defp ensure_world_id_not_claimed_by_other_human(%HumanUser{id: human_id}, world_human_id) do
-    case Repo.one(
-           from human in HumanUser,
-             where: human.world_human_id == ^world_human_id and human.id != ^human_id,
-             select: human.id,
-             limit: 1
-         ) do
+  defp ensure_world_id_not_claimed_by_other_human(%HumanUser{id: human_id}, world_human_id, opts) do
+    lock = Keyword.get(opts, :lock)
+
+    query =
+      if is_binary(lock) do
+        from human in HumanUser,
+          where: human.world_human_id == ^world_human_id and human.id != ^human_id,
+          select: human.id,
+          limit: 1,
+          lock: "FOR UPDATE"
+      else
+        from human in HumanUser,
+          where: human.world_human_id == ^world_human_id and human.id != ^human_id,
+          select: human.id,
+          limit: 1
+      end
+
+    case Repo.one(query) do
       nil ->
         :ok
 
@@ -294,13 +302,6 @@ defmodule PlatformPhx.Agentbook do
          {:conflict,
           "This human-backed trust record is already attached to another signed-in person"}}
     end
-  end
-
-  defp attach_world_id_to_human(%HumanUser{} = human, world_human_id) do
-    Accounts.update_human(human, %{
-      world_human_id: world_human_id,
-      world_verified_at: DateTime.utc_now() |> DateTime.truncate(:second)
-    })
   end
 
   defp upsert_link(%Session{} = session, %HumanUser{} = human, world_human_id) do
@@ -342,17 +343,14 @@ defmodule PlatformPhx.Agentbook do
           last_verified_at: now
         })
         |> Repo.insert()
-    end
-  end
+        |> case do
+          {:ok, link} ->
+            {:ok, link}
 
-  defp attach_session_world_identity(%Session{} = session, %HumanUser{} = human, world_human_id) do
-    session
-    |> Session.update_changeset(%{
-      world_human_id: world_human_id,
-      platform_human_user_id: human.id,
-      error_text: nil
-    })
-    |> Repo.update()
+          {:error, changeset} ->
+            handle_link_insert_conflict(identity, world_human_id, human, session, changeset)
+        end
+    end
   end
 
   defp unique_agent_count(nil), do: 0
@@ -381,7 +379,7 @@ defmodule PlatformPhx.Agentbook do
       expires_at: DateTime.to_iso8601(session.expires_at),
       error_text: session.error_text,
       frontend_request: frontend_request(session),
-      tx_request: session.tx_request,
+      tx_request: nil,
       trust:
         case link_for_session(session) do
           %Link{} = link ->
@@ -481,8 +479,6 @@ defmodule PlatformPhx.Agentbook do
          allow_legacy_proofs: Map.get(created, :allow_legacy_proofs, false),
          connector_uri: Map.get(created, :connector_uri),
          deep_link_uri: Map.get(created, :deep_link_uri),
-         proof_payload: Map.get(created, :proof_payload),
-         tx_request: serialize_tx_request(Map.get(created, :tx_request)),
          status: status_string(status),
          world_human_id: Map.get(created, :human_id),
          error_text: Map.get(created, :error_text),
@@ -494,15 +490,34 @@ defmodule PlatformPhx.Agentbook do
   end
 
   defp normalize_updated_session(updated) when is_map(updated) do
-    %{
-      status: status_string(Map.get(updated, :status)),
-      proof_payload: Map.get(updated, :proof_payload),
-      tx_request: serialize_tx_request(Map.get(updated, :tx_request)),
-      world_human_id: Map.get(updated, :human_id),
-      error_text: Map.get(updated, :error_text),
-      connector_uri: Map.get(updated, :connector_uri),
-      deep_link_uri: Map.get(updated, :deep_link_uri)
-    }
+    status = status_string(Map.get(updated, :status))
+
+    if status == "proof_ready" do
+      error_text =
+        case Map.get(updated, :error_text) do
+          value when is_binary(value) and value != "" ->
+            "This trust request needs a wallet step that is not available in this approval flow. #{value}"
+
+          _ ->
+            "This trust request needs a wallet step that is not available in this approval flow."
+        end
+
+      %{
+        status: "failed",
+        world_human_id: Map.get(updated, :human_id),
+        error_text: error_text,
+        connector_uri: Map.get(updated, :connector_uri),
+        deep_link_uri: Map.get(updated, :deep_link_uri)
+      }
+    else
+      %{
+        status: status,
+        world_human_id: Map.get(updated, :human_id),
+        error_text: Map.get(updated, :error_text),
+        connector_uri: Map.get(updated, :connector_uri),
+        deep_link_uri: Map.get(updated, :deep_link_uri)
+      }
+    end
   end
 
   defp same_identity?(%Session{} = session, identity) do
@@ -525,6 +540,14 @@ defmodule PlatformPhx.Agentbook do
     end
   end
 
+  defp ensure_session_not_expired(%Session{} = session) do
+    if DateTime.compare(DateTime.utc_now(), session.expires_at) == :lt do
+      :ok
+    else
+      {:error, {:not_found, "Trust session not found"}}
+    end
+  end
+
   defp to_world_session(%Session{} = session) do
     %{
       session_id: session.session_id,
@@ -543,28 +566,101 @@ defmodule PlatformPhx.Agentbook do
       connector_uri: session.connector_uri,
       deep_link_uri: session.deep_link_uri,
       expires_at: session.expires_at,
-      proof_payload: session.proof_payload,
-      tx_request: session.tx_request,
+      proof_payload: nil,
+      tx_request: nil,
       tx_hash: nil,
       human_id: session.world_human_id,
       error_text: session.error_text
     }
   end
 
-  defp serialize_tx_request(nil), do: nil
+  defp finalize_registered_session(%Session{} = session, %HumanUser{} = human, world_human_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-  defp serialize_tx_request(%AgentWorld.TxRequest{} = request) do
-    %{
-      to: request.to,
-      data: request.data,
-      value: request.value,
-      chain_id: request.chain_id,
-      description: request.description
-    }
+    Multi.new()
+    |> Multi.run(:human, fn repo, _changes ->
+      locked_human =
+        repo.one!(
+          from locked in HumanUser,
+            where: locked.id == ^human.id,
+            lock: "FOR UPDATE"
+        )
+
+      with :ok <- ensure_human_can_claim_world_id(locked_human, world_human_id),
+           :ok <-
+             ensure_world_id_not_claimed_by_other_human(locked_human, world_human_id,
+               lock: "FOR UPDATE"
+             ) do
+        locked_human
+        |> HumanUser.changeset(%{
+          world_human_id: world_human_id,
+          world_verified_at: now
+        })
+        |> repo.update()
+        |> case do
+          {:ok, updated_human} ->
+            {:ok, updated_human}
+
+          {:error, changeset} ->
+            map_human_update_error(changeset)
+        end
+      end
+    end)
+    |> Multi.run(:link, fn _repo, %{human: updated_human} ->
+      upsert_link(session, updated_human, world_human_id)
+    end)
+    |> Multi.run(:session, fn repo, %{human: updated_human} ->
+      session
+      |> Session.update_changeset(%{
+        world_human_id: world_human_id,
+        platform_human_user_id: updated_human.id,
+        error_text: nil
+      })
+      |> repo.update()
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{session: finalized}} ->
+        {:ok, finalized}
+
+      {:error, _step, {:error, reason}, _changes} ->
+        {:error, reason}
+
+      {:error, _step, reason, _changes} ->
+        {:error, reason}
+    end
   end
 
-  defp serialize_tx_request(value) when is_map(value), do: value
-  defp serialize_tx_request(_value), do: nil
+  defp map_human_update_error(%Ecto.Changeset{} = changeset) do
+    if Keyword.has_key?(changeset.errors, :world_human_id) do
+      {:error,
+       {:conflict,
+        "This human-backed trust record is already attached to another signed-in person"}}
+    else
+      {:error, {:unavailable, "The human-backed trust record could not be saved"}}
+    end
+  end
+
+  defp handle_link_insert_conflict(identity, world_human_id, %HumanUser{} = human, session, _changeset) do
+    case link_for_identity(identity) do
+      %Link{world_human_id: ^world_human_id} = link ->
+        link
+        |> Link.changeset(%{
+          platform_human_user_id: human.id,
+          source: session.source,
+          last_verified_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update()
+
+      %Link{} ->
+        {:error,
+         {:conflict,
+          "This Regent agent is already linked to a different human-backed trust record"}}
+
+      nil ->
+        {:error, {:unavailable, "The Regent agent trust link could not be saved"}}
+    end
+  end
 
   defp fetch_required(map, key) do
     case Map.get(map, key) do

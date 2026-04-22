@@ -47,5 +47,6 @@ defmodule PlatformPhx.Accounts.HumanUser do
       "past_due"
     ])
     |> unique_constraint(:privy_user_id)
+    |> unique_constraint(:world_human_id)
   end
 end

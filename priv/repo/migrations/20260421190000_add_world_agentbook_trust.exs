@@ -7,7 +7,9 @@ defmodule PlatformPhx.Repo.Migrations.AddWorldAgentbookTrust do
       add :world_verified_at, :utc_datetime
     end
 
-    create index(:platform_human_users, [:world_human_id])
+    create unique_index(:platform_human_users, [:world_human_id],
+             where: "world_human_id IS NOT NULL"
+           )
 
     create table(:platform_world_agent_links) do
       add :wallet_address, :string, null: false
@@ -53,8 +55,6 @@ defmodule PlatformPhx.Repo.Migrations.AddWorldAgentbookTrust do
       add :allow_legacy_proofs, :boolean, null: false, default: false
       add :connector_uri, :text
       add :deep_link_uri, :text
-      add :proof_payload, :map
-      add :tx_request, :map
       add :status, :string, null: false
       add :world_human_id, :string
       add :platform_human_user_id, references(:platform_human_users, on_delete: :nilify_all)
