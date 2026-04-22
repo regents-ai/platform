@@ -80,7 +80,7 @@ defmodule PlatformPhxWeb.Discovery do
       "name" => "Regents Site Agent",
       "version" => app_version(),
       "description" =>
-        "Read-only discovery surface for the Regent website, its public contracts, and the published Regents CLI skill.",
+        "Read-only discovery surface for the Regents website, its public contracts, and the published Regents CLI skill.",
       "documentationUrl" => SiteUrl.absolute_url("/docs"),
       "url" => SiteUrl.absolute_url("/"),
       "supportedInterfaces" => [
@@ -89,7 +89,7 @@ defmodule PlatformPhxWeb.Discovery do
           "serviceUrl" => SiteUrl.absolute_url("/"),
           "transportProtocol" => "https",
           "description" =>
-            "Public discovery documents and entry pages for the Regent website and Regents CLI."
+            "Public discovery documents and entry pages for the Regents website and Regents CLI."
         }
       ],
       "capabilities" => %{
@@ -132,7 +132,7 @@ defmodule PlatformPhxWeb.Discovery do
         "version" => app_version()
       },
       "description" =>
-        "Public discovery card for Regent website resources, contracts, and the published Regents CLI skill.",
+        "Public discovery card for the Regents website resources, contracts, and the published Regents CLI skill.",
       "documentationUrl" => SiteUrl.absolute_url("/docs"),
       "capabilities" => %{
         "resources" => true,

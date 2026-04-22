@@ -1,6 +1,6 @@
 # Platform
 
-This app is the Regent website for guided account setup, company launch, and public company pages.
+This app is the Regents website for guided account setup, company launch, and public company pages.
 
 It covers the guided website path in one place:
 
@@ -11,7 +11,7 @@ It covers the guided website path in one place:
 
 ## What The Site Is For
 
-Use this app when a person needs the guided Regent path in the browser.
+Use this app when a person needs the guided Regents path in the browser.
 
 Today that mostly means:
 
