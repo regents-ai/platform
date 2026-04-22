@@ -39,7 +39,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
     with {:ok, service} <-
            SpriteRuntimeClient.service_state(
              agent.sprite_name,
-             agent.sprite_service_name || "paperclip"
+             agent.sprite_service_name || "hermes-workspace"
            ) do
       observed_state = service.state
       agent = persist_observed_state(agent, observed_state)
@@ -48,7 +48,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
         agent.desired_runtime_state == "paused" ->
           ensure_paused(agent)
 
-        runtime_allowed?(agent, billing_account) ->
+        runtime_allowed?(agent, billing_account, now) ->
           reconcile_running_runtime(agent, billing_account, observed_state, now)
 
         true ->
@@ -68,24 +68,18 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
 
   defp reconcile_running_runtime(agent, %BillingAccount{} = billing_account, "active", now) do
     if trial_active?(agent, now) do
-      agent
-      |> Agent.changeset(%{runtime_last_checked_at: now, runtime_status: "ready"})
-      |> Repo.update!()
+      mark_runtime_ready(agent, now)
     else
       bill_runtime_window(agent, billing_account, now)
     end
   end
 
   defp reconcile_running_runtime(agent, _billing_account, "active", now) do
-    agent
-    |> Agent.changeset(%{runtime_last_checked_at: now, runtime_status: "ready"})
-    |> Repo.update!()
+    mark_runtime_ready(agent, now)
   end
 
   defp reconcile_running_runtime(agent, _billing_account, _observed_state, now) do
-    agent
-    |> Agent.changeset(%{runtime_last_checked_at: now, runtime_status: "ready"})
-    |> Repo.update!()
+    mark_runtime_ready(agent, now)
   end
 
   defp bill_runtime_window(agent, billing_account, now) do
@@ -150,7 +144,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
             Agent.changeset(locked_agent, %{
               runtime_last_checked_at: now,
               runtime_status:
-                if(runtime_allowed?(locked_agent, updated_account),
+                if(runtime_allowed?(locked_agent, updated_account, now),
                   do: "ready",
                   else: "paused_for_credits"
                 )
@@ -161,7 +155,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
           |> SyncSpriteUsageRecordWorker.new()
           |> Oban.insert!()
 
-          {usage_record, updated_account, runtime_allowed?(locked_agent, updated_account)}
+          {usage_record, updated_account, runtime_allowed?(locked_agent, updated_account, now)}
         end)
 
       if runtime_allowed_after_charge? do
@@ -205,22 +199,25 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
     end
   end
 
-  defp load_billing_account(%Agent{owner_human_id: nil}), do: nil
-
   defp load_billing_account(agent) do
     Repo.one(
       from account in BillingAccount, where: account.human_user_id == ^agent.owner_human_id
     )
   end
 
-  defp runtime_allowed?(agent, billing_account) do
-    trial_active?(agent, DateTime.utc_now() |> DateTime.truncate(:second)) or
-      AgentPlatform.billing_allows_runtime?(billing_account)
+  defp runtime_allowed?(agent, billing_account, now) do
+    trial_active?(agent, now) or AgentPlatform.billing_allows_runtime?(billing_account)
   end
 
   defp trial_active?(agent, now) do
     is_struct(agent.sprite_free_until, DateTime) and
       DateTime.compare(agent.sprite_free_until, now) == :gt
+  end
+
+  defp mark_runtime_ready(agent, now) do
+    agent
+    |> Agent.changeset(%{runtime_last_checked_at: now, runtime_status: "ready"})
+    |> Repo.update!()
   end
 
   defp runtime_charge_cents(seconds) when seconds > 0 do
