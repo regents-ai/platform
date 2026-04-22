@@ -211,10 +211,12 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
     assert get_in(detached, [:agent, :ens, :attached]) == false
     assert detached.cleanup.forward.chain_id == 1
     assert detached.cleanup.ensip25.chain_id == 1
+
     case detached.cleanup.erc8004 do
       :blocked -> assert true
       erc8004 -> assert erc8004.chain_id == 8453
     end
+
     assert detached.cleanup.reverse.chain_id == 1
 
     detached_claim = Repo.get!(Mint, claim.id)
@@ -247,10 +249,12 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
     assert is_boolean(response.prepared.plan.forward_resolution_verified)
     assert response.prepared.forward in [:noop, :blocked]
     assert response.prepared.ensip25.chain_id == 1
+
     case response.prepared.erc8004 do
       :blocked -> assert true
       erc8004 -> assert erc8004.chain_id == 8453
     end
+
     assert response.prepared.reverse.chain_id == 1
     assert response.prepared.cleanup.forward == :noop
     assert response.prepared.plan.ensip25_key =~ "agent-registration[0x0001000002210514"
