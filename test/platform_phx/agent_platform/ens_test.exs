@@ -176,12 +176,14 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
              })
 
     assert get_in(attached, [:agent, :ens, :name]) == "tempoattach.regent.eth"
-
-    case attached.prepared.forward do
-      :noop -> assert true
-      :blocked -> assert true
-      forward -> assert forward.chain_id == 1
-    end
+    assert attached.prepared.forward == :noop
+    assert attached.prepared.ensip25.action == "write_ensip25_proof"
+    assert attached.prepared.ensip25.chain_id == 1
+    assert attached.prepared.erc8004.action == "update_agent_registration"
+    assert attached.prepared.erc8004.chain_id == 8453
+    assert attached.prepared.reverse.action == "set_primary_name"
+    assert attached.prepared.reverse.chain_id == 1
+    assert attached.prepared.plan.forward_resolution_verified == true
 
     reloaded_claim = Repo.get!(Mint, claim.id)
     assert reloaded_claim.attached_agent_slug == agent.slug
@@ -211,12 +213,8 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
     assert get_in(detached, [:agent, :ens, :attached]) == false
     assert detached.cleanup.forward.chain_id == 1
     assert detached.cleanup.ensip25.chain_id == 1
-
-    case detached.cleanup.erc8004 do
-      :blocked -> assert true
-      erc8004 -> assert erc8004.chain_id == 8453
-    end
-
+    assert detached.cleanup.erc8004.action == "clear_agent_registration_name"
+    assert detached.cleanup.erc8004.chain_id == 8453
     assert detached.cleanup.reverse.chain_id == 1
 
     detached_claim = Repo.get!(Mint, claim.id)
@@ -246,17 +244,17 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
              })
 
     assert response.prepared.plan.ens_name == "tempolink.regent.eth"
-    assert is_boolean(response.prepared.plan.forward_resolution_verified)
-    assert response.prepared.forward in [:noop, :blocked]
+    assert response.prepared.plan.forward_resolution_verified == true
+    assert response.prepared.forward == :noop
+    assert response.prepared.ensip25.action == "write_ensip25_proof"
     assert response.prepared.ensip25.chain_id == 1
-
-    case response.prepared.erc8004 do
-      :blocked -> assert true
-      erc8004 -> assert erc8004.chain_id == 8453
-    end
-
+    assert response.prepared.erc8004.action == "update_agent_registration"
+    assert response.prepared.erc8004.chain_id == 8453
+    assert response.prepared.reverse.action == "set_primary_name"
     assert response.prepared.reverse.chain_id == 1
     assert response.prepared.cleanup.forward == :noop
+    assert response.prepared.plan.erc8004_status == "ens_service_mismatch"
+    assert response.prepared.plan.ensip25_status == "ens_record_missing"
     assert response.prepared.plan.ensip25_key =~ "agent-registration[0x0001000002210514"
   end
 

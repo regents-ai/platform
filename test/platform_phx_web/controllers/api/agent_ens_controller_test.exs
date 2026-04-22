@@ -204,7 +204,10 @@ defmodule PlatformPhxWeb.Api.AgentEnsControllerTest do
       |> json_response(200)
 
     assert attached["claim"]["attached_agent_slug"] == agent.slug
-    assert attached["prepared"]["forward"] in ["noop", %{"action" => "write_forward_address"}]
+    assert attached["prepared"]["forward"] == "noop"
+    assert attached["prepared"]["ensip25"]["action"] == "write_ensip25_proof"
+    assert attached["prepared"]["erc8004"]["action"] == "update_agent_registration"
+    assert attached["prepared"]["reverse"]["action"] == "set_primary_name"
 
     planned =
       conn
@@ -229,7 +232,10 @@ defmodule PlatformPhxWeb.Api.AgentEnsControllerTest do
       })
       |> json_response(200)
 
-    assert prepared["prepared"]["forward"] in ["noop", %{"chain_id" => 1}]
+    assert prepared["prepared"]["forward"] == "noop"
+    assert prepared["prepared"]["ensip25"]["action"] == "write_ensip25_proof"
+    assert prepared["prepared"]["erc8004"]["action"] == "update_agent_registration"
+    assert prepared["prepared"]["reverse"]["action"] == "set_primary_name"
     assert prepared["prepared"]["cleanup"]["forward"] == "noop"
   end
 
