@@ -3,8 +3,45 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
 
   def intro do
     [
-      "Regents CLI is the local tool for work that starts on your machine. Use it for Techtree work, Autolaunch work, reporting, and repeatable terminal runs through the published `@regentslabs/cli` package.",
-      "Use the Regent website for guided account tasks such as checking wallet access, claiming names, adding billing, and launching a company. Use Regents CLI when the work moves onto the local machine or into an agent."
+      "The local tool for working with the Regents platform.",
+      "One CLI for company setup, Techtree, Autolaunch, and day-to-day operator work."
+    ]
+  end
+
+  def hero_highlights do
+    [
+      %{
+        icon: "hero-command-line",
+        title: "Local first",
+        body: "All commands run on your machine."
+      },
+      %{
+        icon: "hero-shield-check",
+        title: "Secure by default",
+        body: "Your keys stay local. You stay in control."
+      },
+      %{
+        icon: "hero-arrow-path",
+        title: "Built for repeatability",
+        body: "Run it once, then run it again with less guesswork."
+      }
+    ]
+  end
+
+  def hero_quick_start_steps do
+    [
+      %{
+        title: "Install globally with pnpm",
+        command: "pnpm add -g @regentslabs/cli"
+      },
+      %{
+        title: "Create the local workspace",
+        command: "regents create init"
+      },
+      %{
+        title: "Start the guided path",
+        command: "regents techtree start"
+      }
     ]
   end
 
@@ -18,40 +55,185 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
     ]
   end
 
+  def quick_start_steps do
+    [
+      %{
+        title: "Install Regents CLI",
+        command: "pnpm add -g @regentslabs/cli",
+        note: "Put the CLI on the machine that will handle the work."
+      },
+      %{
+        title: "Create the local workspace",
+        command: "regents create init",
+        note: "Set up the working files once so later runs stay organized."
+      },
+      %{
+        title: "Export the wallet line",
+        command: "regents create wallet --write-env",
+        note: "Paste the printed line into your shell before you continue."
+      },
+      %{
+        title: "Start the guided path",
+        command: "regents techtree start",
+        note: "Let the CLI check the machine and tell you the next move."
+      }
+    ]
+  end
+
   def quick_start_note do
-    "If `regents techtree start` needs to mint a new identity, the selected wallet also needs Sepolia ETH and a working Sepolia RPC URL."
+    "If the machine is new, run `regents create wallet --write-env` and paste the printed line into your shell before you continue."
   end
 
   def techtree_start_intro do
-    "`regents techtree start` is the best first command for most people because it prepares the machine and tells you the next move."
+    "`regents techtree start` is the best first command for most people because it prepares the machine and tells you what to do next."
   end
 
   def techtree_start_steps do
     [
       "create or reuse the local config file",
       "make sure the working folders exist",
-      "check that a wallet key is available",
-      "start the local runtime if it is not already running",
+      "check that a wallet key is ready",
+      "bring up the local service if the flow needs it",
       "help you choose or mint a Techtree identity",
       "sign that identity in",
       "check Techtree and BBH readiness",
-      "print the next commands for the current machine"
+      "print the next commands for this machine"
+    ]
+  end
+
+  def work_loop do
+    [
+      %{
+        icon: "hero-command-line",
+        title: "You run a command",
+        body: "Locally from your terminal."
+      },
+      %{
+        icon: "hero-sparkles",
+        title: "Techtree does the work",
+        body: "Research, flows, and changes."
+      },
+      %{
+        icon: "hero-document-text",
+        title: "You get a report",
+        body: "What changed and why."
+      },
+      %{
+        icon: "hero-arrow-path",
+        title: "You run it again",
+        body: "Iterate safely. Keep improving."
+      }
+    ]
+  end
+
+  def best_first_marks do
+    [
+      %{
+        icon: "hero-eye",
+        title: "Understand",
+        body: "Map your project."
+      },
+      %{
+        icon: "hero-wrench-screwdriver",
+        title: "Improve",
+        body: "Apply flows."
+      },
+      %{
+        icon: "hero-document-text",
+        title: "Report",
+        body: "See results."
+      },
+      %{
+        icon: "hero-arrow-trending-up",
+        title: "Repeat",
+        body: "Keep it current."
+      }
+    ]
+  end
+
+  def common_rule_cards do
+    [
+      %{
+        icon: "hero-computer-desktop",
+        title: "Local first",
+        body: "Commands run on your machine."
+      },
+      %{
+        icon: "hero-magnifying-glass",
+        title: "Inspect before change",
+        body: "Review the plan and diff before anything is written."
+      },
+      %{
+        icon: "hero-arrow-path",
+        title: "Idempotent by design",
+        body: "Safe to run repeatedly without duplicate work."
+      },
+      %{
+        icon: "hero-code-bracket",
+        title: "Small, focused changes",
+        body: "Precise edits over broad rewrites."
+      },
+      %{
+        icon: "hero-lock-closed",
+        title: "You're in control",
+        body: "Commit, rollback, or ignore. Your call."
+      }
+    ]
+  end
+
+  def command_tiles do
+    [
+      %{
+        icon: "hero-sparkles",
+        title: "Start Techtree",
+        command: "regents techtree start",
+        note: "Run Techtree on your codebase."
+      },
+      %{
+        icon: "hero-list-bullet",
+        title: "See flows",
+        command: "regents techtree flows",
+        note: "List available flows."
+      },
+      %{
+        icon: "hero-wrench-screwdriver",
+        title: "Apply a flow",
+        command: "regents techtree apply <flow>",
+        note: "Apply a specific flow."
+      },
+      %{
+        icon: "hero-chart-bar-square",
+        title: "Review the report",
+        command: "regents techtree report",
+        note: "View the latest report."
+      },
+      %{
+        icon: "hero-rocket-launch",
+        title: "Plan the launch",
+        command: "regents autolaunch plan",
+        note: "Plan your launch."
+      },
+      %{
+        icon: "hero-play",
+        title: "Start the launch process",
+        command: "regents autolaunch start",
+        note: "Start the launch process."
+      }
     ]
   end
 
   def mental_model do
     [
       [
-        code("regents.sh/app"),
-        text(" and "),
-        code("regents.sh/app/dashboard"),
-        text(" handle guided setup, billing, company opening, and hosted company control.")
+        text("The "),
+        code("App"),
+        text(" handles access, identity, billing, company opening, and hosted company control.")
       ],
       [
         code("regents create ..."),
         text(" and "),
         code("regents config ..."),
-        text(" set up and inspect machine-local state.")
+        text(" set up and inspect local working state.")
       ],
       [
         code("regents techtree start"),
@@ -59,11 +241,11 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
       ],
       [
         code("regents run"),
-        text(" keeps the local runtime available for commands that need it.")
+        text(" keeps the local service available for commands that depend on it.")
       ],
       [
         code("regents auth siwa ..."),
-        text(" signs the local operator into Techtree.")
+        text(" signs the operator into Techtree.")
       ],
       [
         code("regents techtree ..."),
@@ -83,7 +265,7 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
         code("regents regent-staking ..."),
         text(", and "),
         code("regents gossipsub ..."),
-        text(" are adjacent surfaces shipped from the same binary.")
+        text(" are adjacent lanes shipped from the same binary.")
       ]
     ]
   end
@@ -91,19 +273,17 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
   def common_rules do
     [
       [
-        text(
-          "The CLI is JSON-first. In a human terminal it may render a formatted panel, but non-interactive output stays machine-readable JSON."
-        )
+        text("The CLI keeps results clear for people and easy for agents to pass along.")
       ],
       [
-        text(
-          "Use the Regent website when you need wallet access checks, claimed names, billing, or company launch."
-        )
+        text("Use the "),
+        code("App"),
+        text(" when the next job is wallet access, claimed names, billing, or company launch.")
       ],
       [
         text("Use "),
         code("--config /absolute/path.json"),
-        text(" to point at a non-default local config file.")
+        text(" to point at a specific workspace when you need to keep runs separate.")
       ],
       [
         text("For flags documented as "),
@@ -112,22 +292,19 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
         code("@file.json"),
         text(", prefix the path with "),
         code("@"),
-        text(" to read the value from disk.")
+        text(" when you want the command to read the value from disk.")
       ],
       [
-        text("Daemon-backed commands need the local runtime socket to be reachable.")
-      ],
-      [
-        text("Start with "),
-        code("regents techtree start"),
-        text(" unless you already know you need the lower-level steps.")
-      ],
-      [
-        text("Some commands are intentionally long-running, such as "),
+        text("Some commands stay open while the work continues, such as "),
         code("regents run"),
         text(" and "),
         code("regents chatbox tail"),
         text(".")
+      ],
+      [
+        text("Start with "),
+        code("regents techtree start"),
+        text(" unless you already know the exact path you need.")
       ]
     ]
   end
@@ -144,7 +321,7 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
         ],
         [
           text(
-            "Start here on a new machine. The guided start tells you what is missing, while the other commands let you inspect the same setup directly."
+            "Start here on a new machine. The guided start shows what is missing, while the other commands let you inspect the same setup directly."
           )
         ]
       ),
@@ -159,7 +336,7 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
         ],
         [
           text(
-            "Use these when you want to inspect or control each setup step directly instead of staying inside the guided start."
+            "Use these when you want to inspect or control each setup step directly instead of staying inside the guided path."
           )
         ]
       ),
@@ -175,7 +352,7 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
         ],
         [
           text(
-            "These are the safest commands to reach for when you want to understand the current graph, recent activity, or work available to the current operator."
+            "Reach for these when you want to understand the live tree, recent activity, or work available to the current operator."
           )
         ]
       ),
@@ -192,7 +369,7 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
         ],
         [
           text(
-            "Use these when you are ready to create nodes, attach comments, or publish structured skill and eval workspaces."
+            "Use these when you are ready to create nodes, add comments, or publish skill and eval work."
           )
         ]
       ),
@@ -227,7 +404,9 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
           code("history"),
           text(" or "),
           code("tail"),
-          text(", the CLI defaults to the webapp room. CLI posting is agent-room only.")
+          text(
+            ", the shared room opens by default. Posting from the CLI always goes to the agent room."
+          )
         ]
       ),
       group(
@@ -244,7 +423,7 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
         ],
         [
           text(
-            "Use these when you move beyond Techtree into launch operations, shader avatar export for ERC-8004 identities, messaging, registry lookups, staking, or transport inspection."
+            "Use these when the work moves beyond Techtree into launch planning, avatar export, messaging, registry lookups, staking, or transport checks."
           )
         ]
       )
@@ -254,17 +433,46 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
   def guidance do
     [
       [
+        text("For humans, start in the "),
+        code("App"),
         text(
-          "For humans, start on the Regent website for account and company setup, then use Regents CLI when the work moves onto the local machine."
+          " for account and company setup, then move into Regents CLI when the work moves onto the local machine."
         )
       ],
       [
-        text("For agents, prefer non-interactive runs, pin "),
+        text("For agents, prefer repeatable runs, pin "),
         code("--config"),
         text(
-          " when reproducibility matters, and treat Regents CLI as a JSON-first local interface."
+          " when reproducibility matters, and treat Regents CLI as the local lane for work they can rerun."
         )
       ]
+    ]
+  end
+
+  def guidance_cards do
+    [
+      %{
+        title: "For humans",
+        icon: "hero-user",
+        href: "/app",
+        cta: "Go to App setup",
+        points: [
+          "Start small and iterate.",
+          "Review the plan and diff.",
+          "Commit when you're happy."
+        ]
+      },
+      %{
+        title: "For agents",
+        icon: "hero-cpu-chip",
+        href: "/docs",
+        cta: "Read Docs",
+        points: [
+          "Follow the CLI contract.",
+          "Prefer safe, incremental changes.",
+          "Report clearly. Don't guess."
+        ]
+      }
     ]
   end
 

@@ -22,7 +22,7 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
       "",
       "Form your agent company.",
       "",
-      "Use the Regent website for guided setup, company launch, and public company pages. Use Regents CLI when the work moves onto a machine or into an agent.",
+      "Use the App for guided setup, company launch, and public company pages. Use Regents CLI when the work moves onto a machine or into an agent.",
       "",
       "## Start here",
       "",
@@ -35,7 +35,7 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
       "",
       "- Guided wallet access and name claim steps in one place.",
       "- A clear path into Agent Formation and the live company page.",
-      "- One local CLI surface for Techtree, Autolaunch, automation, and repeatable terminal work."
+      "- One local CLI surface for Techtree, Autolaunch, automation, and repeatable local work."
     ]
     |> Enum.join("\n")
   end
@@ -51,6 +51,37 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
       "- Continue into billing and company launch.",
       "",
       "If the next work starts on a machine instead, use Regents CLI."
+    ]
+    |> Enum.join("\n")
+  end
+
+  def docs_markdown do
+    [
+      "# Docs",
+      "",
+      "Start here when you want the short version of where each Regent surface fits.",
+      "",
+      "## The path",
+      "",
+      "- Start in the App for access, identity, billing, and company opening.",
+      "- Use the public company page after launch when you want the live company home.",
+      "- Move into Regents CLI when the next step belongs on a machine.",
+      "- Keep Techtree and Autolaunch as the two main work lanes after setup is ready.",
+      "",
+      "## What this page covers",
+      "",
+      "- The App for guided setup and company control.",
+      "- The public company page after launch.",
+      "- Regents CLI for local work that needs a machine.",
+      "- Techtree and Autolaunch after setup is ready.",
+      "",
+      "## Quick links",
+      "",
+      "- `/app` for guided setup.",
+      "- `/cli` for local work.",
+      "- `/techtree` for research and publishing.",
+      "- `/autolaunch` for launch planning and live market work.",
+      "- `/bug-report` for the public bug report ledger."
     ]
     |> Enum.join("\n")
   end
@@ -79,7 +110,9 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
       "",
       quick_start_note,
       "",
-      "## Start with `regents techtree start`",
+      "## Best first command",
+      "",
+      "Start with `regents techtree start`.",
       "",
       techtree_start_intro,
       ""
@@ -89,7 +122,7 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
       "",
       "## Mental model",
       "",
-      "The CLI handles local work. The Regent website handles guided account and company setup.",
+      "Keep the local path simple: run a command, let the work happen, review the result, then run it again.",
       ""
     ])
     |> Kernel.++(Enum.map(mental_model, &"- #{fragments_to_markdown(&1)}"))
@@ -144,7 +177,7 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
       "",
       "## Agent skill",
       "",
-      "Use the published Regents CLI skill at `/agent-skills/regents-cli.md` when an agent needs to decide when to stay in the website and when to move into local Techtree work."
+      "Use the published Regents CLI skill at `/agent-skills/regents-cli.md` when an agent needs to decide when to stay in the App and when to move into local Techtree work."
     ]
     |> Enum.join("\n")
   end
@@ -188,13 +221,13 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
     [
       "# Regents CLI skill",
       "",
-      "Use Regents CLI when the work starts on a machine or inside an agent. Use the Regent website for guided wallet access, claimed names, billing, and company launch.",
+      "Use Regents CLI when the work starts on a machine or inside an agent. Use the App for guided wallet access, claimed names, billing, and company launch.",
       "",
       "## When to use this skill",
       "",
-      "- The task needs local files, local runtime access, or repeatable terminal commands.",
+      "- The task needs local files, local service access, or repeatable local commands.",
       "- The next work is Techtree research, publishing, BBH work, or Autolaunch operator work.",
-      "- The agent needs a stable, JSON-first interface instead of a guided browser flow.",
+      "- The agent needs a repeatable local path instead of a guided App flow.",
       "",
       "## Quick start",
       "",
@@ -220,15 +253,15 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
       "## Working rules",
       "",
       "- Treat Regents CLI as the local surface for repeatable work.",
-      "- Prefer non-interactive runs when the agent is operating on its own.",
+      "- Prefer repeatable runs when the agent is operating on its own.",
       "- Pin `--config` when reproducibility matters.",
-      "- Stay on the website when the task is wallet access, claimed names, billing, or company launch."
+      "- Stay in the App when the task is wallet access, claimed names, billing, or company launch."
     ]
     |> Enum.join("\n")
   end
 
   def regents_cli_skill_description do
-    "Local skill for using Regents CLI for Techtree work, Autolaunch work, automation, and repeatable terminal runs."
+    "Local skill for using Regents CLI for Techtree work, Autolaunch work, automation, and repeatable local runs."
   end
 
   defp fragments_to_markdown(fragments) when is_list(fragments) do

@@ -232,7 +232,7 @@ defmodule PlatformPhxWeb.HomeLive do
                         id="home-nav-open-app"
                         class="inline-flex items-center justify-center rounded-[0.95rem] bg-[color:color-mix(in_oklch,var(--brand-ink)_88%,var(--foreground)_12%)] px-5 py-3 text-[0.98rem] text-white/95 shadow-[0_18px_40px_-28px_color-mix(in_oklch,var(--brand-ink)_65%,transparent)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_-30px_color-mix(in_oklch,var(--brand-ink)_72%,transparent)]"
                       >
-                        {if @current_human, do: "Resume formation", else: "Open app"}
+                        {if @current_human, do: "Continue setup", else: "Open app"}
                       </.link>
                     </div>
                   </header>
@@ -301,7 +301,7 @@ defmodule PlatformPhxWeb.HomeLive do
                                 />
                               </span>
                               <span class="text-[0.98rem]">
-                                {if @current_human, do: "Resume formation", else: "Open app"}
+                                {if @current_human, do: "Continue setup", else: "Open app"}
                               </span>
                               <span
                                 class="text-[1rem] transition duration-200 group-hover:translate-x-0.5"

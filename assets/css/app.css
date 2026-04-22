@@ -5302,3 +5302,62 @@ html[data-color-mode="dark"] .pp-heerich-shell-list li {
     padding: 0.25rem;
   }
 }
+
+.pp-sidebar-utility-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0.25rem 0;
+  border-radius: 0.8rem;
+  color: var(--muted-foreground);
+  transition:
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.pp-sidebar-utility-link:hover {
+  color: var(--foreground);
+  transform: translateX(2px);
+}
+
+#platform-shell-frame {
+  backdrop-filter: saturate(1.02);
+}
+
+#platform-shell-sidebar {
+  background-image:
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--sidebar) 96%, transparent),
+      color-mix(in oklch, var(--sidebar) 86%, var(--card) 14%)
+    );
+}
+
+#platform-shell-header-desktop,
+#platform-shell-header-mobile {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--background) 96%, var(--card) 4%),
+      color-mix(in oklch, var(--background) 92%, var(--card) 8%)
+    );
+}
+
+#platform-trust-root .pp-route-panel,
+#agent-site-preview-shell .pp-route-panel {
+  box-shadow: 0 22px 48px -42px color-mix(in oklch, var(--foreground) 26%, transparent);
+}
+
+html[data-color-mode="dark"] #platform-shell-frame {
+  box-shadow: 0 34px 72px -52px rgba(0, 0, 0, 0.58);
+}
+
+html[data-color-mode="dark"] #platform-shell-header-desktop,
+html[data-color-mode="dark"] #platform-shell-header-mobile {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--background) 88%, var(--card) 12%),
+      color-mix(in oklch, var(--background) 82%, var(--card) 18%)
+    );
+}

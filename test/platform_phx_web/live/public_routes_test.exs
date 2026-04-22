@@ -64,7 +64,8 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     refute html =~ "Three-step story"
     assert html =~ "The path"
     assert html =~ "What this page gives you"
-    assert html =~ "Improve the agent in Techtree. Fund it in Autolaunch."
+    assert html =~ "Open the hosted Regent company here."
+    assert html =~ "use Autolaunch when funding comes next."
     assert html =~ "href=\"/docs\""
     assert html =~ "href=\"/cli\""
     assert html =~ "href=\"/app\""
@@ -85,16 +86,27 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   end
 
   test "docs route renders in app", %{conn: conn} do
-    {:ok, _docs, html} = live(conn, "/docs")
+    {:ok, docs, html} = live(conn, "/docs")
 
     assert html =~ "platform-docs-shell"
-    assert html =~ "Use this page when you want the short version of the Regent story."
-    assert html =~ "The website is for guided setup and company launch."
+    assert html =~ "Start here"
+    assert html =~ "Copy page as markdown"
+    assert html =~ "The Regent story, short version"
+    assert html =~ "The four surfaces"
+    assert html =~ "Quick links"
+    assert html =~ "App setup"
     assert html =~ "href=\"/app\""
     assert html =~ "href=\"/cli\""
     assert html =~ "href=\"/techtree\""
     assert html =~ "href=\"/autolaunch\""
-    assert html =~ "href=\"/docs\""
+    assert html =~ "href=\"/bug-report\""
+    refute html =~ "Open app"
+    assert has_element?(docs, "#platform-shell-sidebar")
+    assert has_element?(docs, "#platform-shell-header-desktop")
+    assert has_element?(docs, "#platform-shell-header-mobile")
+    assert has_element?(docs, "#platform-docs-story")
+    assert has_element?(docs, "#platform-docs-surfaces")
+    assert has_element?(docs, "#platform-docs-quick-links")
   end
 
   test "www host renders the main home page instead of the missing subdomain state", %{
@@ -122,7 +134,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   end
 
   test "app access route renders", %{conn: conn} do
-    {:ok, _access, html} = live(conn, "/app/access")
+    {:ok, access, html} = live(conn, "/app/access")
 
     assert html =~ "App setup"
     assert html =~ "Check access"
@@ -133,6 +145,9 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "phx-hook=\"DashboardWallet\""
     assert html =~ "phx-hook=\"DashboardRedeem\""
     assert html =~ "OpenSea"
+    refute html =~ "Open app"
+    assert has_element?(access, "#platform-shell-sidebar")
+    assert has_element?(access, "#platform-shell-header-desktop")
   end
 
   test "app identity route renders clear claim guidance", %{conn: conn} do
@@ -178,7 +193,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   end
 
   test "cli route renders", %{conn: conn} do
-    {:ok, _cli, html} = live(conn, "/cli")
+    {:ok, cli, html} = live(conn, "/cli")
 
     canonical_html =
       conn
@@ -186,13 +201,15 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
       |> html_response(200)
 
     assert html =~ "Regents CLI"
-    assert html =~ "Use Regents CLI when the work starts on your machine."
+    assert html =~ "The local tool for working with the Regents platform."
     assert html =~ "Copy page as markdown"
     assert html =~ "pnpm add -g @regentslabs/cli"
     assert html =~ "regents techtree start"
-
-    assert html =~
-             "Use the website for guided setup. Use the CLI for local work and repeatable runs."
+    assert html =~ "App setup"
+    assert html =~ "View CLI docs"
+    assert has_element?(cli, "#platform-regents-cli-quick-start")
+    assert has_element?(cli, "#platform-regents-cli-commands")
+    assert has_element?(cli, "#platform-regents-cli-guidance")
 
     assert canonical_html =~ ~s(<link rel="canonical" href="http://www.example.com/cli")
     assert canonical_html =~ ~s(<meta property="og:url" content="http://www.example.com/cli")
@@ -209,8 +226,8 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
 
     assert html =~ "Anonymous public report"
     assert html =~ "Sent from the public bug report form"
-    assert html =~ "No wallet was attached to this report."
-    assert html =~ "This report came through the public form."
+    assert html =~ "No wallet attached"
+    assert html =~ "Open"
     refute html =~ "token ·"
   end
 
@@ -227,18 +244,15 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
 
     assert html =~ "Solidity Regent"
     assert html =~ "Regent company"
+    assert html =~ "Public company home"
+    assert html =~ "Company profile"
+    assert html =~ "Service menu"
     assert html =~ "Ways to work with this company"
-    assert html =~ "Public work feed"
-    assert html =~ "solidity.agent.base.eth"
-    assert html =~ "solidity.regent.eth"
-    assert html =~ "This page is the public home for the company."
+    assert html =~ "Recent finished work"
+    assert html =~ "How this company works"
     assert html =~ "Treasury Router audit"
-    assert html =~ "Company room"
-
-    assert html =~
-             "Join the room to ask questions, follow updates, and keep the company conversation in one place."
-
     refute html =~ "https://solidity.sprites.dev"
+
     assert canonical_html =~ ~s(<link rel="canonical" href="http://solidity.regents.sh/")
     assert canonical_html =~ ~s(<meta property="og:url" content="http://solidity.regents.sh/")
   end
@@ -258,12 +272,13 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
 
     assert html =~ "Owner Control Regent"
     assert html =~ "agent-site-preview-shell"
-    assert html =~ "Regent company"
+    assert html =~ "Public company home"
+    assert html =~ "Company at a glance"
     assert html =~ "Company room"
-    assert html =~ "href=\"/agents/public-output-test\""
-    refute html =~ "href=\"https://public-output-test.regents.sh/\""
-    refute html =~ "layout-wallet-control-desktop"
-    refute html =~ "layout-wallet-control-mobile"
+    assert html =~ "View all finished work"
+    assert html =~ "Finished work"
+    assert html =~ "layout-wallet-control-desktop"
+    assert html =~ "layout-wallet-control-mobile"
   end
 
   test "signed-in owner sees company controls on the public company page", %{conn: conn} do
@@ -393,10 +408,10 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   test "shader route renders", %{conn: conn} do
     {:ok, _shader, html} = live(conn, "/shader")
 
-    assert html =~ "Shader Registry"
     assert html =~ "Shader"
     assert html =~ "shader-root"
     assert html =~ "phx-hook=\"ShaderRoot\""
+    assert html =~ "platform-shader-shell"
     assert html =~ "platform-layout-root"
     assert html =~ "platform-footer-voxel-classic"
   end
@@ -522,118 +537,122 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   end
 
   test "techtree route renders", %{conn: conn} do
-    {:ok, _techtree, html} = live(conn, "/techtree")
+    {:ok, techtree, html} = live(conn, "/techtree")
 
-    assert html =~ "Shared Research and Eval Tree"
+    assert html =~ "Research • Review • Publish"
     assert html =~ "Techtree"
+    assert html =~ "Regents CLI starts the setup."
+    assert html =~ "reviewable"
+    assert html =~ "publishable"
+    assert html =~ "Open Techtree"
+    assert html =~ "View CLI"
+    assert html =~ "regents techtree start"
+    assert html =~ "Purpose"
+    assert html =~ "Tech stack"
     assert html =~ "Agent Skill"
-
-    assert html =~
-             "Start with Regents CLI, then move into Techtree for research, review, and publishing."
-
-    assert html =~ "regents techtree start"
-    assert html =~ "actual research and publishing work lives"
-
-    assert html =~
-             "After the guided start, the usual next moves are reading the live tree, publishing work, or stepping into the BBH branch for local runs, replay, and public proof."
-
-    assert html =~ "Edison Scientific and Nvidia"
-    assert html =~ "https://edisonscientific.com/articles/accelerating-science-at-scale"
-    assert html =~ "Linked tools, runtimes, research surfaces, and platforms behind Techtree."
-    assert html =~ "Privy"
-    assert html =~ "IPFS"
-    assert html =~ "Ethereum"
-    assert html =~ "Base"
-    assert html =~ "https://openclaw.sh"
+    assert html =~ "Preview"
+    assert html =~ "Primary skill: Research • Synthesis • Publishing"
+    assert html =~ "CLI rails"
+    assert html =~ "Everything you need to run Techtree from the terminal."
+    assert html =~ "Start Techtree"
+    assert html =~ "BBH-Train"
+    assert html =~ "Capsules"
+    assert html =~ "Review"
+    assert html =~ "Publish"
+    assert html =~ "Graph"
+    assert html =~ "regents techtree train"
+    assert html =~ "regents techtree capsule"
+    assert html =~ "regents techtree review"
+    assert html =~ "regents techtree publish"
+    assert html =~ "regents techtree graph"
+    assert html =~ "https://www.postgresql.org"
+    assert html =~ "https://hexdocs.pm/ecto/Ecto.html"
+    assert html =~ "https://hexdocs.pm/phoenix_live_view/welcome.html"
     assert html =~ "https://elixir-lang.org"
-    assert html =~ "https://www.phoenixframework.org"
-    assert html =~ "https://privy.io"
-    assert html =~ "https://ipfs.io"
-    assert html =~ "https://ethereum.org"
-    assert html =~ "https://base.org"
-    assert html =~ "Techtree is live at techtree.sh."
-    assert html =~ "regents techtree start"
-    assert html =~ "regents techtree autoskill publish skill"
-    assert html =~ "regents techtree bbh capsules list"
-    assert html =~ "Open techtree.sh"
-    assert html =~ "https://github.com/regents-ai/techtree"
+    assert html =~ "Open Techtree site"
     assert html =~ "https://techtree.sh"
-    assert html =~ "/agent-skills/regents-cli.md"
-    assert html =~ "Open the live Techtree site, or inspect the repo that runs it."
+    assert html =~ "The Regents CLI is your operator console."
+    refute html =~ "Open app"
     refute html =~ "Copy prompt"
     refute html =~ "Why this surface exists"
-    refute html =~ "platform-techtree-surface"
-    refute html =~ "[Techtree skill.md coming soon]"
+    assert has_element?(techtree, "#platform-shell-sidebar")
+    assert has_element?(techtree, "#platform-shell-header-desktop")
+    assert has_element?(techtree, "#platform-techtree-hero")
+    assert has_element?(techtree, "#platform-techtree-summary-grid")
+    assert has_element?(techtree, "#platform-techtree-cli-rails")
   end
 
   test "autolaunch route renders", %{conn: conn} do
-    {:ok, _autolaunch, html} = live(conn, "/autolaunch")
+    {:ok, autolaunch, html} = live(conn, "/autolaunch")
 
-    assert html =~ "Raise agent capital"
+    assert html =~ "Capital formation for agents"
     assert html =~ "Autolaunch"
-    assert html =~ "Agent Skill"
     assert html =~ "Turn agent edge into runway."
-    assert html =~ "bring in aligned backers"
-    assert html =~ "claims, staking, and revenue"
-    assert html =~ "Linked tools, runtimes, agent surfaces, and platforms behind Autolaunch."
-    assert html =~ "Privy"
-    assert html =~ "IPFS"
-    assert html =~ "Ethereum"
-    assert html =~ "Base"
-    assert html =~ "Autolaunch is live at autolaunch.sh."
-    assert html =~ "regents autolaunch prelaunch wizard"
-    assert html =~ "regents autolaunch launch finalize"
-    assert html =~ "regents autolaunch trust x-link --agent &lt;id&gt;"
-    assert html =~ "Open autolaunch.sh"
-    assert html =~ "https://github.com/regents-ai/autolaunch"
+    assert html =~ "Open Autolaunch"
+    assert html =~ "View CLI"
+    assert html =~ "The launch pipeline"
+    assert html =~ "Live preview"
+    assert html =~ "Built for agents, not tokens."
+    assert html =~ "Purpose"
+    assert html =~ "Tech stack"
+    assert html =~ "Agent Skill"
+    assert html =~ "Market activity"
+    assert html =~ "Active launches"
+    assert html =~ "Recently launched"
+    assert html =~ "Go to App setup"
+
+    assert html =~ "regents autolaunch plan"
+    assert html =~ "--name &quot;Sentinel&quot;"
+    assert html =~ "--target 250000"
+    assert html =~ "--token SRNT"
+    assert html =~ "regents autolaunch preview publish --id srnt"
+    assert html =~ "regents autolaunch launch --id srnt"
     assert html =~ "https://autolaunch.sh"
-    assert html =~ "/agent-skills/regents-cli.md"
     refute html =~ "Copy prompt"
-    assert html =~ "https://openclaw.sh"
-    assert html =~ "https://elixir-lang.org"
-    assert html =~ "https://www.phoenixframework.org"
-    assert html =~ "https://privy.io"
-    assert html =~ "https://ipfs.io"
-    assert html =~ "https://ethereum.org"
-    assert html =~ "https://base.org"
+    refute html =~ "Open app"
     refute html =~ "Why this surface exists"
-    refute html =~ "platform-autolaunch-surface"
-    refute html =~ "[Autolaunch skill.md coming soon]"
+    assert has_element?(autolaunch, "#platform-shell-sidebar")
+    assert has_element?(autolaunch, "#platform-shell-header-desktop")
+    assert has_element?(autolaunch, "#platform-autolaunch-hero")
+    assert has_element?(autolaunch, "#platform-autolaunch-summary-grid")
+    assert has_element?(autolaunch, "#platform-autolaunch-cli-rails")
   end
 
   test "regents cli route renders", %{conn: conn} do
-    {:ok, _regents_cli, html} = live(conn, "/cli")
+    {:ok, regents_cli, html} = live(conn, "/cli")
 
     assert html =~ "CLI"
     assert html =~ "Regents CLI"
     assert html =~ "Copy page as markdown"
-    assert html =~ "Use Regents CLI when the work starts on your machine."
+    assert html =~ "The local tool for working with the Regents platform."
     assert html =~ "@regentslabs/cli"
-    assert html =~ "regents create init"
-    assert html =~ "regents create wallet --write-env"
+    assert html =~ "Create the local workspace"
+    assert html =~ "Start the guided path"
     assert html =~ "regents techtree start"
-    assert html =~ "regents auth siwa login"
-    assert html =~ "The CLI is JSON-first."
-    assert html =~ "Use the Regent website for guided account tasks"
-    assert html =~ "regents chatbox history --webapp|--agent"
-    assert html =~ "CLI posting is agent-room only."
-    assert html =~ "regents autolaunch ..."
-    assert html =~ "regents shader list"
-    assert html =~ "regents shader export w3dfWN --out avatars/shard.png"
+    assert html =~ "You run a command"
+    assert html =~ "For humans"
+    assert html =~ "For agents"
+    assert html =~ "regents techtree apply &lt;flow&gt;"
+    assert html =~ "regents autolaunch plan"
+    assert html =~ "View CLI docs"
+    assert has_element?(regents_cli, "#platform-regents-cli-hero")
+    assert has_element?(regents_cli, "#platform-regents-cli-best-first-command")
+    assert has_element?(regents_cli, "#platform-regents-cli-guidance")
   end
 
   test "token info route renders", %{conn: conn} do
     {:ok, token_info, html} = live(conn, "/token-info")
 
-    assert html =~ "Token Purpose"
-    assert html =~ "$REGENT is staked to earn your share of protocol revenue."
-    assert html =~ "The majority of revenue is used to buyback $REGENT."
-    assert html =~ "Market Cap"
-    assert html =~ "FDV"
-    assert html =~ "$REGENT is live on Base"
+    assert html =~ "Revenue that stays legible from source to stake."
+    assert html =~ "$REGENT is the platform revsplit token."
+    assert html =~ "Market cap"
+    assert html =~ "Fully diluted"
+    assert html =~ "$REGENT on Base"
 
-    assert html =~ "Platform revenue token"
-    assert html =~ "Agent economies"
+    assert html =~ "Why the token exists"
+    assert html =~ "Share revenue"
+    assert html =~ "Support buybacks"
+    assert html =~ "Reward early staking"
 
     assert html =~
              "https://app.uniswap.org/explore/tokens/base/0x6f89bca4ea5931edfcb09786267b251dee752b07?inputCurrency=NATIVE"
@@ -649,42 +668,44 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "View on Dexscreener"
     assert html =~ "Autolaunch"
     assert html =~ "Techtree"
-    assert html =~ "$REGENT staking emissions"
-    assert html =~ "20% yield for initial year"
+    assert html =~ "20% first-year stream"
 
-    assert html =~
-             "Platform and Autolaunch both open the same staking rail and the same emission claims."
+    assert html =~ "same staking rail"
+    assert html =~ "same reward claims"
 
-    assert html =~ "pp-token-fee-highlight"
     assert html =~ "agent token&#39;s trading fees from the Uniswap v4 fee hook"
     assert html =~ "raised USDC in CCA auctions."
     assert html =~ "Stablecoin Revenues"
     assert html =~ "Regents Platform"
-    assert html =~ "Stake $REGENT in the protocol revsplit contract."
-    assert html =~ "Claim your stablecoin share of Regent Labs revenue anytime."
-    assert html =~ "Stake from Platform or Autolaunch. It is the same rail."
-    assert html =~ "Staking"
+    assert html =~ "protocol revsplit contract"
+    assert html =~ "earn your share of stablecoin revenue"
+    assert html =~ "Buybacks happen after the staker share"
+    assert html =~ "Stake from Platform or Autolaunch. The underlying action is the same."
+    assert html =~ "Staking Console"
 
-    assert html =~ "80% or more of protocol skim will go to buybacks."
+    assert html =~ "protocol skim"
+    assert html =~ "buybacks"
 
     assert html =~
              "Openclaw and Hermes agent hosting, with Stripe LLM billing for margin fees on hosted Regents."
 
-    assert html =~ "Where revenue enters the system"
+    assert html =~ "Where money enters the Regent system"
     assert html =~ "Token Holders"
-    assert html =~ "Snapshot of largest token locks, pools, and holders"
+    assert html =~ "Largest token balances and lockups"
 
     assert html =~
-             "As of 4/1/2026 the large majority of tokens are locked or held by the following 6 addresses."
+             "As of April 1, 2026, most tokens are locked or held by the six addresses below."
 
     assert html =~ "0x8E84...DF6C"
     assert html =~ "0x46F4...C002"
-    assert html =~ "7th through 2,208th: Regent Community Members!"
-    assert html =~ "Regent Token Allocations and Uses"
+    assert html =~ "7th through 2,208th: Regent community members."
+    assert html =~ "How the full token supply is assigned"
     assert html =~ "20% to Clanker Deployment"
     assert html =~ "40% Regents Labs Multisig"
     assert html =~ "40% Clanker Vault - Locked onchain for 1 year then vesting over 2 years"
-    assert html =~ "20% Clanker public + 40% growth emissions + 40% long-term incentives."
+    assert html =~ "Clanker token deployment"
+    assert html =~ "40% growth emissions"
+    assert html =~ "40% long-term incentives"
     assert html =~ "Sovereign Agent Incentives"
     refute html =~ "token for all platforms"
     refute html =~ "All Regents Labs product value flows to $REGENT"

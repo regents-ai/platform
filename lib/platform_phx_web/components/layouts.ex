@@ -2,32 +2,41 @@ defmodule PlatformPhxWeb.Layouts do
   use PlatformPhxWeb, :html
 
   alias PlatformPhx.RuntimeConfig
+  alias PlatformPhxWeb.LayoutHelpers
 
-  embed_templates "layouts/*"
+  embed_templates("layouts/*")
 
-  attr :flash, :map, required: true, doc: "the map of flash messages"
+  attr(:flash, :map, required: true, doc: "the map of flash messages")
 
-  attr :current_scope, :map,
+  attr(:current_scope, :map,
     default: nil,
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
+  )
 
-  attr :chrome, :atom, default: :app
-  attr :active_nav, :string, default: nil
-  attr :header_eyebrow, :string, default: nil
-  attr :header_title, :string, default: nil
-  attr :content_class, :string, default: ""
-  attr :theme_class, :string, default: "rg-regent-theme-platform"
-  attr :current_human, :map, default: nil
-  attr :show_wallet_control, :boolean, default: true
+  attr(:chrome, :atom, default: :app)
+  attr(:active_nav, :string, default: nil)
+  attr(:header_eyebrow, :string, default: nil)
+  attr(:header_title, :string, default: nil)
+  attr(:content_class, :string, default: "")
+  attr(:theme_class, :string, default: "rg-regent-theme-platform")
+  attr(:current_human, :map, default: nil)
+  attr(:show_wallet_control, :boolean, default: true)
 
-  slot :inner_block, required: true
+  slot(:inner_block, required: true)
 
   def app(assigns) do
+    quick_search_items = LayoutHelpers.quick_search_items()
+
     assigns =
       assigns
-      |> assign(:nav_items, nav_items())
-      |> assign(:quick_search_items, quick_search_items())
-      |> assign(:quick_search_items_json, Jason.encode!(quick_search_items()))
+      |> assign(:nav_items, LayoutHelpers.nav_items())
+      |> assign(:quick_search_items, quick_search_items)
+      |> assign(:quick_search_items_json, Jason.encode!(quick_search_items))
+      |> assign(
+        :shell_eyebrow,
+        LayoutHelpers.header_eyebrow(assigns.header_eyebrow, assigns.active_nav)
+      )
+      |> assign(:shell_title, LayoutHelpers.shell_title(assigns.header_title, assigns.active_nav))
       |> assign(:wallet_bridge_config, Jason.encode!(wallet_bridge_config()))
       |> assign(:wallet_ready?, wallet_ready?())
 
@@ -70,176 +79,197 @@ defmodule PlatformPhxWeb.Layouts do
       </a>
 
       <%= if @chrome == :app do %>
-        <div class="mx-auto flex min-h-screen max-w-[1600px] gap-3 p-3 lg:p-4">
-          <div class="pp-sidebar-column hidden w-72 shrink-0 self-stretch lg:flex lg:flex-col">
+        <div class="mx-auto max-w-[1550px] p-3 sm:p-4">
+          <div
+            id="platform-shell-frame"
+            class={[
+              "relative flex min-h-[calc(100vh-1.5rem)] overflow-hidden rounded-[1.6rem] border border-[color:color-mix(in_oklch,var(--border)_86%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_98%,var(--card)_2%)] shadow-[0_28px_72px_-48px_color-mix(in_oklch,var(--brand-ink)_28%,transparent)]",
+              @active_nav == "token-info" && "pp-platform-content-shell--token"
+            ]}
+          >
             <aside
+              id="platform-shell-sidebar"
               data-background-suppress
-              class="pp-sidebar-shell relative isolate z-10 rounded-[1.75rem] border border-[color:var(--border)] bg-[color:var(--sidebar)] p-5 shadow-[0_24px_70px_-48px_color-mix(in_oklch,var(--brand-ink)_55%,transparent)]"
+              class="hidden w-[16.9rem] shrink-0 border-r border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--sidebar)_94%,var(--background)_6%)] lg:flex"
             >
-              <div class="pp-sidebar-brand-row">
+              <div class="flex min-h-full w-full flex-col px-7 py-6">
                 <.link navigate={~p"/"} class="flex items-center gap-3 text-[color:var(--foreground)]">
-                  <div class="flex h-12 w-12 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-[color:var(--card)]">
+                  <div class="flex h-12 w-12 items-center justify-center rounded-[0.95rem] bg-[color:var(--brand-ink)] shadow-[0_16px_30px_-26px_color-mix(in_oklch,var(--brand-ink)_70%,transparent)]">
                     <img
                       src={~p"/images/regents-logo.png"}
-                      alt="Regent"
-                      class="h-9 w-9 rounded-xl object-cover"
+                      alt="Regents"
+                      class="h-8 w-8 rounded-[0.7rem] object-cover"
                     />
                   </div>
                   <div>
-                    <p class="font-display text-[1.7rem] font-black leading-none">Regents</p>
+                    <p class="font-display text-[2rem] leading-none tracking-[-0.06em]">Regents</p>
                   </div>
                 </.link>
-              </div>
 
-              <nav class="mt-8 space-y-2" aria-label="Primary">
-                <%= for item <- @nav_items do %>
-                  <%= if item.kind == :internal do %>
-                    <.nav_link current={@active_nav == item.key} href={item.href} label={item.label} />
-                  <% else %>
-                    <.external_nav_link href={item.href} label={item.label} />
+                <section class="mt-10">
+                  <p class="font-display text-[2rem] leading-none tracking-[-0.05em] text-[color:var(--foreground)]">
+                    {@shell_title}
+                  </p>
+                  <p class="mt-4 max-w-[14rem] text-[1.02rem] leading-8 text-[color:var(--muted-foreground)]">
+                    {sidebar_intro(@shell_eyebrow, @shell_title)}
+                  </p>
+                </section>
+
+                <nav class="mt-10 space-y-1.5" aria-label="Primary">
+                  <%= for item <- @nav_items do %>
+                    <%= if item.kind == :internal do %>
+                      <.nav_link
+                        current={@active_nav == item.key}
+                        href={item.href}
+                        label={item.label}
+                        note={item.note}
+                        icon={item.icon}
+                      />
+                    <% else %>
+                      <.external_nav_link href={item.href} label={item.label} note={item.note} />
+                    <% end %>
                   <% end %>
-                <% end %>
+                </nav>
 
-                <div id="sidebar-community" class="pp-sidebar-community" phx-hook="SidebarCommunity">
-                  <button
-                    type="button"
-                    class="pp-sidebar-community-toggle"
-                    data-community-toggle
-                    aria-expanded="false"
-                    aria-controls="sidebar-community-drawer"
-                  >
-                    <span class="pp-sidebar-community-label">Community</span>
-                    <span
-                      aria-hidden="true"
-                      class="pp-sidebar-community-icon"
-                      data-community-icon
+                <section class="mt-8 rounded-[1.15rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_86%,var(--card)_14%)] px-4 py-4">
+                  <p class="text-[0.74rem] leading-6 text-[color:var(--muted-foreground)]">
+                    Keep access, billing, and launch steps in one guided place.
+                  </p>
+                  <.app_resume_link
+                    current_human={@current_human}
+                    class="mt-4 w-full justify-between"
+                  />
+                </section>
+
+                <div class="mt-auto pt-8">
+                  <div class="flex flex-col gap-1.5 text-[0.98rem] text-[color:var(--muted-foreground)]">
+                    <.link navigate={~p"/app/dashboard"} class="pp-sidebar-utility-link">
+                      Dashboard
+                    </.link>
+                    <.link navigate={~p"/docs"} class="pp-sidebar-utility-link">
+                      Docs
+                    </.link>
+                    <a
+                      href="https://discord.gg/regents"
+                      target="_blank"
+                      rel="noreferrer"
+                      class="pp-sidebar-utility-link"
                     >
-                      ↓
-                    </span>
-                  </button>
+                      Community
+                    </a>
+                    <.link navigate={~p"/bug-report"} class="pp-sidebar-utility-link">
+                      Support
+                    </.link>
+                  </div>
 
-                  <div
-                    id="sidebar-community-drawer"
-                    class="pp-sidebar-community-drawer"
-                    data-community-panel
-                    hidden
-                  >
-                    <div class="pp-sidebar-community-grid">
-                      <.community_links />
-                    </div>
+                  <div class="mt-8 flex flex-wrap gap-2.5">
+                    <.community_links />
                   </div>
                 </div>
-              </nav>
-
-              <div class="mt-6">
-                <.app_resume_link current_human={@current_human} class="w-full justify-center" />
               </div>
             </aside>
-          </div>
 
-          <div class={[
-            "pp-platform-content-shell flex min-w-0 flex-1 flex-col rounded-[1.75rem] border border-[color:var(--border)] shadow-[0_26px_70px_-44px_color-mix(in_oklch,var(--brand-ink)_55%,transparent)]",
-            @active_nav == "token-info" && "pp-platform-content-shell--token"
-          ]}>
-            <div
-              data-background-suppress
-              class="pp-mobile-nav-shell lg:hidden"
-            >
-              <div class="pp-mobile-nav-header">
-                <.link navigate={~p"/"} class="pp-mobile-home-link">
-                  <span class="pp-mobile-home-mark">
-                    <img
-                      src={~p"/images/regents-logo.png"}
-                      alt=""
-                      class="h-8 w-8 rounded-xl object-cover"
-                    />
-                  </span>
-                  <span class="pp-mobile-home-copy">
-                    <span class="pp-mobile-home-eyebrow">
-                      {header_eyebrow(@header_eyebrow, @active_nav)}
-                    </span>
-                    <span class="pp-mobile-home-title">Regents</span>
-                  </span>
-                </.link>
+            <div class="relative flex min-w-0 flex-1 flex-col">
+              <div
+                id="platform-shell-header-mobile"
+                data-background-suppress
+                class="relative border-b border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] px-4 py-4 lg:hidden"
+              >
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between gap-3">
+                    <.link
+                      navigate={~p"/"}
+                      class="flex min-w-0 items-center gap-3 text-[color:var(--foreground)]"
+                    >
+                      <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[0.95rem] bg-[color:var(--brand-ink)]">
+                        <img
+                          src={~p"/images/regents-logo.png"}
+                          alt=""
+                          class="h-7 w-7 rounded-[0.65rem] object-cover"
+                        />
+                      </div>
+                      <div class="min-w-0">
+                        <p class="truncate font-display text-[1.9rem] leading-none tracking-[-0.05em]">
+                          Regents
+                        </p>
+                        <p class="truncate text-[0.82rem] text-[color:var(--muted-foreground)]">
+                          {@shell_title}
+                        </p>
+                      </div>
+                    </.link>
 
-                <div class="pp-mobile-header-controls">
-                  <.theme_toggle_button mode={:mobile} />
-                  <.notification_menu current_human={@current_human} mode={:mobile} />
+                    <div class="flex shrink-0 items-center gap-2">
+                      <.theme_toggle_button mode={:mobile} />
+                      <.notification_menu current_human={@current_human} mode={:mobile} />
+                      <%= if @show_wallet_control do %>
+                        <.layout_wallet_control
+                          current_human={@current_human}
+                          wallet_ready?={@wallet_ready?}
+                          config={@wallet_bridge_config}
+                          mode={:mobile}
+                        />
+                      <% end %>
+                    </div>
+                  </div>
+
+                  <.quick_search_form
+                    id_prefix="mobile"
+                    items={@quick_search_items}
+                    items_json={@quick_search_items_json}
+                  />
+                </div>
+              </div>
+
+              <header
+                id="platform-shell-header-desktop"
+                data-background-suppress
+                class="relative hidden items-center gap-3 border-b border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] px-6 py-4 lg:flex"
+              >
+                <div class="w-full max-w-[33rem]">
+                  <.quick_search_form
+                    id_prefix="desktop"
+                    items={@quick_search_items}
+                    items_json={@quick_search_items_json}
+                  />
+                </div>
+
+                <div class="ml-auto flex shrink-0 items-center gap-2">
+                  <.theme_toggle_button mode={:desktop} />
+                  <.notification_menu current_human={@current_human} mode={:desktop} />
                   <%= if @show_wallet_control do %>
                     <.layout_wallet_control
                       current_human={@current_human}
                       wallet_ready?={@wallet_ready?}
                       config={@wallet_bridge_config}
-                      mode={:mobile}
+                      mode={:desktop}
                     />
                   <% end %>
                 </div>
-              </div>
+              </header>
 
-              <.quick_search_form
-                id_prefix="mobile"
-                items={@quick_search_items}
-                items_json={@quick_search_items_json}
-              />
+              <main
+                id="main-content"
+                data-background-suppress
+                class={[
+                  "relative min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5 lg:px-8 lg:py-7",
+                  @content_class
+                ]}
+                tabindex="-1"
+              >
+                {render_slot(@inner_block)}
+              </main>
 
-              <nav class="pp-mobile-nav-rail" aria-label="Primary mobile navigation">
-                <%= for item <- @nav_items do %>
-                  <%= if item.kind == :internal do %>
-                    <.mobile_nav_link
-                      current={@active_nav == item.key}
-                      href={item.href}
-                      label={item.label}
-                    />
-                  <% else %>
-                    <.mobile_external_nav_link href={item.href} label={item.label} />
-                  <% end %>
-                <% end %>
-              </nav>
+              <footer
+                data-background-suppress
+                class="relative space-y-3 border-t border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] px-5 py-4 text-sm text-[color:var(--muted-foreground)] lg:px-8"
+              >
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <p>&copy; Regents Labs 2026</p>
+                  <.footer_resource_links />
+                </div>
+                <.footer_social_links />
+              </footer>
             </div>
-
-            <header
-              data-background-suppress
-              class="pp-shell-header hidden border-b border-[color:var(--border)] px-4 py-4 sm:px-5 lg:flex"
-            >
-              <.quick_search_form
-                id_prefix="desktop"
-                items={@quick_search_items}
-                items_json={@quick_search_items_json}
-              />
-
-              <div class="pp-shell-header-actions">
-                <.theme_toggle_button mode={:desktop} />
-                <.notification_menu current_human={@current_human} mode={:desktop} />
-                <%= if @show_wallet_control do %>
-                  <.layout_wallet_control
-                    current_human={@current_human}
-                    wallet_ready?={@wallet_ready?}
-                    config={@wallet_bridge_config}
-                    mode={:desktop}
-                  />
-                <% end %>
-              </div>
-            </header>
-
-            <main
-              id="main-content"
-              data-background-suppress
-              class={["min-h-0 flex-1 overflow-y-auto p-4 sm:p-5 lg:p-6", @content_class]}
-              tabindex="-1"
-            >
-              {render_slot(@inner_block)}
-            </main>
-
-            <footer
-              data-background-suppress
-              class="space-y-3 border-t border-[color:var(--border)] px-5 py-4 text-sm text-[color:var(--muted-foreground)]"
-            >
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <p>&copy; Regents Labs 2026</p>
-                <.footer_resource_links />
-              </div>
-              <.footer_social_links />
-            </footer>
           </div>
         </div>
       <% else %>
@@ -270,10 +300,10 @@ defmodule PlatformPhxWeb.Layouts do
     """
   end
 
-  attr :current_human, :map, default: nil
-  attr :wallet_ready?, :boolean, required: true
-  attr :config, :string, required: true
-  attr :mode, :atom, default: :desktop
+  attr(:current_human, :map, default: nil)
+  attr(:wallet_ready?, :boolean, required: true)
+  attr(:config, :string, required: true)
+  attr(:mode, :atom, default: :desktop)
 
   defp layout_wallet_control(assigns) do
     ~H"""
@@ -283,7 +313,7 @@ defmodule PlatformPhxWeb.Layouts do
       data-dashboard-config={@config}
       data-wallet-shell
       class={[
-        "pp-wallet-shell",
+        "relative items-center gap-2",
         @mode == :desktop && "hidden lg:flex",
         @mode == :mobile && "flex lg:hidden",
         @mode == :floating && "flex"
@@ -292,49 +322,72 @@ defmodule PlatformPhxWeb.Layouts do
       <button
         type="button"
         data-wallet-sign-in
-        class="pp-wallet-pill pp-wallet-pill-primary"
+        class="inline-flex h-11 items-center justify-center rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--brand-ink)_48%,var(--border)_52%)] bg-[color:color-mix(in_oklch,var(--brand-ink)_84%,var(--foreground)_16%)] px-4 text-sm text-white/95 shadow-[0_18px_34px_-28px_color-mix(in_oklch,var(--brand-ink)_60%,transparent)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_42px_-30px_color-mix(in_oklch,var(--brand-ink)_70%,transparent)] disabled:cursor-not-allowed disabled:opacity-45"
         disabled={!@wallet_ready?}
       >
         Connect wallet
       </button>
 
-      <div data-wallet-connected class="pp-wallet-connected-shell hidden">
+      <div data-wallet-connected class="hidden">
         <button
           type="button"
           data-wallet-trigger
-          class="pp-wallet-pill pp-wallet-pill-secondary"
+          class="inline-flex h-11 items-center gap-3 rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_90%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] px-4 text-sm text-[color:var(--foreground)] shadow-[0_14px_26px_-24px_color-mix(in_oklch,var(--foreground)_16%,transparent)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--ring)]"
           aria-expanded="false"
           aria-controls={"layout-wallet-drawer-#{@mode}"}
         >
-          <span class="pp-wallet-pill-dot" aria-hidden="true"></span>
-          <span>Wallet Connected</span>
-          <span class="pp-wallet-pill-caret" data-wallet-caret aria-hidden="true">↓</span>
+          <span
+            class="inline-flex h-7 w-7 items-center justify-center rounded-[0.7rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_94%,var(--card)_6%)] text-[color:var(--foreground)]"
+            aria-hidden="true"
+          >
+            <.icon name="hero-wallet" class="size-4" />
+          </span>
+          <span class="max-w-[7.25rem] truncate">
+            {connected_wallet_label(@current_human)}
+          </span>
+          <span
+            class="h-2.5 w-2.5 rounded-full bg-[color:var(--brand-ink)] shadow-[0_0_0_4px_color-mix(in_oklch,var(--brand-ink)_16%,transparent)]"
+            aria-hidden="true"
+          >
+          </span>
+          <span
+            class="text-xs text-[color:var(--muted-foreground)]"
+            data-wallet-caret
+            aria-hidden="true"
+          >
+            ↓
+          </span>
         </button>
 
         <div
           id={"layout-wallet-drawer-#{@mode}"}
           data-wallet-drawer
-          class="pp-wallet-drawer"
+          class="absolute right-0 top-full z-30 mt-3 w-[18rem] rounded-[1.3rem] border border-[color:color-mix(in_oklch,var(--border)_90%,transparent)] bg-[linear-gradient(180deg,color-mix(in_oklch,var(--background)_96%,var(--card)_4%),color-mix(in_oklch,var(--background)_90%,var(--card)_10%))] p-4 shadow-[0_28px_70px_-46px_color-mix(in_oklch,var(--foreground)_34%,transparent)]"
           hidden
         >
-          <div data-wallet-drawer-inner class="pp-wallet-drawer-inner">
-            <div class="pp-wallet-drawer-row">
-              <p class="pp-wallet-drawer-label">Wallet</p>
-              <div class="pp-wallet-address-row">
-                <span data-wallet-address-text class="pp-wallet-address-text">
+          <div data-wallet-drawer-inner class="space-y-4">
+            <div class="space-y-2">
+              <p class="text-[0.68rem] uppercase tracking-[0.28em] text-[color:color-mix(in_oklch,var(--foreground)_54%,var(--muted-foreground)_46%)]">
+                Wallet
+              </p>
+              <div class="flex items-center gap-2 rounded-[1rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_82%,var(--card)_18%)] px-3 py-3">
+                <span
+                  data-wallet-address-text
+                  class="min-w-0 flex-1 truncate text-sm text-[color:var(--foreground)]"
+                >
                   {abbreviated_wallet(@current_human && @current_human.wallet_address)}
                 </span>
                 <button
                   type="button"
                   data-wallet-copy
-                  class="pp-wallet-icon-button"
+                  class="inline-flex h-9 w-9 items-center justify-center rounded-[0.85rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_92%,var(--card)_8%)] text-[color:var(--foreground)] transition duration-200 hover:border-[color:var(--ring)] hover:text-[color:var(--brand-ink)]"
                   aria-label="Copy wallet address"
                   title="Copy full wallet address"
                 >
-                  <span data-wallet-copy-icon class="pp-wallet-copy-icon" aria-hidden="true">
+                  <span data-wallet-copy-icon class="inline-flex" aria-hidden="true">
                     <.icon name="hero-document-duplicate" class="size-4" />
                   </span>
-                  <span data-wallet-copy-check class="pp-wallet-copy-check" aria-hidden="true">
+                  <span data-wallet-copy-check class="hidden" aria-hidden="true">
                     <.icon name="hero-check" class="size-4" />
                   </span>
                 </button>
@@ -344,7 +397,7 @@ defmodule PlatformPhxWeb.Layouts do
             <button
               type="button"
               data-wallet-disconnect
-              class="pp-wallet-drawer-action"
+              class="inline-flex w-full items-center justify-center rounded-[1rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_86%,var(--card)_14%)] px-4 py-3 text-sm text-[color:var(--foreground)] transition duration-200 hover:border-[color:var(--ring)]"
             >
               Disconnect
             </button>
@@ -364,44 +417,19 @@ defmodule PlatformPhxWeb.Layouts do
     """
   end
 
-  attr :current_human, :map, default: nil
-  attr :class, :string, default: nil
+  attr(:current_human, :map, default: nil)
+  attr(:class, :string, default: nil)
 
   defp app_resume_link(assigns) do
     assigns =
-      assign(
-        assigns,
-        :label,
-        if(assigns.current_human, do: "Continue setup", else: "App setup")
-      )
+      assign(assigns, :label, LayoutHelpers.continue_label(assigns.current_human))
 
     ~H"""
     <.link
       navigate={~p"/app"}
       class={[
-        "inline-flex items-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]",
+        "inline-flex items-center gap-3 rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_90%,var(--card)_10%)] px-4 py-3 text-sm text-[color:var(--foreground)] shadow-[0_16px_30px_-28px_color-mix(in_oklch,var(--foreground)_16%,transparent)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--ring)]",
         @class
-      ]}
-    >
-      {@label}
-    </.link>
-    """
-  end
-
-  attr :href, :string, required: true
-  attr :label, :string, required: true
-  attr :current, :boolean, default: false
-
-  defp nav_link(assigns) do
-    ~H"""
-    <.link
-      navigate={@href}
-      class={[
-        "flex items-center justify-between rounded-2xl border px-4 py-3 text-sm transition",
-        @current &&
-          "border-[color:var(--ring)] bg-[color:var(--sidebar-accent)] text-[color:var(--foreground)] shadow-[0_16px_36px_-28px_color-mix(in_oklch,var(--brand-ink)_60%,transparent)]",
-        !@current &&
-          "border-[color:var(--border)] bg-[color:var(--card)] text-[color:var(--muted-foreground)] hover:border-[color:var(--ring)] hover:text-[color:var(--foreground)]"
       ]}
     >
       <span>{@label}</span>
@@ -410,8 +438,52 @@ defmodule PlatformPhxWeb.Layouts do
     """
   end
 
-  attr :href, :string, required: true
-  attr :label, :string, required: true
+  attr(:href, :string, required: true)
+  attr(:label, :string, required: true)
+  attr(:note, :string, required: true)
+  attr(:icon, :string, required: true)
+  attr(:current, :boolean, default: false)
+
+  defp nav_link(assigns) do
+    ~H"""
+    <.link
+      navigate={@href}
+      class={[
+        "group flex items-center gap-3 rounded-[0.95rem] border px-3.5 py-3 transition",
+        @current &&
+          "border-[color:color-mix(in_oklch,var(--brand-ink)_42%,var(--border)_58%)] bg-[color:color-mix(in_oklch,var(--brand-ink)_10%,var(--background)_90%)] text-[color:var(--foreground)] shadow-[0_18px_34px_-30px_color-mix(in_oklch,var(--brand-ink)_34%,transparent)]",
+        !@current &&
+          "border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] text-[color:var(--muted-foreground)] hover:border-[color:var(--ring)] hover:text-[color:var(--foreground)]"
+      ]}
+    >
+      <span class={[
+        "flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.85rem] border",
+        @current &&
+          "border-[color:color-mix(in_oklch,var(--brand-ink)_32%,transparent)] bg-[color:color-mix(in_oklch,var(--brand-ink)_16%,var(--background)_84%)] text-[color:var(--brand-ink)]",
+        !@current &&
+          "border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_94%,var(--card)_6%)] text-[color:color-mix(in_oklch,var(--foreground)_66%,var(--muted-foreground)_34%)]"
+      ]}>
+        <.icon name={@icon} class="size-5" />
+      </span>
+      <span class="min-w-0 flex-1">
+        <span class="block text-sm text-[color:var(--foreground)]">{@label}</span>
+        <span class="mt-1 block text-[0.72rem] uppercase tracking-[0.24em] text-[color:color-mix(in_oklch,var(--foreground)_48%,var(--muted-foreground)_52%)]">
+          {@note}
+        </span>
+      </span>
+      <span
+        aria-hidden="true"
+        class="text-[color:color-mix(in_oklch,var(--foreground)_46%,var(--muted-foreground)_54%)] transition duration-200 group-hover:translate-x-0.5"
+      >
+        →
+      </span>
+    </.link>
+    """
+  end
+
+  attr(:href, :string, required: true)
+  attr(:label, :string, required: true)
+  attr(:note, :string, default: nil)
 
   defp external_nav_link(assigns) do
     ~H"""
@@ -419,46 +491,18 @@ defmodule PlatformPhxWeb.Layouts do
       href={@href}
       target="_blank"
       rel="noreferrer"
-      class="flex items-center justify-between rounded-2xl border border-[color:var(--border)] bg-[color:var(--card)] px-4 py-3 text-sm text-[color:var(--muted-foreground)] transition hover:border-[color:var(--ring)] hover:text-[color:var(--foreground)]"
+      class="group flex items-center gap-3 rounded-[1.25rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] px-4 py-3 text-sm text-[color:var(--muted-foreground)] transition hover:border-[color:var(--ring)] hover:text-[color:var(--foreground)]"
     >
-      <span>{@label}</span>
-      <span aria-hidden="true">↗</span>
-    </a>
-    """
-  end
-
-  attr :href, :string, required: true
-  attr :label, :string, required: true
-  attr :current, :boolean, default: false
-
-  defp mobile_nav_link(assigns) do
-    ~H"""
-    <.link
-      navigate={@href}
-      class={[
-        "pp-mobile-nav-link",
-        @current && "pp-mobile-nav-link-current"
-      ]}
-    >
-      <span>{@label}</span>
-      <span aria-hidden="true">→</span>
-    </.link>
-    """
-  end
-
-  attr :href, :string, required: true
-  attr :label, :string, required: true
-
-  defp mobile_external_nav_link(assigns) do
-    ~H"""
-    <a
-      href={@href}
-      target="_blank"
-      rel="noreferrer"
-      class="pp-mobile-nav-link"
-    >
-      <span>{@label}</span>
-      <span aria-hidden="true">↗</span>
+      <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_94%,var(--card)_6%)] text-[color:color-mix(in_oklch,var(--foreground)_66%,var(--muted-foreground)_34%)]">
+        <.icon name="hero-arrow-top-right-on-square" class="size-5" />
+      </span>
+      <span class="min-w-0 flex-1">
+        <span class="block text-sm text-[color:var(--foreground)]">{@label}</span>
+        <span :if={@note} class="mt-1 block text-[0.72rem] uppercase tracking-[0.24em]">
+          {@note}
+        </span>
+      </span>
+      <span aria-hidden="true" class="transition duration-200 group-hover:translate-x-0.5">↗</span>
     </a>
     """
   end
@@ -469,40 +513,40 @@ defmodule PlatformPhxWeb.Layouts do
       href="https://x.com/regents_sh"
       target="_blank"
       rel="noreferrer"
-      class="pp-sidebar-community-link"
+      class="inline-flex h-11 w-11 items-center justify-center rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] text-[color:var(--foreground)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--ring)] hover:text-[color:var(--brand-ink)]"
       aria-label="Regents Labs on X"
       title="Regents Labs on X"
     >
-      <.x_mark class="pp-social-mark" />
+      <.x_mark class="size-4" />
     </a>
 
     <a
       href="https://farcaster.xyz/regent"
       target="_blank"
       rel="noreferrer"
-      class="pp-sidebar-community-link"
+      class="inline-flex h-11 w-11 items-center justify-center rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] text-[color:var(--foreground)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--ring)] hover:text-[color:var(--brand-ink)]"
       aria-label="Regent on Farcaster"
       title="Regent on Farcaster"
     >
-      <img src={~p"/images/farcastericon.png"} alt="" class="pp-home-footer-icon-image" />
+      <img src={~p"/images/farcastericon.png"} alt="" class="h-4 w-4 object-contain" />
     </a>
 
     <a
       href="https://discord.gg/regents"
       target="_blank"
       rel="noreferrer"
-      class="pp-sidebar-community-link"
+      class="inline-flex h-11 w-11 items-center justify-center rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] text-[color:var(--foreground)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--ring)] hover:text-[color:var(--brand-ink)]"
       aria-label="Regents on Discord"
       title="Regents on Discord"
     >
-      <.discord_mark class="pp-social-mark" />
+      <.discord_mark class="size-5" />
     </a>
 
     <a
       href="https://github.com/orgs/regents-ai/repositories"
       target="_blank"
       rel="noreferrer"
-      class="pp-sidebar-community-link"
+      class="inline-flex h-11 w-11 items-center justify-center rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] text-[color:var(--foreground)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--ring)] hover:text-[color:var(--brand-ink)]"
       aria-label="Regents Labs GitHub"
       title="Regents Labs GitHub"
     >
@@ -615,25 +659,15 @@ defmodule PlatformPhxWeb.Layouts do
     """
   end
 
-  defp chrome_eyebrow("regents"), do: "Regents"
-  defp chrome_eyebrow("bug-report"), do: "Public Operator Ledger"
-  defp chrome_eyebrow("techtree"), do: "Shared Research and Eval Tree"
-  defp chrome_eyebrow("autolaunch"), do: "Raise agent capital"
-  defp chrome_eyebrow("cli"), do: "Local Operator Surface"
-  defp chrome_eyebrow("docs"), do: "Docs"
-  defp chrome_eyebrow("token-info"), do: "Platform revenue token"
-  defp chrome_eyebrow("shader"), do: "Shader Registry"
-  defp chrome_eyebrow(_), do: "Regents Labs"
-
-  attr :items, :list, required: true
-  attr :items_json, :string, required: true
-  attr :id_prefix, :string, required: true
+  attr(:items, :list, required: true)
+  attr(:items_json, :string, required: true)
+  attr(:id_prefix, :string, required: true)
 
   defp quick_search_form(assigns) do
     ~H"""
     <form
       id={"layout-quick-search-#{@id_prefix}"}
-      class="pp-shell-search"
+      class="group flex h-11 items-center gap-3 overflow-hidden rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] px-3 shadow-[inset_0_1px_0_color-mix(in_oklch,var(--background)_18%,transparent)] transition duration-200 focus-within:border-[color:var(--ring)] focus-within:shadow-[0_0_0_1px_color-mix(in_oklch,var(--ring)_55%,transparent)]"
       phx-hook="QuickSearch"
       data-search-items={@items_json}
       data-search-default={~p"/docs"}
@@ -641,90 +675,111 @@ defmodule PlatformPhxWeb.Layouts do
       <label class="sr-only" for={"layout-quick-search-input-#{@id_prefix}"}>
         Search pages and actions
       </label>
-      <span class="pp-shell-search-icon" aria-hidden="true">
+      <span
+        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.85rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_94%,var(--card)_6%)] text-[color:color-mix(in_oklch,var(--foreground)_56%,var(--muted-foreground)_44%)]"
+        aria-hidden="true"
+      >
         <.icon name="hero-magnifying-glass" class="size-4" />
       </span>
       <input
         id={"layout-quick-search-input-#{@id_prefix}"}
-        class="pp-shell-search-input"
+        class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-[color:var(--foreground)] outline-none placeholder:text-[color:color-mix(in_oklch,var(--foreground)_44%,var(--muted-foreground)_56%)] focus:ring-0"
         type="search"
         name="search"
         list={"layout-quick-search-suggestions-#{@id_prefix}"}
-        placeholder="Search pages and actions"
+        placeholder="Search setup, docs, and pages"
         autocomplete="off"
       />
       <datalist id={"layout-quick-search-suggestions-#{@id_prefix}"}>
         <option :for={item <- @items} value={item.label} />
       </datalist>
-      <button type="submit" class="pp-shell-search-submit">
-        Go
+      <button
+        type="submit"
+        class="inline-flex h-8 shrink-0 items-center justify-center rounded-[0.8rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_94%,var(--card)_6%)] px-3 text-[0.68rem] uppercase tracking-[0.24em] text-[color:color-mix(in_oklch,var(--foreground)_58%,var(--muted-foreground)_42%)] transition duration-200 hover:border-[color:var(--ring)] hover:text-[color:var(--foreground)]"
+      >
+        Find
       </button>
     </form>
     """
   end
 
-  attr :mode, :atom, default: :desktop
+  attr(:mode, :atom, default: :desktop)
 
   defp theme_toggle_button(assigns) do
     ~H"""
     <button
       type="button"
-      class={["pp-shell-action-button", @mode == :mobile && "pp-shell-action-button-mobile"]}
+      class={[
+        "inline-flex h-11 w-11 items-center justify-center rounded-[1rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] text-[color:var(--foreground)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--ring)]",
+        @mode == :mobile && "h-10 w-10 rounded-[0.95rem]"
+      ]}
       data-color-mode-cycle
       aria-label="Toggle light and dark mode"
       title="Toggle light and dark mode"
     >
-      <span class="pp-shell-action-icon pp-shell-action-icon-sun" aria-hidden="true">
+      <span class="inline-flex" aria-hidden="true">
         <.icon name="hero-sun" class="size-4" />
       </span>
-      <span class="pp-shell-action-icon pp-shell-action-icon-moon" aria-hidden="true">
+      <span class="hidden" aria-hidden="true">
         <.icon name="hero-moon" class="size-4" />
       </span>
     </button>
     """
   end
 
-  attr :current_human, :map, default: nil
-  attr :mode, :atom, default: :desktop
+  attr(:current_human, :map, default: nil)
+  attr(:mode, :atom, default: :desktop)
 
   defp notification_menu(assigns) do
     assigns =
-      assign(
-        assigns,
-        :next_label,
-        if(assigns.current_human, do: "Continue setup", else: "App setup")
-      )
+      assign(assigns, :next_label, LayoutHelpers.continue_label(assigns.current_human))
 
     ~H"""
-    <details class="pp-shell-notification">
+    <details class="relative">
       <summary
-        class={["pp-shell-action-button", @mode == :mobile && "pp-shell-action-button-mobile"]}
+        class={[
+          "list-none inline-flex h-11 w-11 items-center justify-center rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] text-[color:var(--foreground)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--ring)]",
+          @mode == :mobile && "h-10 w-10 rounded-[0.95rem]"
+        ]}
         aria-label="Open alerts and quick links"
         title="Alerts and quick links"
       >
-        <span class="pp-shell-notification-dot" aria-hidden="true"></span>
+        <span
+          class="absolute right-3 top-3 h-2 w-2 rounded-full bg-[color:var(--brand-ink)]"
+          aria-hidden="true"
+        >
+        </span>
         <.icon name="hero-bell" class="size-4" />
       </summary>
-      <div class="pp-shell-popover">
-        <p class="pp-shell-popover-kicker">Quick links</p>
-        <div class="pp-shell-popover-links">
-          <.link navigate={~p"/app"} class="pp-shell-popover-link">
+      <div class="absolute right-0 top-full z-30 mt-3 w-[16rem] rounded-[1.25rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[linear-gradient(180deg,color-mix(in_oklch,var(--background)_96%,var(--card)_4%),color-mix(in_oklch,var(--background)_90%,var(--card)_10%))] p-4 shadow-[0_28px_70px_-46px_color-mix(in_oklch,var(--foreground)_34%,transparent)]">
+        <p class="text-[0.68rem] uppercase tracking-[0.28em] text-[color:color-mix(in_oklch,var(--foreground)_54%,var(--muted-foreground)_46%)]">
+          Quick links
+        </p>
+        <div class="mt-3 space-y-2">
+          <.link
+            navigate={~p"/app"}
+            class="flex items-center justify-between rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] px-3 py-3 text-sm text-[color:var(--foreground)] transition duration-200 hover:border-[color:var(--ring)]"
+          >
             {@next_label}
+            <span aria-hidden="true">→</span>
           </.link>
-          <.link navigate={~p"/docs"} class="pp-shell-popover-link">
-            Docs
+          <.link
+            navigate={~p"/docs"}
+            class="flex items-center justify-between rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] px-3 py-3 text-sm text-[color:var(--foreground)] transition duration-200 hover:border-[color:var(--ring)]"
+          >
+            Docs <span aria-hidden="true">→</span>
           </.link>
-          <.link navigate={~p"/bug-report"} class="pp-shell-popover-link">
-            Bug report
+          <.link
+            navigate={~p"/bug-report"}
+            class="flex items-center justify-between rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] px-3 py-3 text-sm text-[color:var(--foreground)] transition duration-200 hover:border-[color:var(--ring)]"
+          >
+            Bug report <span aria-hidden="true">→</span>
           </.link>
         </div>
       </div>
     </details>
     """
   end
-
-  defp header_eyebrow(nil, active_nav), do: chrome_eyebrow(active_nav)
-  defp header_eyebrow(value, _active_nav), do: value
 
   defp wallet_bridge_config do
     %{
@@ -751,36 +806,30 @@ defmodule PlatformPhxWeb.Layouts do
     end
   end
 
-  defp nav_items do
-    [
-      %{kind: :internal, key: "regents", href: "/", label: "Regents"},
-      %{kind: :internal, key: "techtree", href: "/techtree", label: "Techtree"},
-      %{kind: :internal, key: "autolaunch", href: "/autolaunch", label: "Autolaunch"},
-      %{kind: :internal, key: "cli", href: "/cli", label: "CLI"},
-      %{kind: :internal, key: "docs", href: "/docs", label: "Docs"}
-    ]
+  defp connected_wallet_label(nil), do: "Wallet"
+
+  defp connected_wallet_label(%{wallet_address: wallet_address}) when is_binary(wallet_address) do
+    case abbreviated_wallet(wallet_address) do
+      "" -> "Wallet"
+      shortened -> shortened
+    end
   end
 
-  defp quick_search_items do
-    [
-      %{label: "App setup", href: "/app"},
-      %{label: "Check access", href: "/app/access"},
-      %{label: "Claim identity", href: "/app/identity"},
-      %{label: "Add billing", href: "/app/billing"},
-      %{label: "Open company", href: "/app/formation"},
-      %{label: "Company opening", href: "/app/formation"},
-      %{label: "Company dashboard", href: "/app/dashboard"},
-      %{label: "CLI", href: "/cli"},
-      %{label: "Docs", href: "/docs"},
-      %{label: "Techtree", href: "/techtree"},
-      %{label: "Autolaunch", href: "/autolaunch"},
-      %{label: "Token info", href: "/token-info"},
-      %{label: "Bug report", href: "/bug-report"},
-      %{label: "Human-backed trust", href: "/app/trust"}
-    ]
-  end
+  defp connected_wallet_label(_current_human), do: "Wallet"
 
-  attr :class, :string, default: nil
+  defp sidebar_intro("App setup", _shell_title),
+    do: "Complete each step to open your agent company."
+
+  defp sidebar_intro("Agent trust", _shell_title),
+    do: "Review trust, confirm identity, and keep the approval private."
+
+  defp sidebar_intro("Public company", _shell_title),
+    do: "Track what this company offers, what it has shipped, and how people can reach it."
+
+  defp sidebar_intro(_shell_eyebrow, _shell_title),
+    do: "Use this page to move work forward without leaving the main workspace."
+
+  attr(:class, :string, default: nil)
 
   defp x_mark(assigns) do
     ~H"""
@@ -798,7 +847,7 @@ defmodule PlatformPhxWeb.Layouts do
     """
   end
 
-  attr :class, :string, default: nil
+  attr(:class, :string, default: nil)
 
   defp github_mark(assigns) do
     ~H"""
@@ -808,8 +857,8 @@ defmodule PlatformPhxWeb.Layouts do
     """
   end
 
-  attr :flash, :map, required: true, doc: "the map of flash messages"
-  attr :id, :string, default: "flash-group", doc: "the optional id of flash container"
+  attr(:flash, :map, required: true, doc: "the map of flash messages")
+  attr(:id, :string, default: "flash-group", doc: "the optional id of flash container")
 
   def flash_group(assigns) do
     ~H"""
