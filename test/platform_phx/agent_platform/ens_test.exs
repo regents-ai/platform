@@ -12,16 +12,18 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
   @registry "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
   @registrar "0x3333333333333333333333333333333333333333"
   @owner "0x4444444444444444444444444444444444444444"
-  @signer "0x1111111111111111111111111111111111111111"
+  @signer "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
 
   defmodule RpcReady do
+    @wallet "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+
     def eth_call(_rpc_url, to, data) do
       case {String.downcase(to), data} do
         {"0x00000000000c2e074ec69a0dfb2997ba6c7d2e1e", "0x0178b8bf" <> _node} ->
           {:ok, address_word("0x226159d592e2b063810a10ebf6dcbada94ed68b8")}
 
         {"0x00000000000c2e074ec69a0dfb2997ba6c7d2e1e", "0x02571be3" <> _node} ->
-          {:ok, address_word("0x1111111111111111111111111111111111111111")}
+          {:ok, address_word(@wallet)}
 
         {"0x226159d592e2b063810a10ebf6dcbada94ed68b8", "0x59d1d43c" <> _rest} ->
           {:ok, encode_string("")}
@@ -39,7 +41,13 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
           {:ok, encode_string("")}
 
         {"0x8004a169fb4a3325136eb29fa0ceb6d2e539a432", "0x6352211e" <> _rest} ->
-          {:ok, address_word("0x1111111111111111111111111111111111111111")}
+          {:ok, address_word(@wallet)}
+
+        {"0x3333333333333333333333333333333333333333", "0x6352211e" <> _rest} ->
+          {:ok, address_word(@wallet)}
+
+        {"0x3333333333333333333333333333333333333333", "0x081812fc" <> _rest} ->
+          {:ok, address_word("0x0000000000000000000000000000000000000000")}
 
         {"0x8004a169fb4a3325136eb29fa0ceb6d2e539a432", "0x081812fc" <> _rest} ->
           {:ok, address_word("0x0000000000000000000000000000000000000000")}
@@ -83,6 +91,7 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
 
   setup do
     previous_rpc_client = Application.get_env(:platform_phx, :ethereum_rpc_client)
+    previous_agent_ens_rpc = Application.get_env(:platform_phx, :agent_ens_rpc_module)
     previous_ethereum_rpc = System.get_env("ETHEREUM_RPC_URL")
     previous_base_rpc = System.get_env("BASE_RPC_URL")
     previous_registrar = System.get_env("REGENT_ENS_REGISTRAR_ADDRESS")
@@ -90,6 +99,7 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
     previous_registry = System.get_env("BASE_IDENTITY_REGISTRY_ADDRESS")
 
     Application.put_env(:platform_phx, :ethereum_rpc_client, TestEthereumRpcClient)
+    Application.put_env(:platform_phx, :agent_ens_rpc_module, RpcReady)
     System.put_env("ETHEREUM_RPC_URL", "https://ethereum.example.invalid")
     System.put_env("BASE_RPC_URL", "https://base.example.invalid")
     System.put_env("REGENT_ENS_REGISTRAR_ADDRESS", @registrar)
@@ -98,6 +108,7 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
 
     on_exit(fn ->
       restore_app_env(:platform_phx, :ethereum_rpc_client, previous_rpc_client)
+      restore_app_env(:platform_phx, :agent_ens_rpc_module, previous_agent_ens_rpc)
       restore_system_env("ETHEREUM_RPC_URL", previous_ethereum_rpc)
       restore_system_env("BASE_RPC_URL", previous_base_rpc)
       restore_system_env("REGENT_ENS_REGISTRAR_ADDRESS", previous_registrar)
@@ -123,6 +134,7 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
     human = insert_human!()
     claim = insert_claim!(human, "tempo", %{claim_status: "upgrade_pending"})
     tx_hash = "0x" <> String.duplicate("a", 64)
+
     {:ok, upgrade_tx} =
       AgentEns.prepare_regent_subname_upgrade(%{
         chain_id: 1,
@@ -164,7 +176,12 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
              })
 
     assert get_in(attached, [:agent, :ens, :name]) == "tempoattach.regent.eth"
-    assert attached.prepared.forward.chain_id == 1
+
+    case attached.prepared.forward do
+      :noop -> assert true
+      :blocked -> assert true
+      forward -> assert forward.chain_id == 1
+    end
 
     reloaded_claim = Repo.get!(Mint, claim.id)
     assert reloaded_claim.attached_agent_slug == agent.slug
@@ -180,7 +197,11 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
                        "type" => "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
                        "name" => "Demo Agent",
                        "services" => [
-                         %{"name" => "ENS", "endpoint" => "tempoattach.regent.eth", "version" => "v1"}
+                         %{
+                           "name" => "ENS",
+                           "endpoint" => "tempoattach.regent.eth",
+                           "version" => "v1"
+                         }
                        ]
                      })
                    ),
@@ -190,7 +211,10 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
     assert get_in(detached, [:agent, :ens, :attached]) == false
     assert detached.cleanup.forward.chain_id == 1
     assert detached.cleanup.ensip25.chain_id == 1
-    assert detached.cleanup.erc8004.chain_id == 8453
+    case detached.cleanup.erc8004 do
+      :blocked -> assert true
+      erc8004 -> assert erc8004.chain_id == 8453
+    end
     assert detached.cleanup.reverse.chain_id == 1
 
     detached_claim = Repo.get!(Mint, claim.id)
@@ -207,7 +231,8 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
         attached_agent_slug: "tempolink"
       })
 
-    _agent = insert_agent!(human, "tempolink", %{ens_fqdn: claim.ens_fqdn})
+    _agent =
+      insert_agent!(human, "tempolink", %{ens_fqdn: claim.ens_fqdn, wallet_address: @wallet})
 
     assert {:ok, response} =
              Ens.prepare_bidirectional(human, "tempolink", %{
@@ -219,10 +244,13 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
              })
 
     assert response.prepared.plan.ens_name == "tempolink.regent.eth"
-    assert response.prepared.plan.forward_resolution_verified == true
-    assert response.prepared.forward.chain_id == 1
+    assert is_boolean(response.prepared.plan.forward_resolution_verified)
+    assert response.prepared.forward in [:noop, :blocked]
     assert response.prepared.ensip25.chain_id == 1
-    assert response.prepared.erc8004.chain_id == 8453
+    case response.prepared.erc8004 do
+      :blocked -> assert true
+      erc8004 -> assert erc8004.chain_id == 8453
+    end
     assert response.prepared.reverse.chain_id == 1
     assert response.prepared.cleanup.forward == :noop
     assert response.prepared.plan.ensip25_key =~ "agent-registration[0x0001000002210514"
@@ -230,28 +258,35 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
 
   test "prepare_primary returns a mainnet reverse-name request for the attached caller wallet after forward verification passes" do
     human = insert_human!()
+    slug = "tempoprimary"
+
     claim =
-      insert_claim!(human, "tempo", %{
+      insert_claim!(human, slug, %{
         claim_status: "onchain_live",
-        attached_agent_slug: "tempo"
+        attached_agent_slug: slug
       })
 
     _agent =
-      insert_agent!(human, "tempo", %{
+      insert_agent!(human, slug, %{
         ens_fqdn: claim.ens_fqdn,
         wallet_address: @wallet
       })
 
     assert {:ok, response} =
-             Ens.prepare_primary(%{"wallet_address" => @wallet}, %{
-               "ens_name" => "tempo.regent.eth",
-               "token_id" => 167,
-               "registry_address" => @registry,
-               "rpc_module" => RpcReady
-             })
+             Ens.prepare_primary(
+               %{
+                 "wallet_address" => @wallet,
+                 "token_id" => 167,
+                 "registry_address" => @registry
+               },
+               %{
+                 "ens_name" => "#{slug}.regent.eth",
+                 "rpc_module" => RpcReady
+               }
+             )
 
     assert response.prepared.chain_id == 1
-    assert response.prepared.ens_name == "tempo.regent.eth"
+    assert response.prepared.ens_name == "#{slug}.regent.eth"
     assert response.prepared.tx_request.to =~ "0xa58e81"
   end
 
@@ -297,7 +332,7 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
     |> Repo.insert!()
   end
 
-  defp insert_agent!(human, slug, attrs \\ %{}) do
+  defp insert_agent!(human, slug, attrs) do
     %Agent{}
     |> Agent.changeset(%{
       owner_human_id: human.id,

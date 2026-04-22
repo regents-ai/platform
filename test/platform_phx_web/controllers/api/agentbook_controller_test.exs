@@ -265,7 +265,9 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
     first_create =
       conn
       |> put_req_header("content-type", "application/json")
-      |> put_req_headers(agent_headers("/api/agentbook/sessions", Jason.encode!(%{"source" => "regents-cli"})))
+      |> put_req_headers(
+        agent_headers("/api/agentbook/sessions", Jason.encode!(%{"source" => "regents-cli"}))
+      )
       |> post("/api/agentbook/sessions", Jason.encode!(%{"source" => "regents-cli"}))
       |> json_response(200)
 
@@ -327,7 +329,9 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
     assert conflict_response["statusMessage"] =~ "already attached to another signed-in person"
   end
 
-  test "manual wallet-only follow-up is converted into a failed hosted trust session", %{conn: conn} do
+  test "manual wallet-only follow-up is converted into a failed hosted trust session", %{
+    conn: conn
+  } do
     previous_agentbook = Application.get_env(:platform_phx, :agentbook, [])
 
     Application.put_env(
@@ -354,7 +358,9 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
     create_response =
       conn
       |> put_req_header("content-type", "application/json")
-      |> put_req_headers(agent_headers("/api/agentbook/sessions", Jason.encode!(%{"source" => "regents-cli"})))
+      |> put_req_headers(
+        agent_headers("/api/agentbook/sessions", Jason.encode!(%{"source" => "regents-cli"}))
+      )
       |> post("/api/agentbook/sessions", Jason.encode!(%{"source" => "regents-cli"}))
       |> json_response(200)
 

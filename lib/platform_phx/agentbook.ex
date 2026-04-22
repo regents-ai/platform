@@ -641,7 +641,13 @@ defmodule PlatformPhx.Agentbook do
     end
   end
 
-  defp handle_link_insert_conflict(identity, world_human_id, %HumanUser{} = human, session, _changeset) do
+  defp handle_link_insert_conflict(
+         identity,
+         world_human_id,
+         %HumanUser{} = human,
+         session,
+         _changeset
+       ) do
     case link_for_identity(identity) do
       %Link{world_human_id: ^world_human_id} = link ->
         link

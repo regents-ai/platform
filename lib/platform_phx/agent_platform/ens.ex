@@ -169,7 +169,10 @@ defmodule PlatformPhx.AgentPlatform.Ens do
              "agent_id" => token_id,
              "registry_address" => registry_address,
              "current_agent_uri" => attrs["current_agent_uri"],
-             "include_reverse" => true
+             "include_reverse" => true,
+             "rpc_module" => attrs["rpc_module"],
+             "erc8004_fetcher" => attrs["erc8004_fetcher"],
+             "erc8004_fetch_opts" => attrs["erc8004_fetch_opts"]
            }),
          {:ok, plan} <- AgentEns.plan_link(input),
          :ok <- ensure_forward_resolution_verified(plan),
@@ -257,14 +260,13 @@ defmodule PlatformPhx.AgentPlatform.Ens do
   defp ensure_agent_completed(%Agent{}),
     do: {:error, {:conflict, "Finish creating the company before attaching a Regent ENS name"}}
 
-  defp ensure_agent_wallet_present(%Agent{wallet_address: value}) when is_binary(value) and value != "",
-    do: :ok
+  defp ensure_agent_wallet_present(%Agent{wallet_address: value})
+       when is_binary(value) and value != "",
+       do: :ok
 
   defp ensure_agent_wallet_present(%Agent{}),
     do:
-      {:error,
-       {:conflict,
-        "Finish the company wallet setup before attaching a Regent ENS name"}}
+      {:error, {:conflict, "Finish the company wallet setup before attaching a Regent ENS name"}}
 
   defp ensure_agent_not_attached(%Agent{} = agent) do
     case Repo.exists?(from mint in Mint, where: mint.attached_agent_slug == ^agent.slug) do
@@ -418,7 +420,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
              attrs["registry_address"] || RuntimeConfig.base_identity_registry_address(),
              "Base identity registry"
            ) do
-         {:ok,
+      {:ok,
        %{
          ens_name: claim.ens_fqdn,
          ens_chain_id: @ethereum_chain_id,
@@ -430,7 +432,8 @@ defmodule PlatformPhx.AgentPlatform.Ens do
          signer_address: agent.wallet_address,
          include_reverse?: truthy?(attrs["include_reverse"]),
          current_agent_uri: attrs["current_agent_uri"],
-         rpc_module: attrs["rpc_module"] || Application.get_env(:platform_phx, :agent_ens_rpc_module),
+         rpc_module:
+           attrs["rpc_module"] || Application.get_env(:platform_phx, :agent_ens_rpc_module),
          erc8004_fetcher: attrs["erc8004_fetcher"],
          erc8004_fetch_opts: attrs["erc8004_fetch_opts"]
        }}
@@ -517,8 +520,9 @@ defmodule PlatformPhx.AgentPlatform.Ens do
     end
   end
 
-  defp maybe_prepare_erc8004(plan, _input, _wallet_address) when plan.erc8004_status == :ens_service_present,
-    do: :noop
+  defp maybe_prepare_erc8004(plan, _input, _wallet_address)
+       when plan.erc8004_status == :ens_service_present,
+       do: :noop
 
   defp maybe_prepare_erc8004(_plan, input, wallet_address) do
     case AgentEns.prepare_erc8004_update(input) do
@@ -640,8 +644,9 @@ defmodule PlatformPhx.AgentPlatform.Ens do
     end
   end
 
-  defp prepare_reverse_cleanup(wallet_address) when not is_binary(wallet_address) or wallet_address == "",
-    do: :blocked
+  defp prepare_reverse_cleanup(wallet_address)
+       when not is_binary(wallet_address) or wallet_address == "",
+       do: :blocked
 
   defp prepare_reverse_cleanup(wallet_address) do
     case AgentEns.Tx.build_reverse_set_name_tx(%{
@@ -803,7 +808,8 @@ defmodule PlatformPhx.AgentPlatform.Ens do
     else
       false ->
         {:error,
-         {:external, :ethereum, "That mainnet transaction needs more confirmations before it can be marked live"}}
+         {:external, :ethereum,
+          "That mainnet transaction needs more confirmations before it can be marked live"}}
 
       {:error, message} when is_binary(message) ->
         {:error, {:external, :ethereum, message}}
@@ -817,8 +823,11 @@ defmodule PlatformPhx.AgentPlatform.Ens do
     with registrar when is_binary(registrar) <- RuntimeConfig.regent_ens_registrar_address(),
          owner when is_binary(owner) <- RuntimeConfig.regent_ens_owner_address(),
          resolver when is_binary(resolver) <- RuntimeConfig.ens_public_resolver_address(),
-         true <- PlatformPhx.Ethereum.normalize_address(to) == PlatformPhx.Ethereum.normalize_address(registrar),
-         true <- String.starts_with?(input || "", ABI.selector("upgradeClaim(string,address,address)")),
+         true <-
+           PlatformPhx.Ethereum.normalize_address(to) ==
+             PlatformPhx.Ethereum.normalize_address(registrar),
+         true <-
+           String.starts_with?(input || "", ABI.selector("upgradeClaim(string,address,address)")),
          {:ok, decoded} <- decode_upgrade_claim_input(input),
          true <- decoded.label == claim.label,
          true <- decoded.owner_address == PlatformPhx.Ethereum.normalize_address(owner),

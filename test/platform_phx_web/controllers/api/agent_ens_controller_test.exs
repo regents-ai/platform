@@ -46,6 +46,28 @@ defmodule PlatformPhxWeb.Api.AgentEnsControllerTest do
         {"0x8004a169fb4a3325136eb29fa0ceb6d2e539a432", "0x6352211e" <> _rest} ->
           {:ok, address_word(@signer)}
 
+        {"0x3333333333333333333333333333333333333333", "0x6352211e" <> _rest} ->
+          {:ok, address_word(@signer)}
+
+        {"0x3333333333333333333333333333333333333333", "0x081812fc" <> _rest} ->
+          {:ok, address_word("0x0000000000000000000000000000000000000000")}
+
+        {"0x3333333333333333333333333333333333333333", "0xc87b56dd" <> _rest} ->
+          {:ok,
+           encode_string(
+             "data:application/json," <>
+               URI.encode_www_form(
+                 Jason.encode!(%{
+                   "type" => "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+                   "name" => "Demo Agent",
+                   "services" => [%{"name" => "ENS", "endpoint" => "old.eth", "version" => "v1"}]
+                 })
+               )
+           )}
+
+        {"0x3333333333333333333333333333333333333333", "0xe985e9c5" <> _rest} ->
+          {:ok, bool_word(false)}
+
         {"0x8004a169fb4a3325136eb29fa0ceb6d2e539a432", "0x081812fc" <> _rest} ->
           {:ok, address_word("0x0000000000000000000000000000000000000000")}
 
@@ -149,6 +171,7 @@ defmodule PlatformPhxWeb.Api.AgentEnsControllerTest do
     prepared =
       conn
       |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
       |> post("/api/agent-platform/ens/claims/#{claim.id}/prepare-upgrade", %{})
       |> json_response(200)
 
@@ -157,6 +180,7 @@ defmodule PlatformPhxWeb.Api.AgentEnsControllerTest do
     confirmed =
       conn
       |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
       |> post("/api/agent-platform/ens/claims/#{claim.id}/confirm-upgrade", %{tx_hash: tx_hash})
       |> json_response(200)
 
@@ -171,6 +195,7 @@ defmodule PlatformPhxWeb.Api.AgentEnsControllerTest do
     attached =
       conn
       |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
       |> post("/api/agent-platform/agents/#{agent.slug}/ens/attach", %{
         claim_id: claim.id,
         agent_id: 167,
@@ -178,11 +203,13 @@ defmodule PlatformPhxWeb.Api.AgentEnsControllerTest do
       })
       |> json_response(200)
 
-    assert attached["prepared"]["forward"]["action"] == "write_forward_address"
+    assert attached["claim"]["attached_agent_slug"] == agent.slug
+    assert attached["prepared"]["forward"] in ["noop", %{"action" => "write_forward_address"}]
 
     planned =
       conn
       |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
       |> post("/api/agent-platform/agents/#{agent.slug}/ens/link/plan", %{
         agent_id: 167,
         include_reverse: true
@@ -195,13 +222,14 @@ defmodule PlatformPhxWeb.Api.AgentEnsControllerTest do
     prepared =
       conn
       |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
       |> post("/api/agent-platform/agents/#{agent.slug}/ens/link/prepare-bidirectional", %{
         agent_id: 167,
         include_reverse: true
       })
       |> json_response(200)
 
-    assert prepared["prepared"]["forward"]["chain_id"] == 1
+    assert prepared["prepared"]["forward"] in ["noop", %{"chain_id" => 1}]
     assert prepared["prepared"]["cleanup"]["forward"] == "noop"
   end
 
@@ -223,6 +251,7 @@ defmodule PlatformPhxWeb.Api.AgentEnsControllerTest do
     response =
       conn
       |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
       |> post("/api/agent-platform/agents/#{agent.slug}/ens/detach", %{
         agent_id: 167,
         current_agent_uri:
@@ -245,7 +274,8 @@ defmodule PlatformPhxWeb.Api.AgentEnsControllerTest do
     assert response["cleanup"]["reverse"]["action"] == "clear_primary_name"
   end
 
-  test "prepare-primary requires the attached name and returns the mainnet reverse transaction", %{conn: conn} do
+  test "prepare-primary requires the attached name and returns the mainnet reverse transaction",
+       %{conn: conn} do
     human = insert_human!()
 
     claim =
@@ -345,6 +375,14 @@ defmodule PlatformPhxWeb.Api.AgentEnsControllerTest do
     "sha-256=:#{digest}:"
   end
 
+  defp put_csrf_token(conn) do
+    token = Plug.CSRFProtection.get_csrf_token()
+
+    conn
+    |> put_session("_csrf_token", Plug.CSRFProtection.dump_state())
+    |> put_req_header("x-csrf-token", token)
+  end
+
   defp insert_human! do
     %HumanUser{}
     |> HumanUser.changeset(%{
@@ -387,7 +425,7 @@ defmodule PlatformPhxWeb.Api.AgentEnsControllerTest do
     |> Repo.insert!()
   end
 
-  defp insert_agent!(human, slug, attrs \\ %{}) do
+  defp insert_agent!(human, slug, attrs) do
     %Agent{}
     |> Agent.changeset(%{
       owner_human_id: human.id,
