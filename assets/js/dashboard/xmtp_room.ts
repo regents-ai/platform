@@ -38,7 +38,9 @@ function animateEntries(root: DashboardXmtpRoomElement, initial = false) {
 
   root.__xmtpSeenKeys = seenKeys;
 
-  if (feed && (initial || newEntries.length > 0)) {
+  const shouldAutoScroll = feed && (initial || (newEntries.length > 0 && isNearBottom(feed)));
+
+  if (shouldAutoScroll) {
     requestAnimationFrame(() => {
       feed.scrollTop = feed.scrollHeight;
     });
@@ -54,6 +56,10 @@ function animateEntries(root: DashboardXmtpRoomElement, initial = false) {
       ease: "outExpo",
     });
   }
+}
+
+function isNearBottom(el: HTMLElement, threshold = 72): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
 }
 
 export const DashboardXmtpRoomHook: Hook = {

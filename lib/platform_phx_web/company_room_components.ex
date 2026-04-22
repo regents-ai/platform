@@ -71,7 +71,14 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
           >
             <%= if @room.messages == [] do %>
               <div class="flex min-h-[13rem] items-center justify-center rounded-[1.4rem] border border-dashed border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_85%,transparent)] px-5 py-6 text-center text-sm leading-6 text-[color:var(--muted-foreground)]">
-                No one has posted here yet. The first message will appear in this room.
+                <div class="max-w-[24rem] space-y-2">
+                  <p class="font-display text-[1.1rem] leading-none text-[color:var(--foreground)]">
+                    No one has posted here yet.
+                  </p>
+                  <p>
+                    Join the room, then post the first update or question to start the thread.
+                  </p>
+                </div>
               </div>
             <% else %>
               <%= for message <- @room.messages do %>
@@ -103,7 +110,7 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
                         type="button"
                         phx-click="xmtp_delete_message"
                         phx-value-message_id={message.key}
-                        class="rounded-full border border-[color:var(--border)] px-3 py-1 text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)] transition hover:border-[color:var(--ring)] hover:text-[color:var(--foreground)]"
+                        class="rounded-full border border-[color:var(--border)] px-3 py-1 text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--ring)] hover:text-[color:var(--foreground)]"
                       >
                         Remove
                       </button>
@@ -113,7 +120,7 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
                         type="button"
                         phx-click="xmtp_kick_user"
                         phx-value-target={message.sender_wallet || message.sender_inbox_id}
-                        class="rounded-full border border-[color:var(--border)] px-3 py-1 text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)] transition hover:border-[color:#a6574f] hover:text-[color:#a6574f]"
+                        class="rounded-full border border-[color:var(--border)] px-3 py-1 text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:#a6574f] hover:text-[color:#a6574f]"
                       >
                         Remove person
                       </button>
@@ -143,7 +150,7 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
               :if={@room.can_join?}
               type="button"
               phx-click="xmtp_join"
-              class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--foreground)] px-4 py-2 text-sm text-[color:var(--background)] transition hover:opacity-90"
+              class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--foreground)] px-4 py-2 text-sm text-[color:var(--background)] transition duration-200 hover:-translate-y-0.5 hover:opacity-90"
             >
               Join room
             </button>
@@ -170,7 +177,7 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
               </p>
               <button
                 type="submit"
-                class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--foreground)] px-4 py-2 text-sm text-[color:var(--background)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--foreground)] px-4 py-2 text-sm text-[color:var(--background)] transition duration-200 hover:-translate-y-0.5 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={!@room.can_send?}
               >
                 Send

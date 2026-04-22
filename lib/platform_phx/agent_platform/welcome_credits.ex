@@ -76,17 +76,17 @@ defmodule PlatformPhx.AgentPlatform.WelcomeCredits do
     expiry_days = RuntimeConfig.welcome_credit_expiry_days()
 
     Repo.transaction(fn ->
-      existing =
-        Repo.one(
-          from grant in WelcomeCreditGrant,
-            where:
-              grant.billing_account_id == ^account.id or
-                grant.human_user_id == ^account.human_user_id,
-            limit: 1
+      locked_account =
+        Repo.one!(
+          from billing_account in BillingAccount,
+            where: billing_account.id == ^account.id,
+            lock: "FOR UPDATE"
         )
 
+      existing = Repo.one(existing_grant_query(locked_account))
+
       if existing do
-        {:existing, existing, account}
+        {:existing, existing, locked_account}
       else
         ensure_counter!(now)
 
@@ -98,33 +98,27 @@ defmodule PlatformPhx.AgentPlatform.WelcomeCredits do
           )
 
         existing_after_lock =
-          Repo.one(
-            from grant in WelcomeCreditGrant,
-              where:
-                grant.billing_account_id == ^account.id or
-                  grant.human_user_id == ^account.human_user_id,
-              limit: 1
-          )
+          Repo.one(existing_grant_query(locked_account))
 
         cond do
           existing_after_lock ->
-            {:existing, existing_after_lock, account}
+            {:existing, existing_after_lock, locked_account}
 
           counter.next_rank > counter.limit_count ->
-            {:limit_reached, nil, account}
+            {:limit_reached, nil, locked_account}
 
           true ->
             granted_at = now
             expires_at = DateTime.add(granted_at, expiry_days * 86_400, :second)
-            source_ref = "welcome-credit:#{account.id}"
+            source_ref = "welcome-credit:#{locked_account.id}"
 
             Repo.update!(PromotionCounter.changeset(counter, %{next_rank: counter.next_rank + 1}))
 
             grant =
               %WelcomeCreditGrant{}
               |> WelcomeCreditGrant.changeset(%{
-                billing_account_id: account.id,
-                human_user_id: account.human_user_id,
+                billing_account_id: locked_account.id,
+                human_user_id: locked_account.human_user_id,
                 grant_rank: counter.next_rank,
                 amount_usd_cents: amount,
                 credit_scope: @credit_scope,
@@ -139,7 +133,7 @@ defmodule PlatformPhx.AgentPlatform.WelcomeCredits do
 
             %BillingLedgerEntry{}
             |> BillingLedgerEntry.changeset(%{
-              billing_account_id: account.id,
+              billing_account_id: locked_account.id,
               entry_type: "welcome_credit",
               amount_usd_cents: amount,
               description: "Welcome credit for early signup.",
@@ -149,10 +143,10 @@ defmodule PlatformPhx.AgentPlatform.WelcomeCredits do
             |> Repo.insert!()
 
             updated_account =
-              account
+              locked_account
               |> BillingAccount.changeset(%{
                 runtime_credit_balance_usd_cents:
-                  (account.runtime_credit_balance_usd_cents || 0) + amount
+                  (locked_account.runtime_credit_balance_usd_cents || 0) + amount
               })
               |> Repo.update!()
 
@@ -160,6 +154,14 @@ defmodule PlatformPhx.AgentPlatform.WelcomeCredits do
         end
       end
     end)
+  end
+
+  defp existing_grant_query(%BillingAccount{} = account) do
+    from grant in WelcomeCreditGrant,
+      where:
+        grant.billing_account_id == ^account.id or
+          grant.human_user_id == ^account.human_user_id,
+      limit: 1
   end
 
   defp do_sync_stripe_credit_grant(%WelcomeCreditGrant{} = grant) do

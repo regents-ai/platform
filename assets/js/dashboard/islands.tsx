@@ -300,6 +300,7 @@ type WalletShellBinding = {
 
 type WalletShellBindingOptions = {
   getDisconnecting: () => boolean;
+  getPendingConnect: () => boolean;
   onConnectClick: () => void;
   onDisconnectClick: () => Promise<void>;
   serverAddress: `0x${string}` | null;
@@ -311,6 +312,9 @@ function bindDashboardWalletShell(
 ): WalletShellBinding {
   const connectButton = el.querySelector<HTMLButtonElement>(
     "[data-wallet-sign-in]",
+  );
+  const connectLabel = el.querySelector<HTMLElement>(
+    "[data-wallet-sign-in-label]",
   );
   const connectedShell = el.querySelector<HTMLElement>(
     "[data-wallet-connected]",
@@ -329,6 +333,7 @@ function bindDashboardWalletShell(
   const copyButton = el.querySelector<HTMLButtonElement>("[data-wallet-copy]");
   const copyIcon = el.querySelector<HTMLElement>("[data-wallet-copy-icon]");
   const copyCheck = el.querySelector<HTMLElement>("[data-wallet-copy-check]");
+  const copyState = el.querySelector<HTMLElement>("[data-wallet-copy-state]");
   const disconnectButton = el.querySelector<HTMLButtonElement>(
     "[data-wallet-disconnect]",
   );
@@ -376,6 +381,15 @@ function bindDashboardWalletShell(
       } else {
         copyCheck.style.removeProperty("transition");
       }
+    }
+
+    if (copyButton) {
+      copyButton.dataset.copied = "false";
+    }
+
+    if (copyState) {
+      copyState.classList.add("hidden");
+      copyState.textContent = "Copied";
     }
   };
 
@@ -447,7 +461,16 @@ function bindDashboardWalletShell(
 
     if (connectButton) {
       connectButton.disabled =
-        state.connected || !state.privyReady || options.getDisconnecting();
+        state.connected ||
+        !state.privyReady ||
+        options.getDisconnecting() ||
+        options.getPendingConnect();
+
+      if (connectLabel) {
+        connectLabel.textContent = options.getPendingConnect()
+          ? "Waiting for wallet..."
+          : "Connect wallet";
+      }
     }
 
     if (triggerButton) {
@@ -471,6 +494,7 @@ function bindDashboardWalletShell(
 
     if (copyButton) {
       copyButton.disabled = !state.connectedAddress;
+      copyButton.dataset.copied = "false";
     }
   };
 
@@ -500,6 +524,10 @@ function bindDashboardWalletShell(
 
       resetCopyFeedback(true);
 
+      if (copyButton) {
+        copyButton.dataset.copied = "true";
+      }
+
       if (copyIcon) {
         animate(copyIcon, {
           opacity: [1, 0],
@@ -517,6 +545,11 @@ function bindDashboardWalletShell(
           ease: "outBack",
         });
 
+        if (copyState) {
+          copyState.classList.remove("hidden");
+          copyState.textContent = "Copied";
+        }
+
         copyResetTimer = window.setTimeout(() => {
           if (copyIcon) {
             animate(copyIcon, {
@@ -533,6 +566,10 @@ function bindDashboardWalletShell(
             duration: 240,
             ease: "outQuad",
           });
+
+          if (copyState) {
+            copyState.classList.add("hidden");
+          }
         }, 900);
       }
     } catch (error) {
@@ -603,6 +640,7 @@ export function bindDashboardWallet(el: HTMLElement): Cleanup {
   ).map((shell) =>
     bindDashboardWalletShell(shell, {
       getDisconnecting: () => disconnecting,
+      getPendingConnect: () => pendingConnect,
       onConnectClick,
       onDisconnectClick,
       serverAddress,

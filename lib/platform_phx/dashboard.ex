@@ -135,10 +135,8 @@ defmodule PlatformPhx.Dashboard do
   end
 
   @spec name_claim_state(term(), String.t() | nil, String.t() | nil) :: name_claim_state()
-  def name_claim_state(raw_label, parent_name, ens_parent_name) do
+  def name_claim_state(raw_label, _parent_name, _ens_parent_name) do
     label = normalize_label(raw_label)
-    fallback_parent = parent_name || Basenames.parent_name()
-    fallback_ens_parent = ens_parent_name || Basenames.ens_parent_name()
 
     case Basenames.validate_label(label) do
       {:ok, normalized_label} ->
@@ -150,11 +148,8 @@ defmodule PlatformPhx.Dashboard do
               valid?: true,
               reserved?: payload["reserved"] == true,
               available?: payload["available"],
-              fqdn:
-                payload["fqdn"] || Basenames.to_subname_fqdn(normalized_label, fallback_parent),
-              ens_fqdn:
-                payload["ensFqdn"] ||
-                  Basenames.to_subname_fqdn(normalized_label, fallback_ens_parent),
+              fqdn: payload["fqdn"],
+              ens_fqdn: payload["ensFqdn"],
               label_error: nil
             }
 
@@ -162,16 +157,7 @@ defmodule PlatformPhx.Dashboard do
             invalid_name_claim_state(label, message)
 
           {:error, _reason} ->
-            %{
-              label: label,
-              normalized_label: normalized_label,
-              valid?: true,
-              reserved?: false,
-              available?: nil,
-              fqdn: Basenames.to_subname_fqdn(normalized_label, fallback_parent),
-              ens_fqdn: Basenames.to_subname_fqdn(normalized_label, fallback_ens_parent),
-              label_error: nil
-            }
+            unavailable_name_claim_state(label, normalized_label)
         end
 
       {:error, {:bad_request, message}} ->
@@ -192,6 +178,19 @@ defmodule PlatformPhx.Dashboard do
       fqdn: nil,
       ens_fqdn: nil,
       label_error: message
+    }
+  end
+
+  defp unavailable_name_claim_state(label, normalized_label) do
+    %{
+      label: label,
+      normalized_label: normalized_label,
+      valid?: false,
+      reserved?: false,
+      available?: nil,
+      fqdn: nil,
+      ens_fqdn: nil,
+      label_error: "Name settings are unavailable right now."
     }
   end
 

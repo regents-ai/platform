@@ -5,11 +5,18 @@ defmodule PlatformPhx.AgentLaunchTest do
   alias PlatformPhx.AgentLaunch.Auction
   alias PlatformPhx.Repo
 
-  test "falls back to demo auctions when the table is empty" do
+  test "returns an empty list when the table is empty" do
     auctions = AgentLaunch.list_auctions()
 
-    assert length(auctions) == 2
-    assert Enum.any?(auctions, &(&1.agent_name == "demo.regent.eth"))
+    assert auctions == []
+
+    split = AgentLaunch.split_auctions(auctions)
+
+    assert split.current == []
+    assert split.past == []
+
+    payload = AgentLaunch.generated_payload(auctions)
+    assert payload.auctions == []
   end
 
   test "splits current and past auctions with the expected ordering" do

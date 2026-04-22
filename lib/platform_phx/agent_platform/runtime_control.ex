@@ -83,22 +83,17 @@ defmodule PlatformPhx.AgentPlatform.RuntimeControl do
       |> Repo.all()
       |> Enum.reduce(%{updated_agents: [], failed_agents: [], skipped_agents: []}, fn agent,
                                                                                       acc ->
-        cond do
-          not runtime_sync_ready?(agent) ->
-            %{acc | skipped_agents: [agent | acc.skipped_agents]}
+        if runtime_sync_ready?(agent) and should_sync_agent?(agent, target_state) do
+          case sync_agent(agent, target_state, opts) do
+            {:ok, updated_agent} ->
+              %{acc | updated_agents: [updated_agent | acc.updated_agents]}
 
-          not should_sync_agent?(agent, target_state) ->
-            %{acc | skipped_agents: [agent | acc.skipped_agents]}
-
-          true ->
-            case sync_agent(agent, target_state, opts) do
-              {:ok, updated_agent} ->
-                %{acc | updated_agents: [updated_agent | acc.updated_agents]}
-
-              {:error, reason} ->
-                failure = %{agent_id: agent.id, slug: agent.slug, reason: reason}
-                %{acc | failed_agents: [failure | acc.failed_agents]}
-            end
+            {:error, reason} ->
+              failure = %{agent_id: agent.id, slug: agent.slug, reason: reason}
+              %{acc | failed_agents: [failure | acc.failed_agents]}
+          end
+        else
+          %{acc | skipped_agents: [agent | acc.skipped_agents]}
         end
       end)
       |> normalize_sync_result()
@@ -158,11 +153,17 @@ defmodule PlatformPhx.AgentPlatform.RuntimeControl do
   end
 
   defp stop_sprite(agent) do
-    SpriteRuntimeClient.stop_service(agent.sprite_name, agent.sprite_service_name || "paperclip")
+    SpriteRuntimeClient.stop_service(
+      agent.sprite_name,
+      agent.sprite_service_name || "hermes-workspace"
+    )
   end
 
   defp start_sprite(agent) do
-    SpriteRuntimeClient.start_service(agent.sprite_name, agent.sprite_service_name || "paperclip")
+    SpriteRuntimeClient.start_service(
+      agent.sprite_name,
+      agent.sprite_service_name || "hermes-workspace"
+    )
   end
 
   defp lock_agent(agent_id) do

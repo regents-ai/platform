@@ -108,9 +108,9 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorkerTest do
 
     assert Enum.map(result.failed_agents, & &1.slug) == [failing_agent.slug]
 
-    assert_receive {:start_service, ^healthy_sprite_name, "paperclip"}
-    assert_receive {:start_service, ^failing_sprite_name, "paperclip"}
-    refute_receive {:start_service, ^forming_sprite_name, "paperclip"}
+    assert_receive {:start_service, ^healthy_sprite_name, "hermes-workspace"}
+    assert_receive {:start_service, ^failing_sprite_name, "hermes-workspace"}
+    refute_receive {:start_service, ^forming_sprite_name, "hermes-workspace"}
 
     assert Repo.get!(BillingAccount, billing_account.id).runtime_credit_balance_usd_cents == 500
 
@@ -138,9 +138,9 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorkerTest do
 
     assert :ok = perform_job(SyncStripeBillingWorker, args)
 
-    assert_receive {:start_service, ^healthy_sprite_name, "paperclip"}
-    assert_receive {:start_service, ^failing_sprite_name, "paperclip"}
-    refute_receive {:start_service, ^forming_sprite_name, "paperclip"}
+    assert_receive {:start_service, ^healthy_sprite_name, "hermes-workspace"}
+    assert_receive {:start_service, ^failing_sprite_name, "hermes-workspace"}
+    refute_receive {:start_service, ^forming_sprite_name, "hermes-workspace"}
 
     assert Repo.aggregate(
              from(entry in BillingLedgerEntry,
@@ -153,6 +153,38 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorkerTest do
     assert Repo.get!(BillingAccount, billing_account.id).runtime_credit_balance_usd_cents == 500
     assert Repo.get!(Agent, healthy_agent.id).runtime_status == "ready"
     assert Repo.get!(Agent, failing_agent.id).runtime_status == "ready"
+  end
+
+  test "top-up falls back to customer lookup when metadata ids are malformed" do
+    human = insert_human!()
+    billing_account = insert_billing_account!(human)
+
+    args = %{
+      "event_id" => "evt_malformed_topup",
+      "event_type" => "checkout.session.completed",
+      "customer_id" => billing_account.stripe_customer_id,
+      "subscription_id" => nil,
+      "subscription_status" => "complete",
+      "mode" => "payment",
+      "metadata" => %{
+        "checkout_kind" => "runtime_topup",
+        "human_user_id" => "not-a-number",
+        "billing_account_id" => "still-not-a-number",
+        "amount_usd_cents" => "125"
+      }
+    }
+
+    assert :ok = perform_job(SyncStripeBillingWorker, args)
+
+    assert Repo.get!(BillingAccount, billing_account.id).runtime_credit_balance_usd_cents == 125
+
+    assert Repo.aggregate(
+             from(entry in BillingLedgerEntry,
+               where: entry.source_ref == ^"stripe-event:evt_malformed_topup"
+             ),
+             :count,
+             :id
+           ) == 1
   end
 
   defp insert_human! do
@@ -191,7 +223,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorkerTest do
           status: "published",
           public_summary: "Billing sync company",
           sprite_name: "#{slug}-sprite",
-          sprite_service_name: "paperclip",
+          sprite_service_name: "hermes-workspace",
           runtime_status: "ready",
           desired_runtime_state: "active",
           observed_runtime_state: "active"

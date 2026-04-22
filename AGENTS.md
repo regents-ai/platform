@@ -43,7 +43,6 @@ Keep the live discovery surface aligned with the docs and contracts:
 
 ## TODO
 
-- Replace the stale fallback Autolaunch auction sample data so fresh environments do not show out-of-date launches as current.
 - Break the dashboard browser app into smaller pieces so it stops behaving like a second frontend living inside Phoenix.
 - Move the bug report ledger toward LiveView streams so loading older reports does not keep growing one large in-memory list.
 - Add a clear contract-validation workflow so the OpenAPI file stays the real source of truth and project docs stop looking like stock Phoenix defaults.

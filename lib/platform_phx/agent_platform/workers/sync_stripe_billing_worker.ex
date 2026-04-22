@@ -23,13 +23,12 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
       "checkout.session.completed" ->
         sync_checkout_completed(args)
 
-      "customer.subscription.updated" ->
-        sync_subscription_state(args)
-
-      "customer.subscription.paused" ->
-        sync_subscription_state(args)
-
-      "customer.subscription.resumed" ->
+      event_type
+      when event_type in [
+             "customer.subscription.updated",
+             "customer.subscription.paused",
+             "customer.subscription.resumed"
+           ] ->
         sync_subscription_state(args)
 
       _other ->
@@ -38,7 +37,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
   end
 
   defp sync_checkout_completed(args) do
-    case args["metadata"]["checkout_kind"] do
+    case metadata(args)["checkout_kind"] do
       "billing_setup" ->
         with {:ok, account} <- find_billing_account(args),
              {:ok, updated_account} <-
@@ -64,9 +63,11 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
   end
 
   defp sync_runtime_topup(args) do
+    metadata = metadata(args)
+
     with {:ok, account} <- find_billing_account(args),
          amount when is_integer(amount) and amount > 0 <-
-           normalize_positive_integer(args["metadata"]["amount_usd_cents"]) do
+           normalize_positive_integer(metadata["amount_usd_cents"]) do
       source_ref = "stripe-event:#{args["event_id"]}"
 
       Repo.transaction(fn ->
@@ -166,49 +167,56 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
   end
 
   defp find_billing_account(args) do
-    metadata = args["metadata"] || %{}
-
-    query =
-      cond do
-        is_binary(metadata["billing_account_id"]) and metadata["billing_account_id"] != "" ->
-          from(account in BillingAccount,
-            where: account.id == ^String.to_integer(metadata["billing_account_id"])
-          )
-
-        is_binary(metadata["human_user_id"]) and metadata["human_user_id"] != "" ->
-          from(account in BillingAccount,
-            where: account.human_user_id == ^String.to_integer(metadata["human_user_id"])
-          )
-
-        is_binary(args["customer_id"]) and args["customer_id"] != "" ->
-          from(account in BillingAccount,
-            where: account.stripe_customer_id == ^args["customer_id"]
-          )
-
-        true ->
-          nil
-      end
-
-    case query && Repo.one(query) do
-      %BillingAccount{} = account ->
-        {:ok, account}
-
+    case billing_account_query(args) do
       nil ->
         maybe_bootstrap_billing_account(args)
+
+      query ->
+        case Repo.one(query) do
+          %BillingAccount{} = account ->
+            {:ok, account}
+
+          nil ->
+            maybe_bootstrap_billing_account(args)
+        end
+    end
+  end
+
+  defp billing_account_query(args) do
+    metadata = metadata(args)
+    billing_account_id = parse_integer(metadata["billing_account_id"])
+    human_user_id = parse_integer(metadata["human_user_id"])
+
+    cond do
+      is_integer(billing_account_id) ->
+        from(account in BillingAccount,
+          where: account.id == ^billing_account_id
+        )
+
+      is_integer(human_user_id) ->
+        from(account in BillingAccount,
+          where: account.human_user_id == ^human_user_id
+        )
+
+      is_binary(args["customer_id"]) and args["customer_id"] != "" ->
+        from(account in BillingAccount,
+          where: account.stripe_customer_id == ^args["customer_id"]
+        )
+
+      true ->
+        nil
     end
   end
 
   defp maybe_bootstrap_billing_account(args) do
-    metadata = args["metadata"] || %{}
-
-    case metadata["human_user_id"] do
-      human_id when is_binary(human_id) and human_id != "" ->
-        case Repo.get(HumanUser, String.to_integer(human_id)) do
+    case parse_integer(metadata(args)["human_user_id"]) do
+      human_id when is_integer(human_id) ->
+        case Repo.get(HumanUser, human_id) do
           %HumanUser{} = human -> AgentPlatform.ensure_billing_account(human)
           nil -> {:discard, "billing owner not found"}
         end
 
-      _ ->
+      nil ->
         {:discard, "billing account not found"}
     end
   end
@@ -246,7 +254,6 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
 
   defp normalize_status("customer.subscription.paused", _subscription_status), do: "paused"
   defp normalize_status("customer.subscription.resumed", _subscription_status), do: "active"
-  defp normalize_status("checkout.session.completed", _subscription_status), do: "active"
 
   defp normalize_status(_event_type, subscription_status) do
     case subscription_status do
@@ -274,6 +281,19 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
   end
 
   defp normalize_positive_integer(_value), do: false
+
+  defp metadata(args) when is_map(args), do: args["metadata"] || %{}
+
+  defp parse_integer(value) when is_integer(value) and value > 0, do: value
+
+  defp parse_integer(value) when is_binary(value) do
+    case Integer.parse(String.trim(value)) do
+      {parsed, ""} when parsed > 0 -> parsed
+      _ -> nil
+    end
+  end
+
+  defp parse_integer(_value), do: nil
 
   defp sync_runtime_state(_billing_account, nil), do: :ok
 

@@ -13,9 +13,9 @@ defmodule PlatformPhxWeb.BugReportLive do
     {:ok,
      socket
      |> assign(:page_title, "Bug report ledger")
-     |> assign(:loaded_reports, pagination.entries)
      |> assign(:filters, filters)
      |> assign(:filter_form, filters_form(filters))
+     |> assign(:loaded_page, 1)
      |> assign(:next_page, 2)
      |> assign(:has_next, pagination.has_next)
      |> assign(:now, DateTime.utc_now())
@@ -34,11 +34,10 @@ defmodule PlatformPhxWeb.BugReportLive do
 
   def handle_event("load-more", _params, socket) do
     pagination = OperatorReports.list_bug_reports_page(socket.assigns.next_page, @page_size)
-    loaded_reports = socket.assigns.loaded_reports ++ pagination.entries
 
     {:noreply,
      socket
-     |> assign(:loaded_reports, loaded_reports)
+     |> assign(:loaded_page, socket.assigns.loaded_page + 1)
      |> assign(:next_page, socket.assigns.next_page + 1)
      |> assign(:has_next, pagination.has_next)
      |> assign(:now, DateTime.utc_now())
@@ -504,8 +503,10 @@ defmodule PlatformPhxWeb.BugReportLive do
   end
 
   defp refresh_visible_reports(socket, expanded_report_id) do
+    loaded_reports = loaded_reports(socket.assigns.loaded_page)
+
     visible_reports =
-      apply_filters(socket.assigns.loaded_reports, socket.assigns.filters, socket.assigns.now)
+      apply_filters(loaded_reports, socket.assigns.filters, socket.assigns.now)
 
     expanded_report = expanded_report(visible_reports, expanded_report_id)
     status_totals = status_totals(visible_reports)
@@ -520,6 +521,15 @@ defmodule PlatformPhxWeb.BugReportLive do
     |> assign(:expanded_report, expanded_report)
     |> stream(:reports, visible_reports, reset: true)
   end
+
+  defp loaded_reports(loaded_page) when is_integer(loaded_page) and loaded_page > 0 do
+    1..loaded_page
+    |> Enum.flat_map(fn page ->
+      OperatorReports.list_bug_reports_page(page, @page_size).entries
+    end)
+  end
+
+  defp loaded_reports(_loaded_page), do: []
 
   defp expanded_report([], _expanded_report_id), do: nil
 

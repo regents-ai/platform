@@ -13,11 +13,8 @@ defmodule PlatformPhx.AppEntry do
           | {:provisioning, integer()}
 
   def next_step_for_user(%HumanUser{} = human) do
-    with {:ok, %{formation: formation}} <- Dashboard.agent_formation_payload(human) do
-      next_step_for_payload(formation)
-    else
-      _ -> :access
-    end
+    {:ok, %{formation: formation}} = Dashboard.agent_formation_payload(human)
+    next_step_for_payload(formation)
   end
 
   def next_step_for_user(_human), do: :access
@@ -32,8 +29,6 @@ defmodule PlatformPhx.AppEntry do
       {:provisioning, formation_id} -> "/app/provisioning/#{formation_id}"
     end
   end
-
-  defp next_step_for_payload(nil), do: :access
 
   defp next_step_for_payload(formation) do
     cond do

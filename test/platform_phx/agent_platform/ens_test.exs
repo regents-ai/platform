@@ -4,6 +4,7 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.Ens
+  alias PlatformPhx.AgentPlatform.Subdomain
   alias PlatformPhx.Basenames.Mint
   alias PlatformPhx.Repo
   alias PlatformPhx.TestEthereumRpcClient
@@ -164,8 +165,9 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
 
   test "attach and detach update the mutable ENS assignment without touching formation provenance" do
     human = insert_human!()
-    claim = insert_claim!(human, "tempoattach", %{claim_status: "onchain_live"})
+    claim = insert_claim!(human, "tempoalt", %{claim_status: "onchain_live"})
     agent = insert_agent!(human, "tempoattach", %{wallet_address: @wallet})
+    subdomain = insert_subdomain!(agent)
 
     assert {:ok, attached} =
              Ens.attach(human, agent.slug, %{
@@ -175,7 +177,7 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
                "rpc_module" => RpcReady
              })
 
-    assert get_in(attached, [:agent, :ens, :name]) == "tempoattach.regent.eth"
+    assert get_in(attached, [:agent, :ens, :name]) == "tempoalt.regent.eth"
     assert attached.prepared.forward == :noop
     assert attached.prepared.ensip25.action == "write_ensip25_proof"
     assert attached.prepared.ensip25.chain_id == 1
@@ -188,6 +190,7 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
     reloaded_claim = Repo.get!(Mint, claim.id)
     assert reloaded_claim.attached_agent_slug == agent.slug
     assert reloaded_claim.formation_agent_slug == nil
+    assert Repo.get!(Subdomain, subdomain.id).ens_fqdn == claim.ens_fqdn
 
     assert {:ok, detached} =
              Ens.detach(human, agent.slug, %{
@@ -201,7 +204,7 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
                        "services" => [
                          %{
                            "name" => "ENS",
-                           "endpoint" => "tempoattach.regent.eth",
+                           "endpoint" => "tempoalt.regent.eth",
                            "version" => "v1"
                          }
                        ]
@@ -220,6 +223,7 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
     detached_claim = Repo.get!(Mint, claim.id)
     assert detached_claim.attached_agent_slug == nil
     assert detached_claim.formation_agent_slug == nil
+    assert Repo.get!(Subdomain, subdomain.id).ens_fqdn == "#{agent.slug}.regent.eth"
   end
 
   test "prepare_bidirectional returns mainnet ENSIP-25 and reverse actions plus the Base ERC-8004 update" do
@@ -352,6 +356,19 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
       desired_runtime_state: "active",
       observed_runtime_state: "active",
       sprite_metering_status: "trialing"
+    })
+    |> Repo.insert!()
+  end
+
+  defp insert_subdomain!(agent) do
+    %Subdomain{}
+    |> Subdomain.changeset(%{
+      agent_id: agent.id,
+      slug: agent.slug,
+      hostname: "#{agent.slug}.regents.sh",
+      basename_fqdn: agent.basename_fqdn,
+      ens_fqdn: "#{agent.slug}.regent.eth",
+      active: false
     })
     |> Repo.insert!()
   end

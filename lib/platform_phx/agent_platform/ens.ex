@@ -379,7 +379,8 @@ defmodule PlatformPhx.AgentPlatform.Ens do
            {:ok, _agent} <-
              locked_agent
              |> Agent.changeset(%{ens_fqdn: nil, updated_at: now})
-             |> Repo.update() do
+             |> Repo.update(),
+           {:ok, _subdomain} <- maybe_update_subdomain(locked_agent, nil) do
         :ok
       else
         false -> Repo.rollback({:conflict, "That Regent ENS name is no longer attached"})
@@ -401,7 +402,23 @@ defmodule PlatformPhx.AgentPlatform.Ens do
     end
   end
 
+  defp maybe_update_subdomain(%Agent{} = agent, nil) do
+    case Repo.get_by(Subdomain, agent_id: agent.id) do
+      nil ->
+        {:ok, nil}
+
+      %Subdomain{} = subdomain ->
+        subdomain
+        |> Subdomain.changeset(%{ens_fqdn: default_subdomain_ens_fqdn(agent)})
+        |> Repo.update()
+    end
+  end
+
   defp maybe_update_subdomain(_agent, _ens_fqdn), do: {:ok, nil}
+
+  defp default_subdomain_ens_fqdn(%Agent{claimed_label: claimed_label, slug: slug}) do
+    "#{claimed_label || slug}.regent.eth"
+  end
 
   defp set_claim_status(%Mint{} = claim, attrs) do
     claim
