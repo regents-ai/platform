@@ -60,7 +60,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
   end
 
   defp reconcile_running_runtime(agent, _billing_account, "paused", _now) do
-    case RuntimeControl.resume(agent) do
+    case RuntimeControl.resume(agent, source: "sprite_metering_reconcile") do
       {:ok, _updated} -> :ok
       {:error, _reason} -> :ok
     end
@@ -170,7 +170,8 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
     case RuntimeControl.pause(
            agent,
            preserve_desired_state: true,
-           runtime_status: "paused_for_credits"
+           runtime_status: "paused_for_credits",
+           source: "sprite_metering_balance_guard"
          ) do
       {:ok, _updated} -> :ok
       {:error, _reason} -> :ok
@@ -178,7 +179,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
   end
 
   defp ensure_paused(agent) do
-    case RuntimeControl.pause(agent, runtime_status: "paused") do
+    case RuntimeControl.pause(agent, runtime_status: "paused", source: "sprite_metering_pause") do
       {:ok, _updated} -> :ok
       {:error, _reason} -> :ok
     end

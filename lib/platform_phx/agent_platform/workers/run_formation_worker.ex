@@ -11,6 +11,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.FormationEvent
   alias PlatformPhx.AgentPlatform.FormationRun
+  alias PlatformPhx.AgentPlatform.SpriteAudit
   alias PlatformPhx.AgentPlatform.SpriteRunner
   alias PlatformPhx.AgentPlatform.SpriteRuntimeClient
   alias PlatformPhx.Repo
@@ -75,6 +76,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
   defp maybe_run_sprite(%Agent{} = agent, %FormationRun{current_step: step} = formation)
        when step in @runner_steps do
     insert_event(formation, step, "started", "We're setting up your company now.")
+    audit_started(agent, formation, step)
     SpriteRunner.run(agent, formation)
   end
 
@@ -90,6 +92,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
        when step in @runner_steps do
     Enum.each(@runner_steps, fn step ->
       insert_event(formation, step, "succeeded", success_message_for_step(step))
+      audit_succeeded(agent, formation, step)
     end)
 
     formation =
@@ -246,6 +249,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
 
   defp persist_failure(%Agent{} = agent, %FormationRun{} = formation, step, message) do
     insert_event(formation, step, "failed", message)
+    audit_failed(agent, formation, step, message)
 
     formation
     |> FormationRun.changeset(%{
@@ -315,5 +319,62 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
 
   defp now do
     DateTime.utc_now() |> DateTime.truncate(:second)
+  end
+
+  defp audit_started(%Agent{} = agent, %FormationRun{} = formation, action) do
+    case SpriteAudit.log_formation(
+           agent,
+           formation,
+           action,
+           "started",
+           audit_metadata(),
+           nil,
+           audit_details(agent)
+         ) do
+      {:ok, _record} -> :ok
+      {:error, _changeset} -> :ok
+    end
+  end
+
+  defp audit_succeeded(%Agent{} = agent, %FormationRun{} = formation, action) do
+    case SpriteAudit.log_formation(
+           agent,
+           formation,
+           action,
+           "succeeded",
+           audit_metadata(),
+           success_message_for_step(action),
+           audit_details(agent)
+         ) do
+      {:ok, _record} -> :ok
+      {:error, _changeset} -> :ok
+    end
+  end
+
+  defp audit_failed(%Agent{} = agent, %FormationRun{} = formation, action, message) do
+    case SpriteAudit.log_formation(
+           agent,
+           formation,
+           action,
+           "failed",
+           audit_metadata(),
+           message,
+           audit_details(agent)
+         ) do
+      {:ok, _record} -> :ok
+      {:error, _changeset} -> :ok
+    end
+  end
+
+  defp audit_metadata do
+    %{actor_type: "system", source: "run_formation_worker"}
+  end
+
+  defp audit_details(%Agent{} = agent) do
+    %{
+      slug: agent.slug,
+      sprite_name: agent.sprite_name,
+      sprite_service_name: agent.sprite_service_name || "hermes-workspace"
+    }
   end
 end

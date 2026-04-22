@@ -212,7 +212,7 @@ defmodule PlatformPhx.AgentPlatform.SpriteUsage do
     if agent.runtime_status == "paused_for_credits" and
          agent.desired_runtime_state == "active" and
          AgentPlatform.billing_allows_runtime?(account) do
-      RuntimeControl.resume(agent)
+      RuntimeControl.resume(agent, source: "sprite_usage_recovery")
       :ok
     else
       :ok

@@ -16,6 +16,8 @@ Keep the main explanation surfaces aligned. The canonical story lives in:
 - `/cli`
 - adjacent CLI docs and help in `../regents-cli`
 
+Before changing Sprite admin control, operator secrets, Workspace password reset, or customer access rules, read the local Regent security notes in [`../SECURITY.md`](../SECURITY.md). Keep that file local only and do not copy it into product repos.
+
 Use these names consistently:
 
 - `App`: the guided website flow for access, identity, billing, company opening, and the hosted dashboard

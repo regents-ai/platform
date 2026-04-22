@@ -298,7 +298,11 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
   defp sync_runtime_state(_billing_account, nil), do: :ok
 
   defp sync_runtime_state(%BillingAccount{} = billing_account, target_state) do
-    case RuntimeControl.sync_agents_for_billing_account(billing_account, target_state) do
+    case RuntimeControl.sync_agents_for_billing_account(
+           billing_account,
+           target_state,
+           source: "stripe_billing_sync"
+         ) do
       {:ok, _result} -> :ok
       {:error, _reason} = error -> error
     end

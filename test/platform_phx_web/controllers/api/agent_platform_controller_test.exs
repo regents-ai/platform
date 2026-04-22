@@ -10,6 +10,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
   alias PlatformPhx.AgentPlatform.FormationEvent
   alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.AgentPlatform.LlmUsageEvent
+  alias PlatformPhx.AgentPlatform.SpriteAdminAction
   alias PlatformPhx.AgentPlatform.SpriteUsageRecord
   alias PlatformPhx.AgentPlatform.WelcomeCreditGrant
   alias PlatformPhx.AgentPlatform.Workers.RunFormationWorker
@@ -320,6 +321,21 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       |> json_response(200)
 
     assert resume_response["sprite"]["desired_runtime_state"] == "active"
+
+    sprite_actions =
+      Repo.all(
+        from action in SpriteAdminAction,
+          where: action.agent_id == ^formation.agent_id,
+          order_by: [asc: action.created_at],
+          select: {action.action, action.status, action.actor_type, action.source}
+      )
+
+    assert {"create_sprite", "succeeded", "system", "run_formation_worker"} in sprite_actions
+
+    assert {"bootstrap_workspace", "succeeded", "system", "run_formation_worker"} in sprite_actions
+
+    assert {"pause_runtime", "succeeded", "human_user", "formation_api_pause"} in sprite_actions
+    assert {"resume_runtime", "succeeded", "human_user", "formation_api_resume"} in sprite_actions
   end
 
   test "top-up checkout stores the Stripe customer for a fresh billing account", %{conn: conn} do

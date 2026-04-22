@@ -9,6 +9,7 @@ The goal is simple: start one Sprite per company, keep the Hermes gateway privat
 - The Hermes gateway stays private on `127.0.0.1:8642`.
 - Chat, files, memory, skills, and terminal all show up in the Workspace.
 - The Sprite can sleep and wake without changing the setup.
+- The Regents platform keeps the Sprite control key in a locked file instead of saving it in the database.
 
 ## The shape of the runtime
 
@@ -18,6 +19,22 @@ The goal is simple: start one Sprite per company, keep the Hermes gateway privat
 - Public URL: your Sprite hostname on port `3000`
 
 Only the Workspace should be exposed. Do not expose the Hermes gateway directly.
+
+## Operator secret
+
+The Regents platform should keep the Sprite control key in a file that only the service account can read, then point the app at that file with `SPRITES_API_TOKEN_FILE`.
+
+Example:
+
+```bash
+install -m 600 /dev/stdin /etc/regents/sprites-api-token <<'EOF'
+your-real-sprites-control-key
+EOF
+
+export SPRITES_API_TOKEN_FILE=/etc/regents/sprites-api-token
+```
+
+Do not save the Sprite control key in the customer database.
 
 ## 1. Create the Sprite
 
@@ -106,7 +123,7 @@ If you plan to make the Sprite URL public, add a password:
 sprite exec hermes-workspace -- sh -lc 'printf "HERMES_PASSWORD=%s\n" "choose-a-real-password" >> /app/hermes-workspace/runtime.env'
 ```
 
-Private-by-default access is the recommended path.
+If the Sprite is public, keep a password on at all times.
 
 ## 6. Add the launcher
 
@@ -174,6 +191,7 @@ wait -n "$workspace_pid" "$gateway_pid"
 Inside this repo, the checked-in copy lives at:
 
 - [`priv/agent_formation/hermes-workspace/launch_workspace.sh`](/Users/sean/Documents/regent/platform/priv/agent_formation/hermes-workspace/launch_workspace.sh)
+- [`priv/agent_formation/hermes-workspace/reset_workspace_password.sh`](/Users/sean/Documents/regent/platform/priv/agent_formation/hermes-workspace/reset_workspace_password.sh)
 
 ## 7. Start the service
 
@@ -221,6 +239,16 @@ You should end up with one place for:
 - memory
 - skills
 - terminal
+
+## Reset the password
+
+The bundled reset command updates the saved password, clears old sign-ins, and restarts the Workspace.
+
+```bash
+sprite exec hermes-workspace -- /app/bootstrap/reset_workspace_password.sh 'new-strong-password'
+```
+
+That is the safe reset path for a public Sprite because it forces everyone to sign in again with the new password.
 
 ## What changes from local setup
 

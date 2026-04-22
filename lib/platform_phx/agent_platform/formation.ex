@@ -208,7 +208,13 @@ defmodule PlatformPhx.AgentPlatform.Formation do
 
   def pause_sprite(%HumanUser{} = human, slug) when is_binary(slug) do
     with %Agent{} = agent <- AgentPlatform.get_owned_agent(human, slug),
-         {:ok, updated} <- RuntimeControl.pause(agent, runtime_status: "paused") do
+         {:ok, updated} <-
+           RuntimeControl.pause(agent,
+             runtime_status: "paused",
+             actor_type: "human_user",
+             human_user_id: human.id,
+             source: "formation_api_pause"
+           ) do
       {:ok, %{ok: true, sprite: sprite_runtime_control_payload(updated)}}
     else
       nil -> {:error, {:not_found, "Company not found"}}
@@ -221,7 +227,12 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   def resume_sprite(%HumanUser{} = human, slug) when is_binary(slug) do
     with %Agent{} = agent <- AgentPlatform.get_owned_agent(human, slug),
          {:ok, billing_account} <- require_active_or_funded_billing_account(human, agent),
-         {:ok, updated} <- RuntimeControl.resume(agent) do
+         {:ok, updated} <-
+           RuntimeControl.resume(agent,
+             actor_type: "human_user",
+             human_user_id: human.id,
+             source: "formation_api_resume"
+           ) do
       {:ok,
        %{
          ok: true,
