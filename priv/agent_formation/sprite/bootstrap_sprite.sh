@@ -20,6 +20,10 @@ run() {
   "$@"
 }
 
+shell_escape() {
+  printf "%q" "$1"
+}
+
 run "$SPRITE_CLI" create "$SPRITE_NAME"
 run "$SPRITE_CLI" exec "$SPRITE_NAME" -- mkdir -p /app/bin /app/company /app/bootstrap
 run "$SPRITE_CLI" cp "$BUNDLE_DIR/hermes-workspace/seed_company_workspace.mjs" "$SPRITE_NAME:/app/bootstrap/seed_company_workspace.mjs"
@@ -44,7 +48,32 @@ EOF
 if [ -n \"${FORMATION_WORKSPACE_PASSWORD:-}\" ]; then
   printf 'HERMES_PASSWORD=%s\n' \"${FORMATION_WORKSPACE_PASSWORD}\" >>/app/hermes-workspace/runtime.env
 fi"
-run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "FORMATION_SLUG='$SLUG' FORMATION_PUBLIC_HOSTNAME='$PUBLIC_HOSTNAME' FORMATION_HERMES_MODEL='$HERMES_MODEL' FORMATION_HERMES_ADAPTER_TYPE='${FORMATION_HERMES_ADAPTER_TYPE:-stock}' FORMATION_HERMES_PERSIST_SESSION='${FORMATION_HERMES_PERSIST_SESSION:-true}' FORMATION_HERMES_TOOLSETS='${FORMATION_HERMES_TOOLSETS:-[]}' FORMATION_HERMES_RUNTIME_PLUGINS='${FORMATION_HERMES_RUNTIME_PLUGINS:-[]}' FORMATION_HERMES_SHARED_SKILLS='${FORMATION_HERMES_SHARED_SKILLS:-[]}' FORMATION_HERMES_COMMAND='${FORMATION_HERMES_COMMAND:-/app/bin/hermes-company}' FORMATION_HERMES_PROMPT_TEMPLATE_VERSION='${FORMATION_HERMES_PROMPT_TEMPLATE_VERSION:-company-workspace-prompt-v1}' FORMATION_HERMES_PROMPT_TEMPLATE_JSON='${FORMATION_HERMES_PROMPT_TEMPLATE_JSON:-\"\"}' FORMATION_WORKSPACE_PATH='${FORMATION_WORKSPACE_PATH:-/app/company}' FORMATION_WORKSPACE_SEED_VERSION='${FORMATION_WORKSPACE_SEED_VERSION:-company-workspace-v1}' FORMATION_TEMPLATE_KEY='${FORMATION_TEMPLATE_KEY:-}' FORMATION_TEMPLATE_PUBLIC_NAME='${FORMATION_TEMPLATE_PUBLIC_NAME:-}' FORMATION_TEMPLATE_SUMMARY=\"$(printf '%s' "${FORMATION_TEMPLATE_SUMMARY:-}" | tr '\n' ' ')\" FORMATION_TEMPLATE_COMPANY_PURPOSE=\"$(printf '%s' "${FORMATION_TEMPLATE_COMPANY_PURPOSE:-}" | tr '\n' ' ')\" FORMATION_TEMPLATE_WORKER_ROLE=\"$(printf '%s' "${FORMATION_TEMPLATE_WORKER_ROLE:-}" | tr '\n' ' ')\" FORMATION_TEMPLATE_SERVICES='${FORMATION_TEMPLATE_SERVICES:-[]}' FORMATION_TEMPLATE_CONNECTION_DEFAULTS='${FORMATION_TEMPLATE_CONNECTION_DEFAULTS:-[]}' FORMATION_TEMPLATE_RECOMMENDED_NETWORK_DOMAINS='${FORMATION_TEMPLATE_RECOMMENDED_NETWORK_DOMAINS:-[]}' FORMATION_TEMPLATE_CHECKPOINT_MOMENTS='${FORMATION_TEMPLATE_CHECKPOINT_MOMENTS:-[]}' node /app/bootstrap/seed_company_workspace.mjs"
+
+seed_command="FORMATION_SLUG=$(shell_escape "$SLUG")"
+seed_command+=" FORMATION_PUBLIC_HOSTNAME=$(shell_escape "$PUBLIC_HOSTNAME")"
+seed_command+=" FORMATION_HERMES_MODEL=$(shell_escape "$HERMES_MODEL")"
+seed_command+=" FORMATION_HERMES_ADAPTER_TYPE=$(shell_escape "${FORMATION_HERMES_ADAPTER_TYPE:-stock}")"
+seed_command+=" FORMATION_HERMES_PERSIST_SESSION=$(shell_escape "${FORMATION_HERMES_PERSIST_SESSION:-true}")"
+seed_command+=" FORMATION_HERMES_TOOLSETS=$(shell_escape "${FORMATION_HERMES_TOOLSETS:-[]}")"
+seed_command+=" FORMATION_HERMES_RUNTIME_PLUGINS=$(shell_escape "${FORMATION_HERMES_RUNTIME_PLUGINS:-[]}")"
+seed_command+=" FORMATION_HERMES_SHARED_SKILLS=$(shell_escape "${FORMATION_HERMES_SHARED_SKILLS:-[]}")"
+seed_command+=" FORMATION_HERMES_COMMAND=$(shell_escape "${FORMATION_HERMES_COMMAND:-/app/bin/hermes-company}")"
+seed_command+=" FORMATION_HERMES_PROMPT_TEMPLATE_VERSION=$(shell_escape "${FORMATION_HERMES_PROMPT_TEMPLATE_VERSION:-company-workspace-prompt-v1}")"
+seed_command+=" FORMATION_HERMES_PROMPT_TEMPLATE_JSON=$(shell_escape "${FORMATION_HERMES_PROMPT_TEMPLATE_JSON:-}")"
+seed_command+=" FORMATION_WORKSPACE_PATH=$(shell_escape "${FORMATION_WORKSPACE_PATH:-/app/company}")"
+seed_command+=" FORMATION_WORKSPACE_SEED_VERSION=$(shell_escape "${FORMATION_WORKSPACE_SEED_VERSION:-company-workspace-v1}")"
+seed_command+=" FORMATION_TEMPLATE_KEY=$(shell_escape "${FORMATION_TEMPLATE_KEY:-}")"
+seed_command+=" FORMATION_TEMPLATE_PUBLIC_NAME=$(shell_escape "${FORMATION_TEMPLATE_PUBLIC_NAME:-}")"
+seed_command+=" FORMATION_TEMPLATE_SUMMARY=$(shell_escape "$(printf '%s' "${FORMATION_TEMPLATE_SUMMARY:-}" | tr '\n' ' ')")"
+seed_command+=" FORMATION_TEMPLATE_COMPANY_PURPOSE=$(shell_escape "$(printf '%s' "${FORMATION_TEMPLATE_COMPANY_PURPOSE:-}" | tr '\n' ' ')")"
+seed_command+=" FORMATION_TEMPLATE_WORKER_ROLE=$(shell_escape "$(printf '%s' "${FORMATION_TEMPLATE_WORKER_ROLE:-}" | tr '\n' ' ')")"
+seed_command+=" FORMATION_TEMPLATE_SERVICES=$(shell_escape "${FORMATION_TEMPLATE_SERVICES:-[]}")"
+seed_command+=" FORMATION_TEMPLATE_CONNECTION_DEFAULTS=$(shell_escape "${FORMATION_TEMPLATE_CONNECTION_DEFAULTS:-[]}")"
+seed_command+=" FORMATION_TEMPLATE_RECOMMENDED_NETWORK_DOMAINS=$(shell_escape "${FORMATION_TEMPLATE_RECOMMENDED_NETWORK_DOMAINS:-[]}")"
+seed_command+=" FORMATION_TEMPLATE_CHECKPOINT_MOMENTS=$(shell_escape "${FORMATION_TEMPLATE_CHECKPOINT_MOMENTS:-[]}")"
+seed_command+=" node /app/bootstrap/seed_company_workspace.mjs"
+
+run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "$seed_command"
 run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "nohup /app/bootstrap/launch_workspace.sh >/tmp/hermes-workspace-service.log 2>&1 &"
 run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "until curl -fsS http://127.0.0.1:$GATEWAY_PORT/health >/dev/null; do sleep 2; done"
 run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "until curl -fsSI http://127.0.0.1:$WORKSPACE_PORT/ >/dev/null; do sleep 2; done"
