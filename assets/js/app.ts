@@ -561,50 +561,17 @@ function mountDisclosurePanels(
   return () => cleanups.forEach((cleanup) => cleanup());
 }
 
-function mountBugReportLedger(root: HTMLElement, pushEvent?: (event: string, payload: object) => void): () => void {
-  const disclosureCleanup = mountDisclosurePanels(root, "[data-bug-report-toggle]");
-  const sentinel = root.querySelector<HTMLElement>("[data-bug-report-sentinel]");
-
-  if (!sentinel || typeof pushEvent !== "function") return disclosureCleanup;
-
-  let loadLocked = false;
-  const observer = new IntersectionObserver(
-    (entries) => {
-      const isVisible = entries.some((entry) => entry.isIntersecting);
-      if (!isVisible || loadLocked) return;
-      loadLocked = true;
-      pushEvent("load-more", {});
-      window.setTimeout(() => {
-        loadLocked = false;
-      }, 250);
-    },
-    {
-      rootMargin: "0px 0px 320px 0px",
-      threshold: 0.05,
-    },
-  );
-
-  observer.observe(sentinel);
-
-  return () => {
-    observer.disconnect();
-    disclosureCleanup();
-  };
+function mountBugReportLedger(root: HTMLElement): () => void {
+  return mountDisclosurePanels(root, "[data-bug-report-toggle]");
 }
 
 const BugReportLedgerHook = {
-  mounted(this: HookContext & { __bugReportCleanup?: () => void; pushEvent?: (event: string, payload: object) => void }) {
-    this.__bugReportCleanup = mountBugReportLedger(
-      this.el as HTMLElement,
-      this.pushEvent?.bind(this),
-    );
+  mounted(this: HookContext & { __bugReportCleanup?: () => void }) {
+    this.__bugReportCleanup = mountBugReportLedger(this.el as HTMLElement);
   },
-  updated(this: HookContext & { __bugReportCleanup?: () => void; pushEvent?: (event: string, payload: object) => void }) {
+  updated(this: HookContext & { __bugReportCleanup?: () => void }) {
     this.__bugReportCleanup?.();
-    this.__bugReportCleanup = mountBugReportLedger(
-      this.el as HTMLElement,
-      this.pushEvent?.bind(this),
-    );
+    this.__bugReportCleanup = mountBugReportLedger(this.el as HTMLElement);
   },
   destroyed(this: HookContext & { __bugReportCleanup?: () => void }) {
     this.__bugReportCleanup?.();

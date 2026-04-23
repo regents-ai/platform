@@ -48,7 +48,9 @@ defmodule PlatformPhxWeb.BugReportLiveTest do
     assert position(html, "newer summary") < position(html, "older summary")
   end
 
-  test "bug report route loads older reports on infinite scroll", %{conn: conn} do
+  test "bug report route replaces the current page with older reports and returns newer", %{
+    conn: conn
+  } do
     for index <- 1..51 do
       summary = "report-" <> String.pad_leading(Integer.to_string(index), 3, "0")
       {:ok, report} = create_bug_report(summary, "details #{index}")
@@ -60,20 +62,56 @@ defmodule PlatformPhxWeb.BugReportLiveTest do
 
     {:ok, view, html} = live(conn, "/bug-report")
 
-    assert html =~ "Load more reports"
+    assert html =~ "Older"
+    assert html =~ "Newer"
+    assert html =~ "Page 1 shows 50 reports"
     assert html =~ "report-051"
     refute html =~ "report-001"
     assert has_element?(view, "#platform-bug-ledger-stream[phx-update=\"stream\"]")
-    assert has_element?(view, "#bug-report-load-sentinel[data-bug-report-sentinel]")
 
-    html_two =
+    older_html =
       view
-      |> element("#platform-bug-ledger-root")
-      |> render_hook("load-more")
+      |> element("#bug-report-older")
+      |> render_click()
 
-    assert html_two =~ "report-051"
-    assert html_two =~ "report-001"
-    refute html_two =~ "Page 2"
+    assert older_html =~ "Page 2 shows 1 report"
+    assert older_html =~ "report-001"
+    refute older_html =~ "report-051"
+
+    newer_html =
+      view
+      |> element("#bug-report-newer")
+      |> render_click()
+
+    assert newer_html =~ "Page 1 shows 50 reports"
+    assert newer_html =~ "report-051"
+    refute newer_html =~ "report-001"
+  end
+
+  test "changing filters resets the report ledger to page one", %{conn: conn} do
+    for index <- 1..51 do
+      summary = "report-" <> String.pad_leading(Integer.to_string(index), 3, "0")
+      {:ok, report} = create_bug_report(summary, "details #{index}")
+
+      Repo.update_all(from(row in BugReport, where: row.id == ^report.id),
+        set: [created_at: DateTime.add(~U[2026-04-01 10:00:00Z], index, :second)]
+      )
+    end
+
+    {:ok, view, _html} = live(conn, "/bug-report")
+
+    view
+    |> element("#bug-report-older")
+    |> render_click()
+
+    filtered_html =
+      view
+      |> form("#bug-report-filters", filters: %{"status" => "pending"})
+      |> render_change()
+
+    assert filtered_html =~ "Page 1 shows 50 reports"
+    assert filtered_html =~ "report-051"
+    refute filtered_html =~ "report-001"
   end
 
   defp create_bug_report(summary, details) do

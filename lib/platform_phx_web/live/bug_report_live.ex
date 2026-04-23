@@ -17,7 +17,8 @@ defmodule PlatformPhxWeb.BugReportLive do
      |> assign(:page_title, "Bug report ledger")
      |> assign(:filters, filters)
      |> assign(:filter_form, filters_form(filters))
-     |> assign(:next_page, 2)
+     |> assign(:page, pagination.page)
+     |> assign(:has_previous, pagination.has_previous)
      |> assign(:has_next, pagination.has_next)
      |> assign(:now, now)
      |> assign(:report_count, length(pagination.entries))
@@ -36,36 +37,20 @@ defmodule PlatformPhxWeb.BugReportLive do
   end
 
   @impl true
-  def handle_event("load-more", _params, %{assigns: %{has_next: false}} = socket) do
+  def handle_event("older-page", _params, %{assigns: %{has_next: false}} = socket) do
     {:noreply, socket}
   end
 
-  def handle_event("load-more", _params, socket) do
-    now = DateTime.utc_now()
+  def handle_event("older-page", _params, socket) do
+    {:noreply, load_report_page(socket, socket.assigns.page + 1)}
+  end
 
-    pagination =
-      OperatorReports.list_bug_reports_page(
-        socket.assigns.next_page,
-        @page_size,
-        socket.assigns.filters,
-        now
-      )
+  def handle_event("newer-page", _params, %{assigns: %{has_previous: false}} = socket) do
+    {:noreply, socket}
+  end
 
-    stats = report_stats(pagination.entries, now)
-
-    {:noreply,
-     socket
-     |> assign(:next_page, socket.assigns.next_page + 1)
-     |> assign(:has_next, pagination.has_next)
-     |> assign(:now, now)
-     |> assign(:report_count, socket.assigns.report_count + length(pagination.entries))
-     |> assign(:status_totals, merge_totals(socket.assigns.status_totals, stats.status_totals))
-     |> assign(:source_totals, merge_totals(socket.assigns.source_totals, stats.source_totals))
-     |> assign(
-       :reports_today_count,
-       socket.assigns.reports_today_count + stats.reports_today_count
-     )
-     |> stream(:reports, pagination.entries)}
+  def handle_event("newer-page", _params, socket) do
+    {:noreply, load_report_page(socket, socket.assigns.page - 1)}
   end
 
   def handle_event("change-filters", %{"filters" => filter_params}, socket) do
@@ -399,20 +384,34 @@ defmodule PlatformPhxWeb.BugReportLive do
 
               <div class="flex items-center justify-between rounded-[1.5rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_98%,var(--card)_2%)] px-6 py-4">
                 <p class="text-sm text-[color:var(--muted-foreground)]">
-                  Showing newest {Integer.to_string(@report_count)} reports in this view
+                  Page {@page} shows {report_count_label(@report_count)}
                 </p>
-                <div :if={@has_next} class="grid justify-items-end gap-2">
+                <div class="flex flex-wrap items-center justify-end gap-3">
                   <button
-                    id="bug-report-load-more"
+                    id="bug-report-newer"
                     type="button"
-                    phx-click="load-more"
-                    class="inline-flex items-center gap-2 rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:var(--background)] px-4 py-3 text-sm text-[color:var(--brand-ink)] transition duration-200 hover:border-[color:var(--ring)]"
+                    phx-click="newer-page"
+                    disabled={!@has_previous}
+                    class={[
+                      "inline-flex items-center gap-2 rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:var(--background)] px-4 py-3 text-sm text-[color:var(--brand-ink)] transition duration-200 hover:border-[color:var(--ring)] disabled:cursor-not-allowed disabled:opacity-45"
+                    ]}
                   >
-                    <.icon name="hero-arrow-down" class="size-4" />
-                    <span>Load more reports</span>
+                    <.icon name="hero-arrow-up" class="size-4" />
+                    <span>Newer</span>
                   </button>
-                  <span id="bug-report-load-sentinel" data-bug-report-sentinel class="h-px w-px">
-                  </span>
+
+                  <button
+                    id="bug-report-older"
+                    type="button"
+                    phx-click="older-page"
+                    disabled={!@has_next}
+                    class={[
+                      "inline-flex items-center gap-2 rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:var(--background)] px-4 py-3 text-sm text-[color:var(--brand-ink)] transition duration-200 hover:border-[color:var(--ring)] disabled:cursor-not-allowed disabled:opacity-45"
+                    ]}
+                  >
+                    <span>Older</span>
+                    <.icon name="hero-arrow-down" class="size-4" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -511,7 +510,7 @@ defmodule PlatformPhxWeb.BugReportLive do
                         <div>
                           <p class="text-sm text-[color:var(--foreground)]">{source}</p>
                           <p class="text-xs leading-5 text-[color:var(--muted-foreground)]">
-                            {Map.get(@source_totals, source, 0)} reports loaded
+                            {Map.get(@source_totals, source, 0)} reports shown
                           </p>
                         </div>
                       </div>
@@ -541,7 +540,8 @@ defmodule PlatformPhxWeb.BugReportLive do
     stats = report_stats(pagination.entries, now)
 
     socket
-    |> assign(:next_page, 2)
+    |> assign(:page, pagination.page)
+    |> assign(:has_previous, pagination.has_previous)
     |> assign(:has_next, pagination.has_next)
     |> assign(:now, now)
     |> assign(:report_count, length(pagination.entries))
@@ -554,11 +554,23 @@ defmodule PlatformPhxWeb.BugReportLive do
     |> stream(:reports, pagination.entries, reset: true)
   end
 
+  defp load_report_page(socket, page) do
+    now = DateTime.utc_now()
+
+    pagination =
+      OperatorReports.list_bug_reports_page(page, @page_size, socket.assigns.filters, now)
+
+    reset_reports(socket, pagination, now)
+  end
+
   defp first_report_id([report | _reports]), do: report.id
   defp first_report_id([]), do: nil
 
   defp newest_report_at([report | _reports]), do: report.created_at
   defp newest_report_at([]), do: nil
+
+  defp report_count_label(1), do: "1 report"
+  defp report_count_label(count), do: "#{count} reports"
 
   defp report_stats(reports, now) do
     %{
@@ -566,10 +578,6 @@ defmodule PlatformPhxWeb.BugReportLive do
       source_totals: source_totals(reports),
       reports_today_count: reports_today(reports, now)
     }
-  end
-
-  defp merge_totals(left, right) do
-    Map.merge(left, right, fn _key, left_count, right_count -> left_count + right_count end)
   end
 
   defp default_filters do
