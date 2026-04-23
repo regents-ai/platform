@@ -40,7 +40,7 @@ defmodule PlatformPhx.OpenSea do
 
   @spec fetch_redeem_stats() :: {:ok, map()} | {:error, reason()}
   def fetch_redeem_stats do
-    PlatformPhx.Cache.fetch(@redeem_stats_cache_key, @cache_ttl_seconds, fn ->
+    RegentCache.fetch(:platform_phx, @redeem_stats_cache_key, @cache_ttl_seconds, fn ->
       with {:ok, api_key} <- api_key(),
            {:ok, stats} <- fetch_collection_supplies(api_key) do
         {:ok, stats}
@@ -54,7 +54,7 @@ defmodule PlatformPhx.OpenSea do
 
   @spec clear_cache() :: :ok
   def clear_cache do
-    _ = PlatformPhx.Cache.delete(@redeem_stats_cache_key)
+    _ = RegentCache.delete(:platform_phx, @redeem_stats_cache_key)
     :ok
   end
 

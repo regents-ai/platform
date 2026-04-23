@@ -14,7 +14,7 @@ defmodule PlatformPhx.TokenMarketData do
 
   @spec fetch_summary() :: {:ok, map()} | {:error, reason()}
   def fetch_summary do
-    PlatformPhx.Cache.fetch(@cache_key, @cache_ttl_seconds, fn ->
+    RegentCache.fetch(:platform_phx, @cache_key, @cache_ttl_seconds, fn ->
       with {:ok, summary} <- build_summary() do
         {:ok, encode_summary(summary)}
       end
@@ -27,7 +27,7 @@ defmodule PlatformPhx.TokenMarketData do
 
   @spec clear_cache() :: :ok
   def clear_cache do
-    _ = PlatformPhx.Cache.delete(@cache_key)
+    _ = RegentCache.delete(:platform_phx, @cache_key)
     :ok
   end
 
