@@ -1121,7 +1121,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
   defp unique_external_id(prefix), do: "#{prefix}_#{System.unique_integer([:positive])}"
 
   defp unique_tmp_dir!(prefix) do
-    Path.join(System.tmp_dir!(), "#{prefix}-#{System.unique_integer([:positive])}")
+    Path.join(System.tmp_dir!(), "#{prefix}-#{System.unique_integer([:positive, :monotonic])}")
   end
 
   defp stripe_setup_event_body(human_user_id) do
