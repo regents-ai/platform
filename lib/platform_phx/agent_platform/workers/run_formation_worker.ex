@@ -291,9 +291,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
   end
 
   defp insert_event(%FormationRun{} = formation, step, status, message) do
-    event = insert_event_without_broadcast(formation, step, status, message)
-    FormationProgress.broadcast(formation, event)
-    event
+    FormationProgress.insert_and_broadcast!(formation, step, status, message)
   end
 
   defp insert_event_without_broadcast(%FormationRun{} = formation, step, status, message) do

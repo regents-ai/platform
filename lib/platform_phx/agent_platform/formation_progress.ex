@@ -29,6 +29,14 @@ defmodule PlatformPhx.AgentPlatform.FormationProgress do
     |> Repo.insert!()
   end
 
+  @spec insert_and_broadcast!(FormationRun.t(), String.t(), String.t(), String.t()) ::
+          FormationEvent.t()
+  def insert_and_broadcast!(%FormationRun{} = formation, step, status, message) do
+    event = insert_event!(formation, step, status, message)
+    broadcast(formation, event)
+    event
+  end
+
   @spec broadcast(FormationRun.t(), FormationEvent.t()) :: :ok
   def broadcast(%FormationRun{} = formation, %FormationEvent{} = event) do
     :telemetry.execute(

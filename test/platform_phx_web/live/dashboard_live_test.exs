@@ -278,6 +278,23 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       |> init_test_session(%{current_human_id: human.id})
       |> live("/app/provisioning/#{formation.id}")
 
+    formation =
+      formation
+      |> FormationRun.changeset(%{
+        status: "running",
+        current_step: "verify_runtime"
+      })
+      |> Repo.update!()
+
+    FormationProgress.insert_and_broadcast!(
+      formation,
+      "verify_runtime",
+      "started",
+      "We're checking that your company is responding."
+    )
+
+    assert render(provisioning) =~ "Checking your company"
+
     completed_at = DateTime.utc_now() |> DateTime.truncate(:second)
 
     agent
@@ -298,15 +315,12 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       })
       |> Repo.update!()
 
-    event =
-      FormationProgress.insert_event!(
-        formation,
-        "finalize",
-        "succeeded",
-        "Your company is ready."
-      )
-
-    FormationProgress.broadcast(formation, event)
+    FormationProgress.insert_and_broadcast!(
+      formation,
+      "finalize",
+      "succeeded",
+      "Your company is ready."
+    )
 
     assert_redirect(provisioning, "/app/dashboard")
   end
