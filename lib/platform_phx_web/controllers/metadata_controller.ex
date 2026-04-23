@@ -8,7 +8,14 @@ defmodule PlatformPhxWeb.MetadataController do
 
     case File.read(path) do
       {:ok, body} ->
-        json(conn, Jason.decode!(body))
+        case Jason.decode(body) do
+          {:ok, payload} ->
+            json(conn, payload)
+
+          {:error, reason} ->
+            Logger.error("metadata decode failed #{inspect(%{path: path, reason: reason})}")
+            send_resp(conn, :internal_server_error, "Metadata is unavailable right now.")
+        end
 
       {:error, :enoent} ->
         send_resp(conn, :not_found, "Not Found")

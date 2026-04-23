@@ -509,6 +509,33 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     |> response(404)
   end
 
+  test "metadata route hides non-missing file errors", %{conn: conn} do
+    previous_root = Application.fetch_env!(:platform_phx, :token_metadata_root)
+
+    temp_root =
+      Path.join(System.tmp_dir!(), "metadata-public-error-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(temp_root)
+    File.write!(Path.join(temp_root, "broken"), "{not json")
+    Application.put_env(:platform_phx, :token_metadata_root, temp_root)
+
+    on_exit(fn ->
+      Application.put_env(:platform_phx, :token_metadata_root, previous_root)
+      File.rm_rf!(temp_root)
+    end)
+
+    body =
+      conn
+      |> put_req_header("accept", "application/json")
+      |> get("/metadata/broken")
+      |> response(500)
+
+    assert body == "Metadata is unavailable right now."
+    refute body =~ "Jason"
+    refute body =~ "%{"
+    refute body =~ "{:"
+  end
+
   test "heerich demo route renders", %{conn: conn} do
     {:ok, view, _html} = live(conn, "/heerich-demo")
 
