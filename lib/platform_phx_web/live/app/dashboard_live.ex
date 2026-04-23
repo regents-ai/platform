@@ -6,7 +6,6 @@ defmodule PlatformPhxWeb.App.DashboardLive do
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Formation
   alias PlatformPhx.Dashboard
-  alias PlatformPhx.TokenCardManifest
   import PlatformPhxWeb.AppComponents
 
   @impl true
@@ -16,11 +15,12 @@ defmodule PlatformPhxWeb.App.DashboardLive do
      |> assign(:page_title, "Dashboard")
      |> assign(:formation_data, nil)
      |> assign(:formation_notice, nil)
+     |> assign(:dashboard_notices, [])
      |> assign(:avatar_save_notice, nil)
      |> assign(:holdings, empty_holdings())
      |> assign(:formation_token_cards, %{})
      |> assign(:shader_options, AvatarSelection.shader_options())
-     |> assign(:usage, empty_usage())
+     |> assign(:usage, %{})
      |> load_payload()}
   end
 
@@ -88,6 +88,8 @@ defmodule PlatformPhxWeb.App.DashboardLive do
             formation_token_cards={@formation_token_cards}
             shader_options={@shader_options}
             avatar_save_notice={@avatar_save_notice}
+            notice={@formation_notice}
+            notices={@dashboard_notices}
           />
         <% else %>
           <.setup_blocked_stage
@@ -128,6 +130,8 @@ defmodule PlatformPhxWeb.App.DashboardLive do
             action_label="Open Agent Formation"
             action_path={~p"/app/formation"}
             action_copy="Finish company setup first, then come back here to manage the live company."
+            notice={@formation_notice}
+            readiness={Map.get(@formation_data || %{}, :readiness)}
           />
         <% end %>
       </div>
@@ -136,45 +140,15 @@ defmodule PlatformPhxWeb.App.DashboardLive do
   end
 
   defp load_payload(socket) do
-    usage = load_usage(socket.assigns.current_human)
-    holdings = load_holdings(socket.assigns.current_human)
-
-    result =
-      case Dashboard.agent_formation_payload(socket.assigns.current_human) do
-        {:ok, payload} ->
-          payload
-
-        _ ->
-          %{
-            formation: nil,
-            notice: %{tone: :error, message: "Dashboard details are unavailable right now."}
-          }
-      end
+    {:ok, snapshot} = Dashboard.company_snapshot(socket.assigns.current_human)
 
     socket
-    |> assign(:formation_data, result.formation)
-    |> assign(:formation_notice, result.notice)
-    |> assign(:holdings, holdings)
-    |> assign(:formation_token_cards, formation_token_cards(holdings))
-    |> assign(:usage, usage)
-  end
-
-  defp load_usage(nil), do: empty_usage()
-
-  defp load_usage(current_human) do
-    case Formation.billing_usage(current_human) do
-      {:ok, %{usage: usage}} -> usage
-      {:error, _reason} -> empty_usage()
-    end
-  end
-
-  defp load_holdings(nil), do: empty_holdings()
-
-  defp load_holdings(current_human) do
-    case AgentPlatform.holdings_for_human(current_human) do
-      {:ok, holdings} -> holdings
-      {:error, _reason} -> empty_holdings()
-    end
+    |> assign(:formation_data, snapshot.formation)
+    |> assign(:formation_notice, snapshot.notice)
+    |> assign(:dashboard_notices, snapshot.notices)
+    |> assign(:holdings, snapshot.holdings)
+    |> assign(:formation_token_cards, snapshot.formation_token_cards)
+    |> assign(:usage, snapshot.usage)
   end
 
   defp dashboard_ready?(%{owned_companies: owned_companies}) when is_list(owned_companies),
@@ -182,8 +156,17 @@ defmodule PlatformPhxWeb.App.DashboardLive do
 
   defp dashboard_ready?(_formation), do: false
 
+  defp dashboard_not_ready_copy(%{readiness: %{ready: true}}) do
+    "Everything is ready. Open the company, then come back here to manage it."
+  end
+
+  defp dashboard_not_ready_copy(%{readiness: %{blocked_step: %{message: message}}})
+       when is_binary(message) do
+    message
+  end
+
   defp dashboard_not_ready_copy(%{authenticated: true}) do
-    "You are signed in, but no company is open yet. Finish launch in Agent Formation, then come back here to manage it."
+    "Finish the next setup step, then come back here to manage the company."
   end
 
   defp dashboard_not_ready_copy(%{authenticated: false}) do
@@ -194,19 +177,6 @@ defmodule PlatformPhxWeb.App.DashboardLive do
     "We could not load your company details right now. Open Agent Formation to keep going."
   end
 
-  defp empty_usage do
-    %{
-      runtime_credit_balance_usd_cents: 0,
-      runtime_spend_usd_cents: 0,
-      llm_spend_usd_cents: 0,
-      paid_companies: 0,
-      paused_companies: 0,
-      trialing_companies: 0,
-      welcome_credit: nil,
-      companies: []
-    }
-  end
-
   defp empty_holdings do
     %{
       "animata1" => [],
@@ -214,18 +184,4 @@ defmodule PlatformPhxWeb.App.DashboardLive do
       "animataPass" => []
     }
   end
-
-  defp formation_token_cards(%{"animataPass" => token_ids}) when is_list(token_ids) do
-    case TokenCardManifest.fetch_many(token_ids) do
-      {:ok, entries} ->
-        entries
-        |> Enum.reject(fn {_token_id, entry} -> is_nil(entry) end)
-        |> Map.new()
-
-      {:error, _reason} ->
-        %{}
-    end
-  end
-
-  defp formation_token_cards(_holdings), do: %{}
 end

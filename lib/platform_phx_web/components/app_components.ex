@@ -741,6 +741,7 @@ defmodule PlatformPhxWeb.AppComponents do
       title="Add billing"
       summary="Choose the claimed name you want to use for launch, then activate billing so Regents can open the hosted company."
       snapshot={@snapshot}
+      readiness={Map.get(@formation, :readiness)}
       facts={@facts}
       next_steps={@next_steps}
     >
@@ -920,6 +921,7 @@ defmodule PlatformPhxWeb.AppComponents do
       title="Open company"
       summary="Confirm the claimed name you want to use, then launch the hosted company. Regents will reserve the identity, prepare the public page, and bring you into the company controls."
       snapshot={@snapshot}
+      readiness={Map.get(@formation, :readiness)}
       facts={@facts}
       next_steps={@next_steps}
     >
@@ -1186,6 +1188,8 @@ defmodule PlatformPhxWeb.AppComponents do
   attr :formation_token_cards, :map, required: true
   attr :shader_options, :list, required: true
   attr :avatar_save_notice, :map, default: nil
+  attr :notice, :map, default: nil
+  attr :notices, :list, default: []
 
   def dashboard_stage(assigns) do
     assigns =
@@ -1227,9 +1231,16 @@ defmodule PlatformPhxWeb.AppComponents do
       title="Company dashboard"
       summary="Control the hosted company from here. Review company status, billing, and public presentation here, then move into the next lane when you are ready."
       snapshot={@snapshot}
+      readiness={Map.get(@formation, :readiness)}
       facts={@facts}
       next_steps={@next_steps}
     >
+      <div :if={@notices != []} class="mb-5 space-y-3">
+        <.inline_notice :for={notice <- @notices} notice={notice} />
+      </div>
+
+      <.inline_notice :if={@notices == [] and @notice} notice={@notice} class="mb-5" />
+
       <section class="rounded-[1.9rem] border border-[color:color-mix(in_oklch,var(--brand-ink)_14%,var(--border)_86%)] bg-[linear-gradient(180deg,color-mix(in_oklch,var(--background)_97%,var(--card)_3%),color-mix(in_oklch,var(--card)_88%,var(--background)_12%))] p-5 shadow-[0_24px_60px_-48px_color-mix(in_oklch,var(--brand-ink)_22%,transparent)] sm:p-6">
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div class="space-y-2">
@@ -1678,6 +1689,7 @@ defmodule PlatformPhxWeb.AppComponents do
   attr :title, :string, required: true
   attr :summary, :string, required: true
   attr :snapshot, :map, required: true
+  attr :readiness, :map, default: nil
   attr :facts, :list, default: []
   attr :next_steps, :list, default: []
   slot :inner_block, required: true
@@ -1730,7 +1742,12 @@ defmodule PlatformPhxWeb.AppComponents do
       </main>
 
       <aside data-dashboard-block class="xl:sticky xl:top-6 xl:self-start">
-        <.setup_status_sidebar step={@step} snapshot={@snapshot} next_steps={@next_steps} />
+        <.setup_status_sidebar
+          step={@step}
+          snapshot={@snapshot}
+          readiness={@readiness}
+          next_steps={@next_steps}
+        />
       </aside>
     </div>
     """
@@ -1795,6 +1812,7 @@ defmodule PlatformPhxWeb.AppComponents do
 
   attr :step, :integer, required: true
   attr :snapshot, :map, required: true
+  attr :readiness, :map, default: nil
   attr :next_steps, :list, default: []
 
   def setup_status_sidebar(assigns) do
@@ -1836,6 +1854,27 @@ defmodule PlatformPhxWeb.AppComponents do
                     <p class="mt-1 text-sm text-[color:var(--muted-foreground)]">{card.copy}</p>
                   </div>
                   <span class={setup_state_chip_class(card.tone)}>{card.state}</span>
+                </div>
+              </div>
+            <% end %>
+          </div>
+
+          <div :if={readiness_steps(@readiness) != []} class="space-y-3">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-[color:var(--muted-foreground)]">
+              Readiness checklist
+            </p>
+            <%= for step <- readiness_steps(@readiness) do %>
+              <div class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-sm text-[color:var(--foreground)]">{step.label}</p>
+                    <p class="mt-1 text-sm leading-5 text-[color:var(--muted-foreground)]">
+                      {step.message}
+                    </p>
+                  </div>
+                  <span class={readiness_state_chip_class(step.status)}>
+                    {readiness_status_label(step.status)}
+                  </span>
                 </div>
               </div>
             <% end %>
@@ -1917,12 +1956,14 @@ defmodule PlatformPhxWeb.AppComponents do
   attr :title, :string, required: true
   attr :summary, :string, required: true
   attr :snapshot, :map, required: true
+  attr :readiness, :map, default: nil
   attr :facts, :list, default: []
   attr :next_steps, :list, default: []
   attr :blocker_copy, :string, required: true
   attr :action_label, :string, required: true
   attr :action_path, :string, required: true
   attr :action_copy, :string, default: nil
+  attr :notice, :map, default: nil
 
   def setup_blocked_stage(assigns) do
     ~H"""
@@ -1931,9 +1972,12 @@ defmodule PlatformPhxWeb.AppComponents do
       title={@title}
       summary={@summary}
       snapshot={@snapshot}
+      readiness={@readiness}
       facts={@facts}
       next_steps={@next_steps}
     >
+      <.inline_notice :if={@notice} notice={@notice} class="mb-5" />
+
       <div class="grid gap-5 lg:grid-cols-2">
         <section class="rounded-[1.7rem] border border-[color:color-mix(in_oklch,var(--brand-ink)_12%,var(--border)_88%)] bg-[linear-gradient(180deg,color-mix(in_oklch,var(--background)_97%,var(--card)_3%),color-mix(in_oklch,var(--card)_90%,var(--background)_10%))] p-5">
           <p class="text-[11px] uppercase tracking-[0.2em] text-[color:var(--muted-foreground)]">
@@ -2166,6 +2210,21 @@ defmodule PlatformPhxWeb.AppComponents do
   defp setup_state_chip_class(:neutral),
     do:
       "rounded-full border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-1 text-xs text-[color:var(--muted-foreground)]"
+
+  defp readiness_steps(%{steps: steps}) when is_list(steps), do: steps
+  defp readiness_steps(_readiness), do: []
+
+  defp readiness_status_label("complete"), do: "Ready"
+  defp readiness_status_label("ready"), do: "Ready"
+  defp readiness_status_label("needs_action"), do: "Needs action"
+  defp readiness_status_label("waiting"), do: "Waiting"
+  defp readiness_status_label(_status), do: "Waiting"
+
+  defp readiness_state_chip_class(status) when status in ["complete", "ready"],
+    do: setup_state_chip_class(:success)
+
+  defp readiness_state_chip_class("needs_action"), do: setup_state_chip_class(:warning)
+  defp readiness_state_chip_class(_status), do: setup_state_chip_class(:neutral)
 
   defp name_claim_badge_class(true),
     do:
@@ -2506,7 +2565,6 @@ defmodule PlatformPhxWeb.AppComponents do
       "bootstrap_sprite" -> "Preparing your company"
       "bootstrap_workspace" -> "Building your company workspace"
       "verify_runtime" -> "Checking your company"
-      "create_checkpoint" -> "Saving your first restore point"
       "activate_subdomain" -> "Opening your public page"
       "finalize" -> "Opening the dashboard"
       _ -> "Preparing your company"
@@ -2525,7 +2583,6 @@ defmodule PlatformPhxWeb.AppComponents do
   end
 
   defp launch_progress_step_key("bootstrap_sprite"), do: "create_sprite"
-  defp launch_progress_step_key("create_checkpoint"), do: "verify_runtime"
   defp launch_progress_step_key(step), do: step
 
   def billing_stage_ready?(%{authenticated: true, available_claims: claims})
@@ -2538,6 +2595,10 @@ defmodule PlatformPhxWeb.AppComponents do
   def billing_blocker_copy(%{authenticated: false}),
     do: "Sign in first, then claim a name before adding billing."
 
+  def billing_blocker_copy(%{readiness: %{blocked_step: %{message: message}}})
+      when is_binary(message),
+      do: message
+
   def billing_blocker_copy(%{available_claims: []}),
     do: "Claim a name first, then come back here to add billing."
 
@@ -2545,10 +2606,20 @@ defmodule PlatformPhxWeb.AppComponents do
     do: "Add billing once a claimed name is ready."
 
   def billing_next_step_label(%{authenticated: false}), do: "Go to access"
+
+  def billing_next_step_label(%{readiness: %{blocked_step: %{action_label: label}}})
+      when is_binary(label),
+      do: label
+
   def billing_next_step_label(%{available_claims: []}), do: "Go to identity"
   def billing_next_step_label(_formation), do: "Continue"
 
   def billing_next_step_path(%{authenticated: false}), do: "/app/access"
+
+  def billing_next_step_path(%{readiness: %{blocked_step: %{action_path: path}}})
+      when is_binary(path),
+      do: path
+
   def billing_next_step_path(%{available_claims: []}), do: "/app/identity"
   def billing_next_step_path(_formation), do: "/app/formation"
 
@@ -2567,6 +2638,13 @@ defmodule PlatformPhxWeb.AppComponents do
   def formation_blocker_copy(%{authenticated: false}),
     do: "Sign in first so this wallet can be checked."
 
+  def formation_blocker_copy(%{readiness: %{ready: true}}),
+    do: "Everything is ready. You can open the company now."
+
+  def formation_blocker_copy(%{readiness: %{blocked_step: %{message: message}}})
+      when is_binary(message),
+      do: message
+
   def formation_blocker_copy(%{eligible: false}),
     do: "This wallet still needs a qualifying pass."
 
@@ -2580,12 +2658,26 @@ defmodule PlatformPhxWeb.AppComponents do
     do: "The company is not ready yet."
 
   def formation_next_step_label(%{authenticated: false}), do: "Go to access"
+
+  def formation_next_step_label(%{readiness: %{ready: true}}), do: "Open company"
+
+  def formation_next_step_label(%{readiness: %{blocked_step: %{action_label: label}}})
+      when is_binary(label),
+      do: label
+
   def formation_next_step_label(%{eligible: false}), do: "Go to access"
   def formation_next_step_label(%{available_claims: []}), do: "Go to identity"
   def formation_next_step_label(%{billing_account: %{connected: false}}), do: "Go to billing"
   def formation_next_step_label(_formation), do: "Open company"
 
   def formation_next_step_path(%{authenticated: false}), do: "/app/access"
+
+  def formation_next_step_path(%{readiness: %{ready: true}}), do: "/app/formation"
+
+  def formation_next_step_path(%{readiness: %{blocked_step: %{action_path: path}}})
+      when is_binary(path),
+      do: path
+
   def formation_next_step_path(%{eligible: false}), do: "/app/access"
   def formation_next_step_path(%{available_claims: []}), do: "/app/identity"
   def formation_next_step_path(%{billing_account: %{connected: false}}), do: "/app/billing"

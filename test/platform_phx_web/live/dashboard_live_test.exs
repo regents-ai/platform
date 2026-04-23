@@ -6,7 +6,10 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
 
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform
+  alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.BillingAccount
+  alias PlatformPhx.AgentPlatform.FormationProgress
+  alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.Basenames.Mint
   alias PlatformPhx.OpenSea
   alias PlatformPhx.Repo
@@ -128,6 +131,28 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     )
   end
 
+  test "billing return shows payment status, receipt, and next action", %{conn: conn} do
+    human = insert_human!("active")
+    insert_claimed_name!(human, "tempo")
+    insert_billing_account!(human, 900)
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "7"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    {:ok, _billing, html} =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> live("/app/billing?billing=success&claimedLabel=tempo")
+
+    assert html =~ "Payment status: billing is active."
+    assert html =~ "Receipt: your payment method is saved."
+    assert html =~ "Next: open the company."
+  end
+
   test "dashboard route renders a safe no-company state for anonymous visitors", %{conn: conn} do
     {:ok, _dashboard, html} = live(conn, "/app/dashboard")
 
@@ -135,6 +160,28 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     assert html =~ "Open Agent Formation"
     assert html =~ "Techtree"
     assert html =~ "Autolaunch"
+    refute html =~ "Pause company"
+  end
+
+  test "dashboard shows the exact missing billing step before a company opens", %{conn: conn} do
+    human = insert_human!("not_connected")
+    insert_claimed_name!(human, "tempo")
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "7"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    {:ok, _dashboard, html} =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> live("/app/dashboard")
+
+    assert html =~ "Activate billing before opening a company."
+    assert html =~ "Readiness checklist"
+    assert html =~ "Billing"
     refute html =~ "Pause company"
   end
 
@@ -155,6 +202,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       |> live("/app/dashboard")
 
     assert html =~ "Open a company to make this your home."
+    assert html =~ "Claim a name before adding billing."
     assert html =~ "Open Agent Formation"
     assert html =~ "Techtree"
     assert html =~ "Autolaunch"
@@ -198,6 +246,69 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     assert dashboard_html =~ "Techtree"
     assert dashboard_html =~ "Autolaunch"
     assert dashboard_html =~ launch_label
+  end
+
+  test "provisioning follows live launch progress without polling", %{conn: conn} do
+    launch_label = "live-progress"
+    human = insert_human!("active")
+    insert_billing_account!(human, 900)
+    insert_claimed_name!(human, launch_label)
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "7"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    {:ok, view, _html} =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> live("/app/formation?claimedLabel=#{launch_label}")
+
+    view
+    |> element("button", "Open company")
+    |> render_click()
+
+    agent = AgentPlatform.get_owned_agent(human, launch_label)
+    formation = agent.formation_run
+
+    {:ok, provisioning, _html} =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> live("/app/provisioning/#{formation.id}")
+
+    completed_at = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    agent
+    |> Agent.changeset(%{
+      status: "published",
+      runtime_status: "ready",
+      observed_runtime_state: "active",
+      published_at: completed_at
+    })
+    |> Repo.update!()
+
+    formation =
+      formation
+      |> FormationRun.changeset(%{
+        status: "succeeded",
+        current_step: "finalize",
+        completed_at: completed_at
+      })
+      |> Repo.update!()
+
+    event =
+      FormationProgress.insert_event!(
+        formation,
+        "finalize",
+        "succeeded",
+        "Your company is ready."
+      )
+
+    FormationProgress.broadcast(formation, event)
+
+    assert_redirect(provisioning, "/app/dashboard")
   end
 
   test "dashboard shows the avatar creator with the saved avatar and owned choices", %{conn: conn} do

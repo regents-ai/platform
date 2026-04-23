@@ -8,7 +8,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.Connection
-  alias PlatformPhx.AgentPlatform.FormationEvent
+  alias PlatformPhx.AgentPlatform.FormationProgress
   alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.AgentPlatform.RuntimeControl
   alias PlatformPhx.AgentPlatform.Service
@@ -24,6 +24,8 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   @bootstrap_script_version "agent-formation-v1"
 
   def formation_payload(nil) do
+    billing_account = AgentPlatform.billing_account_payload(nil, [])
+
     {:ok,
      %{
        ok: true,
@@ -33,9 +35,19 @@ defmodule PlatformPhx.AgentPlatform.Formation do
        collections: empty_holdings(),
        claimed_names: [],
        available_claims: [],
-       billing_account: AgentPlatform.billing_account_payload(nil, []),
+       billing_account: billing_account,
        owned_companies: [],
-       active_formations: []
+       active_formations: [],
+       readiness:
+         readiness_payload(%{
+           authenticated: false,
+           wallet_connected?: false,
+           eligible: false,
+           available_claims: [],
+           billing_account: billing_account,
+           owned_companies: [],
+           active_formations: []
+         })
      }}
   end
 
@@ -44,6 +56,14 @@ defmodule PlatformPhx.AgentPlatform.Formation do
       claimed_names = AgentPlatform.claimed_names_for_human(human)
       companies = AgentPlatform.list_owned_agents(human)
       billing_account = AgentPlatform.get_billing_account(human)
+      available_claims = Enum.reject(claimed_names, &formation_claim_used?/1)
+      billing_account_payload = AgentPlatform.billing_account_payload(billing_account, companies)
+
+      active_formations =
+        companies
+        |> Enum.map(& &1.formation_run)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.map(&serialize_formation/1)
 
       {:ok,
        %{
@@ -53,14 +73,20 @@ defmodule PlatformPhx.AgentPlatform.Formation do
          eligible: AgentPlatform.eligible_holdings?(holdings),
          collections: holdings,
          claimed_names: claimed_names,
-         available_claims: Enum.reject(claimed_names, &formation_claim_used?/1),
-         billing_account: AgentPlatform.billing_account_payload(billing_account, companies),
+         available_claims: available_claims,
+         billing_account: billing_account_payload,
          owned_companies: Enum.map(companies, &AgentPlatform.serialize_agent(&1, :private)),
-         active_formations:
-           companies
-           |> Enum.map(& &1.formation_run)
-           |> Enum.reject(&is_nil/1)
-           |> Enum.map(&serialize_formation/1)
+         active_formations: active_formations,
+         readiness:
+           readiness_payload(%{
+             authenticated: true,
+             wallet_connected?: AgentPlatform.linked_wallet_addresses(human) != [],
+             eligible: AgentPlatform.eligible_holdings?(holdings),
+             available_claims: available_claims,
+             billing_account: billing_account_payload,
+             owned_companies: companies,
+             active_formations: active_formations
+           })
        }}
     end
   end
@@ -322,20 +348,19 @@ defmodule PlatformPhx.AgentPlatform.Formation do
                bootstrap_script_version: @bootstrap_script_version
              })
              |> Repo.insert(),
-           {:ok, _event} <-
-             %FormationEvent{}
-             |> FormationEvent.changeset(%{
-               formation_id: formation.id,
-               step: "reserve_claim",
-               status: "succeeded",
-               message: "Your company name is saved."
-             })
-             |> Repo.insert(),
+           event =
+             FormationProgress.insert_event!(
+               formation,
+               "reserve_claim",
+               "succeeded",
+               "Your company name is saved."
+             ),
            {:ok, _job} <- enqueue_formation(agent.id) do
         %{
           agent:
             Repo.preload(agent, [:subdomain, :services, :connections, :artifacts, :formation_run]),
-          formation: formation
+          formation: formation,
+          event: event
         }
       else
         {:error, changeset} when is_map(changeset) ->
@@ -346,8 +371,12 @@ defmodule PlatformPhx.AgentPlatform.Formation do
       end
     end)
     |> case do
-      {:ok, result} -> {:ok, result}
-      {:error, reason} -> {:error, reason}
+      {:ok, %{formation: formation, event: event} = result} ->
+        FormationProgress.broadcast(formation, event)
+        {:ok, Map.delete(result, :event)}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -420,6 +449,302 @@ defmodule PlatformPhx.AgentPlatform.Formation do
       nil -> {:error, {:unavailable, "Customer start template is missing"}}
       template -> {:ok, template}
     end
+  end
+
+  defp readiness_payload(context) do
+    steps = readiness_steps(context)
+
+    %{
+      ready: readiness_ready?(steps),
+      blocked_step: Enum.find(steps, &(&1.status in ["needs_action", "waiting"])),
+      steps: steps
+    }
+  end
+
+  defp readiness_steps(context) do
+    authenticated? = context.authenticated
+    wallet_connected? = context.wallet_connected?
+    eligible? = context.eligible
+    name_ready? = context.available_claims != []
+    billing_account = context.billing_account
+    billing_ready? = Map.get(billing_account, :connected) == true
+    billing_status = Map.get(billing_account, :status)
+    template_ready? = not is_nil(AgentPlatform.get_template(@default_template_key))
+    company_opened? = context.owned_companies != []
+    launch_active? = active_formation?(context.active_formations)
+
+    [
+      identity_readiness_step(authenticated?),
+      wallet_readiness_step(authenticated?, wallet_connected?),
+      access_readiness_step(wallet_connected?, eligible?),
+      name_readiness_step(eligible?, name_ready?),
+      billing_readiness_step(name_ready?, billing_ready?, billing_status),
+      template_readiness_step(billing_ready?, template_ready?),
+      company_readiness_step(billing_ready? and template_ready?, company_opened?, launch_active?),
+      launch_queue_readiness_step(
+        billing_ready? and template_ready?,
+        company_opened?,
+        launch_active?
+      )
+    ]
+  end
+
+  defp readiness_ready?(steps) do
+    Enum.all?(steps, &(&1.status in ["complete", "ready"]))
+  end
+
+  defp active_formation?(active_formations) when is_list(active_formations) do
+    Enum.any?(active_formations, &(&1.status in ["queued", "running"]))
+  end
+
+  defp active_formation?(_active_formations), do: false
+
+  defp identity_readiness_step(true) do
+    readiness_step(:identity, "Signed in", "complete", "You are signed in.", nil, nil)
+  end
+
+  defp identity_readiness_step(false) do
+    readiness_step(
+      :identity,
+      "Sign in",
+      "needs_action",
+      "Sign in to start company setup.",
+      "Go to access",
+      "/app/access"
+    )
+  end
+
+  defp wallet_readiness_step(_authenticated?, true) do
+    readiness_step(:wallet, "Wallet", "complete", "A wallet is connected.", nil, nil)
+  end
+
+  defp wallet_readiness_step(false, false) do
+    readiness_step(
+      :wallet,
+      "Wallet",
+      "waiting",
+      "Sign in so your wallet can be checked.",
+      "Go to access",
+      "/app/access"
+    )
+  end
+
+  defp wallet_readiness_step(true, false) do
+    readiness_step(
+      :wallet,
+      "Wallet",
+      "needs_action",
+      "Connect a wallet before company setup can continue.",
+      "Go to access",
+      "/app/access"
+    )
+  end
+
+  defp access_readiness_step(_wallet_connected?, true) do
+    readiness_step(:access, "Access", "complete", "This wallet has company access.", nil, nil)
+  end
+
+  defp access_readiness_step(false, false) do
+    readiness_step(
+      :access,
+      "Access",
+      "waiting",
+      "Connect a wallet before access can be checked.",
+      "Go to access",
+      "/app/access"
+    )
+  end
+
+  defp access_readiness_step(true, false) do
+    readiness_step(
+      :access,
+      "Access",
+      "needs_action",
+      "This wallet needs a qualifying pass before company setup can continue.",
+      "Go to access",
+      "/app/access"
+    )
+  end
+
+  defp name_readiness_step(_eligible?, true) do
+    readiness_step(:name, "Company name", "complete", "A claimed name is ready to use.", nil, nil)
+  end
+
+  defp name_readiness_step(false, false) do
+    readiness_step(
+      :name,
+      "Company name",
+      "waiting",
+      "Confirm company access before choosing a name.",
+      "Go to access",
+      "/app/access"
+    )
+  end
+
+  defp name_readiness_step(true, false) do
+    readiness_step(
+      :name,
+      "Company name",
+      "needs_action",
+      "Claim a name before adding billing.",
+      "Go to identity",
+      "/app/identity"
+    )
+  end
+
+  defp billing_readiness_step(_name_ready?, true, _billing_status) do
+    readiness_step(:billing, "Billing", "complete", "Billing is active.", nil, nil)
+  end
+
+  defp billing_readiness_step(true, false, "checkout_open") do
+    readiness_step(
+      :billing,
+      "Billing",
+      "waiting",
+      "Billing setup is being confirmed.",
+      "Check billing",
+      "/app/billing"
+    )
+  end
+
+  defp billing_readiness_step(false, false, _billing_status) do
+    readiness_step(
+      :billing,
+      "Billing",
+      "waiting",
+      "Claim a name before billing can be activated.",
+      "Go to identity",
+      "/app/identity"
+    )
+  end
+
+  defp billing_readiness_step(true, false, _billing_status) do
+    readiness_step(
+      :billing,
+      "Billing",
+      "needs_action",
+      "Activate billing before opening a company.",
+      "Go to billing",
+      "/app/billing"
+    )
+  end
+
+  defp template_readiness_step(false, _template_ready?) do
+    readiness_step(
+      :template,
+      "Launch plan",
+      "waiting",
+      "Activate billing before the launch plan can be used.",
+      "Go to billing",
+      "/app/billing"
+    )
+  end
+
+  defp template_readiness_step(true, true) do
+    readiness_step(:template, "Launch plan", "complete", "The launch plan is ready.", nil, nil)
+  end
+
+  defp template_readiness_step(true, false) do
+    readiness_step(
+      :template,
+      "Launch plan",
+      "waiting",
+      "The launch plan needs attention before company opening.",
+      nil,
+      nil
+    )
+  end
+
+  defp company_readiness_step(_launch_ready?, _company_opened?, true) do
+    readiness_step(
+      :company,
+      "Company",
+      "waiting",
+      "Your company is opening now.",
+      "View progress",
+      "/app/formation"
+    )
+  end
+
+  defp company_readiness_step(_launch_ready?, true, false) do
+    readiness_step(:company, "Company", "complete", "A company is open.", nil, nil)
+  end
+
+  defp company_readiness_step(true, false, false) do
+    readiness_step(
+      :company,
+      "Company",
+      "ready",
+      "You can open the company now.",
+      "Open company",
+      "/app/formation"
+    )
+  end
+
+  defp company_readiness_step(false, false, false) do
+    readiness_step(
+      :company,
+      "Company",
+      "waiting",
+      "Finish setup before opening a company.",
+      "Open setup",
+      "/app/formation"
+    )
+  end
+
+  defp launch_queue_readiness_step(_launch_ready?, _company_opened?, true) do
+    readiness_step(
+      :launch_queue,
+      "Launch queue",
+      "waiting",
+      "Company opening is already in progress.",
+      "View progress",
+      "/app/formation"
+    )
+  end
+
+  defp launch_queue_readiness_step(_launch_ready?, true, false) do
+    readiness_step(
+      :launch_queue,
+      "Launch queue",
+      "complete",
+      "The company has moved through launch.",
+      nil,
+      nil
+    )
+  end
+
+  defp launch_queue_readiness_step(true, false, false) do
+    readiness_step(
+      :launch_queue,
+      "Launch queue",
+      "ready",
+      "Launch can start when you open the company.",
+      "Open company",
+      "/app/formation"
+    )
+  end
+
+  defp launch_queue_readiness_step(false, false, false) do
+    readiness_step(
+      :launch_queue,
+      "Launch queue",
+      "waiting",
+      "Finish setup before launch can start.",
+      "Open setup",
+      "/app/formation"
+    )
+  end
+
+  defp readiness_step(key, label, status, message, action_label, action_path) do
+    %{
+      key: Atom.to_string(key),
+      label: label,
+      status: status,
+      message: message,
+      action_label: action_label,
+      action_path: action_path
+    }
   end
 
   defp require_available_claimed_name(%HumanUser{} = human, attrs) do
@@ -554,8 +879,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   end
 
   defp formation_claim_used?(claim) when is_map(claim) do
-    is_binary(Map.get(claim, :formation_agent_slug)) or
-      is_binary(Map.get(claim, "formation_agent_slug"))
+    claim.in_use == true
   end
 
   defp maybe_preload_events(%FormationRun{events: events} = formation) when is_list(events),

@@ -6,6 +6,7 @@ defmodule PlatformPhx.Dashboard do
   alias PlatformPhx.AgentPlatform.Formation
   alias PlatformPhx.Basenames
   alias PlatformPhx.OpenSea
+  alias PlatformPhx.TokenCardManifest
 
   @type notice_tone :: :error | :info | :success
   @type notice :: %{tone: notice_tone(), message: String.t()}
@@ -32,6 +33,15 @@ defmodule PlatformPhx.Dashboard do
   @type agent_formation_payload :: %{
           formation: map() | nil,
           notice: notice() | nil
+        }
+
+  @type company_snapshot :: %{
+          formation: map() | nil,
+          notice: notice() | nil,
+          notices: [notice()],
+          holdings: map(),
+          formation_token_cards: map(),
+          usage: map()
         }
 
   @type name_claim_state :: %{
@@ -132,6 +142,27 @@ defmodule PlatformPhx.Dashboard do
            notice: %{tone: :error, message: "Agent Formation is unavailable right now."}
          }}
     end
+  end
+
+  @spec company_snapshot(%HumanUser{} | nil) :: {:ok, company_snapshot()}
+  def company_snapshot(human) do
+    {holdings, holdings_notice} = dashboard_holdings(human)
+    formation = dashboard_formation(human)
+    {usage, usage_notice} = dashboard_usage(human)
+
+    notices =
+      [formation.notice, holdings_notice, usage_notice]
+      |> Enum.reject(&is_nil/1)
+
+    {:ok,
+     %{
+       formation: formation.formation,
+       notice: List.first(notices),
+       notices: notices,
+       holdings: holdings,
+       formation_token_cards: formation_token_cards(holdings),
+       usage: usage
+     }}
   end
 
   @spec name_claim_state(term(), String.t() | nil, String.t() | nil) :: name_claim_state()
@@ -267,24 +298,101 @@ defmodule PlatformPhx.Dashboard do
 
   defp map_redeem_supply(_payload), do: %{animata: nil, regent_animata_ii: nil}
 
+  defp dashboard_formation(human) do
+    case agent_formation_payload(human) do
+      {:ok, payload} ->
+        payload
+
+      _ ->
+        %{
+          formation: nil,
+          notice: %{tone: :error, message: "Dashboard details are unavailable right now."}
+        }
+    end
+  end
+
+  defp dashboard_usage(nil), do: {empty_usage(), nil}
+
+  defp dashboard_usage(current_human) do
+    case Formation.billing_usage(current_human) do
+      {:ok, %{usage: usage}} ->
+        {usage, nil}
+
+      {:error, _reason} ->
+        {empty_usage(), %{tone: :error, message: "Billing usage is unavailable right now."}}
+    end
+  end
+
+  defp dashboard_holdings(nil), do: {empty_dashboard_holdings(), nil}
+
+  defp dashboard_holdings(current_human) do
+    case AgentPlatform.holdings_for_human(current_human) do
+      {:ok, holdings} ->
+        {holdings, nil}
+
+      {:error, _reason} ->
+        {empty_dashboard_holdings(),
+         %{tone: :error, message: "Wallet holdings are unavailable right now."}}
+    end
+  end
+
+  defp empty_usage do
+    %{
+      runtime_credit_balance_usd_cents: 0,
+      runtime_spend_usd_cents: 0,
+      llm_spend_usd_cents: 0,
+      paid_companies: 0,
+      paused_companies: 0,
+      trialing_companies: 0,
+      welcome_credit: nil,
+      companies: []
+    }
+  end
+
+  defp empty_dashboard_holdings do
+    %{
+      "animata1" => [],
+      "animata2" => [],
+      "animataPass" => []
+    }
+  end
+
+  defp formation_token_cards(%{"animataPass" => token_ids}) when is_list(token_ids) do
+    case TokenCardManifest.fetch_many(token_ids) do
+      {:ok, entries} ->
+        entries
+        |> Enum.reject(fn {_token_id, entry} -> is_nil(entry) end)
+        |> Map.new()
+
+      {:error, _reason} ->
+        %{}
+    end
+  end
+
+  defp formation_token_cards(_holdings), do: %{}
+
   defp map_formation_payload(payload) when is_map(payload) do
-    collections = Map.get(payload, :collections) || Map.get(payload, "collections") || %{}
+    collections = Map.get(payload, :collections) || %{}
 
     %{
-      authenticated:
-        Map.get(payload, :authenticated) || Map.get(payload, "authenticated") || false,
-      wallet_address: Map.get(payload, :wallet_address) || Map.get(payload, "wallet_address"),
-      eligible: Map.get(payload, :eligible) || Map.get(payload, "eligible") || false,
+      authenticated: Map.get(payload, :authenticated) || false,
+      wallet_address: Map.get(payload, :wallet_address),
+      eligible: Map.get(payload, :eligible) || false,
       collections: map_holdings(collections),
-      claimed_names: Map.get(payload, :claimed_names) || Map.get(payload, "claimed_names") || [],
-      available_claims:
-        Map.get(payload, :available_claims) || Map.get(payload, "available_claims") || [],
-      billing_account:
-        Map.get(payload, :billing_account) || Map.get(payload, "billing_account") || %{},
-      owned_companies:
-        Map.get(payload, :owned_companies) || Map.get(payload, "owned_companies") || [],
-      active_formations:
-        Map.get(payload, :active_formations) || Map.get(payload, "active_formations") || []
+      claimed_names: Map.get(payload, :claimed_names) || [],
+      available_claims: Map.get(payload, :available_claims) || [],
+      billing_account: Map.get(payload, :billing_account) || %{},
+      owned_companies: Map.get(payload, :owned_companies) || [],
+      active_formations: Map.get(payload, :active_formations) || [],
+      readiness: Map.get(payload, :readiness) || empty_readiness()
+    }
+  end
+
+  defp empty_readiness do
+    %{
+      ready: false,
+      blocked_step: nil,
+      steps: []
     }
   end
 

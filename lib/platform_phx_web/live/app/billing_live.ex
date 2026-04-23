@@ -112,6 +112,7 @@ defmodule PlatformPhxWeb.App.BillingLive do
               action_label="Back to identity"
               action_path={~p"/app/identity"}
               action_copy="Return to the previous step, then come back here once billing is available again."
+              notice={@billing_notice}
             />
           <% billing_stage_ready?(@formation_data) -> %>
             <.billing_stage
@@ -154,6 +155,8 @@ defmodule PlatformPhxWeb.App.BillingLive do
               action_label={billing_next_step_label(@formation_data)}
               action_path={billing_next_step_path(@formation_data)}
               action_copy="Finish the missing name step, then return here to activate billing and continue."
+              notice={@billing_notice}
+              readiness={Map.get(@formation_data, :readiness)}
             />
         <% end %>
       </div>
@@ -212,16 +215,25 @@ defmodule PlatformPhxWeb.App.BillingLive do
         :success ->
           if socket.assigns.formation_data &&
                socket.assigns.formation_data.billing_account.connected do
-            %{tone: :success, message: "Billing is ready. You can continue to company creation."}
+            %{
+              tone: :success,
+              message:
+                "Payment status: billing is active. Receipt: your payment method is saved. Next: open the company."
+            }
           else
             %{
               tone: :info,
-              message: "Finishing billing setup now. This page will update automatically."
+              message:
+                "Payment status: confirmation is still running. Receipt: your setup request was received. Next: this page will update automatically."
             }
           end
 
         :cancel ->
-          %{tone: :error, message: "Billing setup was cancelled."}
+          %{
+            tone: :error,
+            message:
+              "Payment status: billing was not finished. Receipt: no active billing method was saved. Next: start billing setup again when ready."
+          }
       end
 
     assign(socket, :billing_notice, notice)

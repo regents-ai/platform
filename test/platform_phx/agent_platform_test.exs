@@ -33,4 +33,24 @@ defmodule PlatformPhx.AgentPlatformTest do
     assert payload.hermes.prompt_template_version ==
              WorkspaceBootstrap.prompt_template_version()
   end
+
+  test "workspace bootstrap pins runtime source versions" do
+    env =
+      WorkspaceBootstrap.build_env(
+        %Agent{
+          owner_human_id: 1,
+          slug: "pinned",
+          template_key: "start",
+          hermes_toolsets: [],
+          hermes_runtime_plugins: [],
+          hermes_shared_skills: []
+        },
+        %FormationRun{metadata: %{}}
+      )
+
+    assert env["FORMATION_HERMES_AGENT_REF"] == WorkspaceBootstrap.hermes_agent_ref()
+    assert env["FORMATION_WORKSPACE_REPO"] == WorkspaceBootstrap.workspace_repo()
+    assert env["FORMATION_WORKSPACE_REF"] == WorkspaceBootstrap.workspace_ref()
+    refute env["FORMATION_WORKSPACE_REF"] == "main"
+  end
 end

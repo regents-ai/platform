@@ -10,6 +10,7 @@ defmodule PlatformPhx.AgentPlatform do
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.Artifact
   alias PlatformPhx.AgentPlatform.BillingAccount
+  alias PlatformPhx.AgentPlatform.CompanyProfiles
   alias PlatformPhx.AgentPlatform.Connection
   alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.AgentPlatform.LlmUsageEvent
@@ -82,18 +83,11 @@ defmodule PlatformPhx.AgentPlatform do
   end
 
   def list_public_agents do
-    Agent
-    |> where([agent], agent.status == "published")
-    |> order_by([agent], asc: agent.slug)
-    |> preload([:subdomain, :services, :connections, :artifacts, :owner_human])
-    |> Repo.all()
+    CompanyProfiles.list_agents()
   end
 
   def get_public_agent(slug) when is_binary(slug) do
-    Agent
-    |> where([agent], agent.slug == ^normalize_slug(slug) and agent.status == "published")
-    |> preload([:subdomain, :services, :connections, :artifacts, :owner_human])
-    |> Repo.one()
+    CompanyProfiles.get_agent_by_slug(slug)
   end
 
   def get_public_agent(_slug), do: nil
@@ -131,31 +125,26 @@ defmodule PlatformPhx.AgentPlatform do
   def get_agent(_agent_id), do: nil
 
   def get_agent_by_host(host) when is_binary(host) do
-    host = String.downcase(String.trim(host))
-
-    Repo.one(
-      from agent in Agent,
-        join: subdomain in assoc(agent, :subdomain),
-        where:
-          subdomain.hostname == ^host and subdomain.active == true and agent.status == "published",
-        preload: [:subdomain, :services, :connections, :artifacts, :owner_human]
-    )
+    CompanyProfiles.get_agent_by_host(host)
   end
 
   def get_agent_by_host(_host), do: nil
 
   def resolve_host_payload(host) when is_binary(host) do
-    case get_agent_by_host(host) do
-      %Agent{} = agent -> {:ok, %{ok: true, host: host, agent: serialize_agent(agent, :public)}}
-      nil -> {:error, {:not_found, "No published agent matches that host"}}
+    case CompanyProfiles.by_host(host) do
+      %{agent: %Agent{} = agent, host: resolved_host} ->
+        {:ok, %{ok: true, host: resolved_host, agent: serialize_agent(agent, :public)}}
+
+      nil ->
+        {:error, {:not_found, "No published agent matches that host"}}
     end
   end
 
   def resolve_host_payload(_host), do: {:error, {:bad_request, "Invalid host"}}
 
   def feed_payload(slug) when is_binary(slug) do
-    case get_public_agent(slug) do
-      %Agent{} = agent ->
+    case CompanyProfiles.by_slug(slug) do
+      %{agent: %Agent{} = agent} ->
         {:ok,
          %{
            ok: true,
@@ -191,6 +180,7 @@ defmodule PlatformPhx.AgentPlatform do
         claim_status: mint.claim_status,
         upgrade_tx_hash: mint.upgrade_tx_hash,
         upgraded_at: mint.upgraded_at,
+        is_in_use: mint.is_in_use,
         formation_agent_slug: mint.formation_agent_slug,
         attached_agent_slug: mint.attached_agent_slug
       })
@@ -203,6 +193,7 @@ defmodule PlatformPhx.AgentPlatform do
           ens_fqdn: name.ens_fqdn || "#{name.label}.regent.eth",
           claimed_at: iso(name.created_at),
           claim_status: name.claim_status,
+          in_use: claimed_name_in_use?(name),
           upgrade_tx_hash: name.upgrade_tx_hash,
           upgraded_at: iso(name.upgraded_at),
           formation_agent_slug: name.formation_agent_slug,
@@ -213,6 +204,11 @@ defmodule PlatformPhx.AgentPlatform do
   end
 
   def claimed_names_for_human(_human), do: []
+
+  defp claimed_name_in_use?(name) do
+    name.is_in_use == true or is_binary(name.formation_agent_slug) or
+      is_binary(name.attached_agent_slug)
+  end
 
   def holdings_for_human(%HumanUser{} = human) do
     case current_wallet_address(human) do

@@ -147,6 +147,7 @@ defmodule PlatformPhxWeb.App.FormationLive do
               action_label={formation_next_step_label(@formation_data)}
               action_path={formation_next_step_path(@formation_data)}
               action_copy="Finish the missing setup step, then come back here to launch the company."
+              readiness={Map.get(@formation_data, :readiness)}
             />
         <% end %>
       </div>

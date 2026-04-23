@@ -13,7 +13,9 @@ HERMES_MODEL="${FORMATION_HERMES_MODEL:-glm-5.1}"
 BUNDLE_DIR="${FORMATION_BUNDLE_DIR:?missing FORMATION_BUNDLE_DIR}"
 LOG_PATH="${FORMATION_LOG_PATH:-}"
 WORKSPACE_REPO="${FORMATION_WORKSPACE_REPO:-https://github.com/outsourc-e/hermes-workspace.git}"
-WORKSPACE_REF="${FORMATION_WORKSPACE_REF:-main}"
+WORKSPACE_REF="${FORMATION_WORKSPACE_REF:-60ee8ea2d0dd9092258246388134125845fbfe2b}"
+HERMES_AGENT_REF="${FORMATION_HERMES_AGENT_REF:-v2026.4.16}"
+HERMES_PACKAGE_SPEC="hermes-agent[all] @ git+https://github.com/NousResearch/hermes-agent.git@$HERMES_AGENT_REF"
 
 run() {
   echo "+ $*"
@@ -30,7 +32,7 @@ run "$SPRITE_CLI" cp "$BUNDLE_DIR/hermes-workspace/seed_company_workspace.mjs" "
 run "$SPRITE_CLI" cp "$BUNDLE_DIR/hermes-workspace/launch_workspace.sh" "$SPRITE_NAME:/app/bootstrap/launch_workspace.sh"
 run "$SPRITE_CLI" cp "$BUNDLE_DIR/hermes-workspace/reset_workspace_password.sh" "$SPRITE_NAME:/app/bootstrap/reset_workspace_password.sh"
 run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "chmod +x /app/bootstrap/launch_workspace.sh /app/bootstrap/reset_workspace_password.sh"
-run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "export PATH=\"\$HOME/.hermes/bin:\$HOME/.local/bin:\$PATH\"; if ! command -v pnpm >/dev/null 2>&1; then corepack enable >/dev/null 2>&1 || true; corepack prepare pnpm@latest --activate >/dev/null 2>&1 || npm install -g pnpm; fi; if ! command -v hermes >/dev/null 2>&1; then curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash; export PATH=\"\$HOME/.hermes/bin:\$HOME/.local/bin:\$PATH\"; fi; rm -rf /app/hermes-workspace; git clone --depth 1 '$WORKSPACE_REPO' /app/hermes-workspace; git -C /app/hermes-workspace checkout '$WORKSPACE_REF'; cd /app/hermes-workspace; pnpm install --frozen-lockfile; pnpm build"
+run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "export PATH=\"\$HOME/.hermes/bin:\$HOME/.local/bin:\$PATH\"; if ! command -v pnpm >/dev/null 2>&1; then corepack enable >/dev/null 2>&1 || true; corepack prepare pnpm@latest --activate >/dev/null 2>&1 || npm install -g pnpm; fi; if ! command -v uv >/dev/null 2>&1; then curl -LsSf https://astral.sh/uv/install.sh | sh; export PATH=\"\$HOME/.local/bin:\$PATH\"; fi; uv tool install '$HERMES_PACKAGE_SPEC' --force --python 3.11; export PATH=\"\$HOME/.hermes/bin:\$HOME/.local/bin:\$PATH\"; rm -rf /app/hermes-workspace; git clone '$WORKSPACE_REPO' /app/hermes-workspace; git -C /app/hermes-workspace checkout '$WORKSPACE_REF'; cd /app/hermes-workspace; pnpm install --frozen-lockfile; pnpm build"
 run "$SPRITE_CLI" exec "$SPRITE_NAME" -- sh -lc "HERMES_ENV_PATH=\"\$(hermes config env-path 2>/dev/null || true)\"; if [ -z \"\$HERMES_ENV_PATH\" ]; then HERMES_ENV_PATH=\"\$HOME/.hermes/.env\"; fi; mkdir -p \"\$(dirname \"\$HERMES_ENV_PATH\")\"; touch \"\$HERMES_ENV_PATH\"; grep -vE '^API_SERVER_(ENABLED|HOST|PORT)=' \"\$HERMES_ENV_PATH\" >\"\$HERMES_ENV_PATH.tmp\" || true; mv \"\$HERMES_ENV_PATH.tmp\" \"\$HERMES_ENV_PATH\"; cat >>\"\$HERMES_ENV_PATH\" <<EOF
 API_SERVER_ENABLED=true
 API_SERVER_HOST=127.0.0.1
@@ -82,5 +84,5 @@ run "$SPRITE_CLI" services create "$SPRITE_NAME" hermes-workspace --http-port "$
 CHECKPOINT_REF="$("$SPRITE_CLI" checkpoint create "$SPRITE_NAME" --comment "agent formation bootstrap" | tail -n 1)"
 
 cat <<EOF
-{"sprite_url":"https://$SPRITE_HOSTNAME","workspace_url":"https://$SPRITE_HOSTNAME","checkpoint_ref":"$CHECKPOINT_REF","workspace_path":"${FORMATION_WORKSPACE_PATH:-/app/company}","workspace_seed_version":"${FORMATION_WORKSPACE_SEED_VERSION:-company-workspace-v1}","hermes_command":"${FORMATION_HERMES_COMMAND:-/app/bin/hermes-company}","prompt_template_version":"${FORMATION_HERMES_PROMPT_TEMPLATE_VERSION:-company-workspace-prompt-v1}","log_path":"$LOG_PATH"}
+{"sprite_url":"https://$SPRITE_HOSTNAME","workspace_url":"https://$SPRITE_HOSTNAME","checkpoint_ref":"$CHECKPOINT_REF","workspace_path":"${FORMATION_WORKSPACE_PATH:-/app/company}","workspace_seed_version":"${FORMATION_WORKSPACE_SEED_VERSION:-company-workspace-v1}","workspace_repo":"$WORKSPACE_REPO","workspace_ref":"$WORKSPACE_REF","hermes_command":"${FORMATION_HERMES_COMMAND:-/app/bin/hermes-company}","hermes_agent_ref":"$HERMES_AGENT_REF","prompt_template_version":"${FORMATION_HERMES_PROMPT_TEMPLATE_VERSION:-company-workspace-prompt-v1}","log_path":"$LOG_PATH"}
 EOF

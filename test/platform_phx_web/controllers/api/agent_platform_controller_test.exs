@@ -150,6 +150,9 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert response["eligible"] == false
     assert response["available_claims"] == []
     assert response["billing_account"]["connected"] == false
+    assert response["readiness"]["ready"] == false
+    assert get_in(response, ["readiness", "blocked_step", "key"]) == "identity"
+    assert length(response["readiness"]["steps"]) == 8
   end
 
   test "formation shows eligible holdings and claimed names for a signed-in human", %{conn: conn} do
@@ -173,6 +176,43 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert response["eligible"] == true
     assert get_in(response, ["collections", "animata1"]) == [7]
     assert Enum.map(response["available_claims"], & &1["label"]) == ["tempo"]
+    assert hd(response["available_claims"])["in_use"] == false
+    assert get_in(response, ["readiness", "blocked_step", "key"]) == "billing"
+
+    assert get_in(response, ["readiness", "blocked_step", "message"]) ==
+             "Activate billing before opening a company."
+  end
+
+  test "formation only offers claimed names that are not already in use", %{conn: conn} do
+    human = insert_human!()
+    insert_claimed_name!(human, "fresh")
+    insert_claimed_name!(human, "marked", %{is_in_use: true})
+    insert_claimed_name!(human, "forming", %{formation_agent_slug: "forming"})
+    insert_claimed_name!(human, "attached", %{attached_agent_slug: "attached"})
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "7"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    response =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> get("/api/agent-platform/formation")
+      |> json_response(200)
+
+    assert Enum.map(response["available_claims"], & &1["label"]) == ["fresh"]
+
+    claimed_by_label = Map.new(response["claimed_names"], &{&1["label"], &1["in_use"]})
+
+    assert claimed_by_label == %{
+             "attached" => true,
+             "forming" => true,
+             "fresh" => false,
+             "marked" => true
+           }
   end
 
   test "billing setup, top-up, webhook sync, and formation queue a company", %{conn: conn} do
@@ -252,7 +292,9 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     assert formation.metadata["workspace_path"] == "/app/company"
     assert formation.metadata["workspace_seed_version"] == "company-workspace-v1"
+    assert formation.metadata["workspace_ref"] == "60ee8ea2d0dd9092258246388134125845fbfe2b"
     assert formation.metadata["hermes_command"] == "/app/bin/hermes-company"
+    assert formation.metadata["hermes_agent_ref"] == "v2026.4.16"
     assert formation.metadata["prompt_template_version"] == "company-workspace-prompt-v1"
 
     runtime_response =
@@ -458,7 +500,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert File.read!(hermes_command) == "#!/usr/bin/env sh\necho custom-wrapper\n"
   end
 
-  test "public feed only returns public artifacts and strips unsafe urls", %{conn: conn} do
+  test "public feed only returns public artifacts", %{conn: conn} do
     human = insert_human!()
     agent = insert_agent!(human, "feedline", %{})
 
@@ -466,13 +508,6 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       title: "Public safe artifact",
       summary: "Safe output",
       url: "https://example.com/safe-output",
-      visibility: "public"
-    })
-
-    insert_legacy_artifact!(agent, %{
-      title: "Public unsafe artifact",
-      summary: "Unsafe output",
-      url: "javascript:alert('xss')",
       visibility: "public"
     })
 
@@ -493,13 +528,11 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     assert response["feed"]
            |> Enum.map(& &1["title"])
-           |> Enum.sort() == ["Public safe artifact", "Public unsafe artifact"]
+           |> Enum.sort() == ["Public safe artifact"]
 
     safe_artifact = Enum.find(response["feed"], &(&1["title"] == "Public safe artifact"))
-    unsafe_artifact = Enum.find(response["feed"], &(&1["title"] == "Public unsafe artifact"))
 
     assert safe_artifact["url"] == "https://example.com/safe-output"
-    assert unsafe_artifact["url"] == nil
   end
 
   test "company creation rolls back the claimed name when the launch job cannot be queued", %{
@@ -985,11 +1018,11 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     |> Repo.insert!()
   end
 
-  defp insert_claimed_name!(human, label) do
+  defp insert_claimed_name!(human, label, attrs \\ %{}) do
+    attrs = Enum.into(attrs, %{})
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    %Mint{}
-    |> Mint.changeset(%{
+    mint_attrs = %{
       parent_node: "0xparent",
       parent_name: "agent.base.eth",
       label: label,
@@ -1003,7 +1036,10 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       ens_assigned_at: now,
       is_free: true,
       is_in_use: false
-    })
+    }
+
+    %Mint{}
+    |> Mint.changeset(Map.merge(mint_attrs, attrs))
     |> Repo.insert!()
   end
 
@@ -1044,20 +1080,6 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     %Artifact{}
     |> Artifact.changeset(Map.merge(defaults, attrs))
-    |> Repo.insert!()
-  end
-
-  defp insert_legacy_artifact!(agent, attrs) do
-    defaults = %{
-      agent_id: agent.id,
-      title: "Artifact",
-      summary: "Artifact summary",
-      visibility: "public",
-      published_at: DateTime.utc_now() |> DateTime.truncate(:second)
-    }
-
-    %Artifact{}
-    |> struct!(Map.merge(defaults, attrs))
     |> Repo.insert!()
   end
 

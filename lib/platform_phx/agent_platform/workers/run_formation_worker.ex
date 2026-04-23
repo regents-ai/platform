@@ -9,7 +9,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
   import Ecto.Query, warn: false
 
   alias PlatformPhx.AgentPlatform.Agent
-  alias PlatformPhx.AgentPlatform.FormationEvent
+  alias PlatformPhx.AgentPlatform.FormationProgress
   alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.AgentPlatform.SpriteAudit
   alias PlatformPhx.AgentPlatform.SpriteRunner
@@ -19,8 +19,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
   @runner_steps [
     "create_sprite",
     "bootstrap_sprite",
-    "bootstrap_workspace",
-    "create_checkpoint"
+    "bootstrap_workspace"
   ]
 
   @impl true
@@ -135,7 +134,10 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
     )
 
     with {:ok, runtime_state} <-
-           SpriteRuntimeClient.service_state(agent.sprite_name, agent.sprite_service_name),
+           SpriteRuntimeClient.service_state(
+             agent.sprite_name,
+             agent.sprite_service_name || "hermes-workspace"
+           ),
          :ok <- require_active_runtime(runtime_state.state) do
       formation =
         formation
@@ -213,13 +215,28 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
         })
         |> Repo.update!()
 
-      insert_event(formation, "activate_subdomain", "succeeded", "Your public site is live.")
-      insert_event(formation, "finalize", "succeeded", "Your company is ready.")
+      activate_event =
+        insert_event_without_broadcast(
+          formation,
+          "activate_subdomain",
+          "succeeded",
+          "Your public site is live."
+        )
 
-      {Repo.preload(agent, [:subdomain, :formation_run]), formation}
+      finalize_event =
+        insert_event_without_broadcast(
+          formation,
+          "finalize",
+          "succeeded",
+          "Your company is ready."
+        )
+
+      {Repo.preload(agent, [:subdomain, :formation_run]), formation,
+       [activate_event, finalize_event]}
     end)
     |> case do
-      {:ok, {published_agent, completed_formation}} ->
+      {:ok, {published_agent, completed_formation, events}} ->
+        Enum.each(events, &FormationProgress.broadcast(completed_formation, &1))
         {:ok, published_agent, completed_formation}
 
       {:error, reason} ->
@@ -274,20 +291,18 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
   end
 
   defp insert_event(%FormationRun{} = formation, step, status, message) do
-    %FormationEvent{}
-    |> FormationEvent.changeset(%{
-      formation_id: formation.id,
-      step: step,
-      status: status,
-      message: message
-    })
-    |> Repo.insert!()
+    event = insert_event_without_broadcast(formation, step, status, message)
+    FormationProgress.broadcast(formation, event)
+    event
+  end
+
+  defp insert_event_without_broadcast(%FormationRun{} = formation, step, status, message) do
+    FormationProgress.insert_event!(formation, step, status, message)
   end
 
   defp success_message_for_step("create_sprite"), do: "The first launch step is complete."
   defp success_message_for_step("bootstrap_sprite"), do: "Your company setup is in place."
   defp success_message_for_step("bootstrap_workspace"), do: "Your company workspace is ready."
-  defp success_message_for_step("create_checkpoint"), do: "Your first restore point is saved."
   defp success_message_for_step(_step), do: "This launch step is complete."
 
   defp require_active_runtime("active"), do: :ok

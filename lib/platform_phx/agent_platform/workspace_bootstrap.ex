@@ -11,12 +11,18 @@ defmodule PlatformPhx.AgentPlatform.WorkspaceBootstrap do
   @workspace_path "/app/company"
   @hermes_command "/app/bin/hermes-company"
   @prompt_template_version "company-workspace-prompt-v1"
+  @hermes_agent_ref "v2026.4.16"
+  @workspace_repo "https://github.com/outsourc-e/hermes-workspace.git"
+  @workspace_ref "60ee8ea2d0dd9092258246388134125845fbfe2b"
 
   def bootstrap_version, do: @bootstrap_version
   def workspace_seed_version, do: @workspace_seed_version
   def workspace_path, do: @workspace_path
   def hermes_command, do: @hermes_command
   def prompt_template_version, do: @prompt_template_version
+  def hermes_agent_ref, do: @hermes_agent_ref
+  def workspace_repo, do: @workspace_repo
+  def workspace_ref, do: @workspace_ref
 
   def bundle_dir do
     Application.app_dir(:platform_phx, "priv/agent_formation")
@@ -46,8 +52,11 @@ defmodule PlatformPhx.AgentPlatform.WorkspaceBootstrap do
       "FORMATION_HERMES_RUNTIME_PLUGINS" => Jason.encode!(agent.hermes_runtime_plugins || []),
       "FORMATION_HERMES_SHARED_SKILLS" => Jason.encode!(agent.hermes_shared_skills || []),
       "FORMATION_HERMES_COMMAND" => @hermes_command,
+      "FORMATION_HERMES_AGENT_REF" => @hermes_agent_ref,
       "FORMATION_HERMES_PROMPT_TEMPLATE_VERSION" => @prompt_template_version,
       "FORMATION_HERMES_PROMPT_TEMPLATE_JSON" => Jason.encode!(hermes_prompt_template()),
+      "FORMATION_WORKSPACE_REPO" => @workspace_repo,
+      "FORMATION_WORKSPACE_REF" => @workspace_ref,
       "FORMATION_WORKSPACE_PATH" => @workspace_path,
       "FORMATION_WORKSPACE_SEED_VERSION" => @workspace_seed_version,
       "FORMATION_TEMPLATE_KEY" => agent.template_key || "",

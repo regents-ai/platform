@@ -1,10 +1,9 @@
 defmodule PlatformPhxWeb.App.ProvisioningLive do
   use PlatformPhxWeb, :live_view
 
+  alias PlatformPhx.AgentPlatform.FormationProgress
   alias PlatformPhx.Dashboard
   import PlatformPhxWeb.AppComponents
-
-  @refresh_ms 2_500
 
   @impl true
   def mount(%{"id" => formation_id}, _session, socket) do
@@ -12,6 +11,7 @@ defmodule PlatformPhxWeb.App.ProvisioningLive do
      socket
      |> assign(:page_title, "Opening company")
      |> assign(:formation_id, parse_formation_id(formation_id))
+     |> assign(:formation_progress_subscribed?, false)
      |> assign(:formation_data, nil)
      |> assign(:company, nil)
      |> assign(:formation, nil)
@@ -19,9 +19,12 @@ defmodule PlatformPhxWeb.App.ProvisioningLive do
   end
 
   @impl true
-  def handle_info(:refresh_formation_payload, socket) do
+  def handle_info({:formation_progress, %{formation_id: formation_id}}, socket)
+      when formation_id == socket.assigns.formation_id do
     {:noreply, load_payload(socket)}
   end
+
+  def handle_info({:formation_progress, _payload}, socket), do: {:noreply, socket}
 
   @impl true
   def render(assigns) do
@@ -90,19 +93,25 @@ defmodule PlatformPhxWeb.App.ProvisioningLive do
     formation = formation_by_id(formation_data, socket.assigns.formation_id)
     company = company_for_formation(formation_data, formation)
 
-    socket =
-      socket
-      |> assign(:formation_data, formation_data)
-      |> assign(:formation, formation)
-      |> assign(:company, company)
-      |> maybe_navigate_to_dashboard()
-
-    if connected?(socket) and formation_active?(formation) do
-      Process.send_after(self(), :refresh_formation_payload, @refresh_ms)
-    end
-
     socket
+    |> assign(:formation_data, formation_data)
+    |> assign(:formation, formation)
+    |> assign(:company, company)
+    |> maybe_subscribe_to_progress(formation)
+    |> maybe_navigate_to_dashboard()
   end
+
+  defp maybe_subscribe_to_progress(socket, %{id: formation_id} = formation) do
+    if connected?(socket) and formation_active?(formation) and
+         socket.assigns.formation_progress_subscribed? == false do
+      :ok = FormationProgress.subscribe(formation_id)
+      assign(socket, :formation_progress_subscribed?, true)
+    else
+      socket
+    end
+  end
+
+  defp maybe_subscribe_to_progress(socket, _formation), do: socket
 
   defp maybe_navigate_to_dashboard(%{assigns: %{company: company, formation: formation}} = socket) do
     if dashboard_ready?(company, formation) do
