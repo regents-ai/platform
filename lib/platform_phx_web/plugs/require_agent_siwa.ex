@@ -4,6 +4,7 @@ defmodule PlatformPhxWeb.Plugs.RequireAgentSiwa do
   import Plug.Conn
 
   alias PlatformPhx.SiwaClient
+  alias PlatformPhxWeb.ApiErrors
 
   def init(opts), do: opts
 
@@ -35,14 +36,7 @@ defmodule PlatformPhxWeb.Plugs.RequireAgentSiwa do
 
   defp unauthorized(conn) do
     conn
-    |> put_status(:unauthorized)
-    |> Phoenix.Controller.json(%{
-      "ok" => false,
-      "error" => %{
-        "code" => "siwa_auth_denied",
-        "message" => "Signed agent authentication failed"
-      }
-    })
+    |> ApiErrors.error({:unauthorized, "Signed agent authentication failed"})
     |> halt()
   end
 end

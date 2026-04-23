@@ -2,6 +2,7 @@ defmodule PlatformPhx.Agentbook do
   @moduledoc false
 
   import Ecto.Query, warn: false
+  require Logger
 
   alias Ecto.Multi
   alias AgentWorld.Error
@@ -222,7 +223,8 @@ defmodule PlatformPhx.Agentbook do
         {:error, {:bad_request, Exception.message(error)}}
 
       {:error, reason} ->
-        {:error, {:unavailable, inspect(reason)}}
+        Logger.warning("agentbook world proof submission failed #{inspect(%{reason: reason})}")
+        {:error, {:unavailable, PlatformPhx.PublicErrors.trust_approval()}}
     end
   end
 
@@ -410,8 +412,7 @@ defmodule PlatformPhx.Agentbook do
       app_id: session.app_id,
       action: session.action,
       signal: session.signal,
-      rp_context: session.rp_context,
-      allow_legacy_proofs: session.allow_legacy_proofs
+      rp_context: session.rp_context
     }
   end
 
@@ -476,7 +477,6 @@ defmodule PlatformPhx.Agentbook do
          rp_id: rp_id,
          signal: signal,
          rp_context: rp_context,
-         allow_legacy_proofs: Map.get(created, :allow_legacy_proofs, false),
          connector_uri: Map.get(created, :connector_uri),
          deep_link_uri: Map.get(created, :deep_link_uri),
          status: status_string(status),

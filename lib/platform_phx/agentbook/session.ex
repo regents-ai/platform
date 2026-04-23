@@ -24,7 +24,6 @@ defmodule PlatformPhx.Agentbook.Session do
     field :rp_id, :string
     field :signal, :string
     field :rp_context, :map
-    field :allow_legacy_proofs, :boolean, default: false
     field :connector_uri, :string
     field :deep_link_uri, :string
     field :status, :string
@@ -56,7 +55,6 @@ defmodule PlatformPhx.Agentbook.Session do
       :rp_id,
       :signal,
       :rp_context,
-      :allow_legacy_proofs,
       :connector_uri,
       :deep_link_uri,
       :status,
