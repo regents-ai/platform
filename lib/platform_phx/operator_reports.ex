@@ -58,17 +58,22 @@ defmodule PlatformPhx.OperatorReports do
 
   @spec list_bug_reports_page(integer(), integer()) :: bug_report_page()
   def list_bug_reports_page(page, page_size \\ @default_bug_report_page_size) do
+    list_bug_reports_page(page, page_size, %{}, DateTime.utc_now())
+  end
+
+  @spec list_bug_reports_page(integer(), integer(), map(), DateTime.t()) :: bug_report_page()
+  def list_bug_reports_page(page, page_size, filters, now) do
     page = normalize_page(page)
     page_size = normalize_page_size(page_size)
     offset = (page - 1) * page_size
 
     reports =
-      Repo.all(
-        from report in BugReport,
-          order_by: [desc: report.created_at, desc: report.id],
-          offset: ^offset,
-          limit: ^(page_size + 1)
-      )
+      BugReport
+      |> bug_report_filters(filters, now)
+      |> order_by([report], desc: report.created_at, desc: report.id)
+      |> offset(^offset)
+      |> limit(^(page_size + 1))
+      |> Repo.all()
 
     {entries, remainder} = Enum.split(reports, page_size)
 
@@ -80,6 +85,10 @@ defmodule PlatformPhx.OperatorReports do
       has_next: remainder != []
     }
   end
+
+  @spec get_bug_report(pos_integer()) :: BugReport.t() | nil
+  def get_bug_report(id) when is_integer(id) and id > 0, do: Repo.get(BugReport, id)
+  def get_bug_report(_id), do: nil
 
   @spec create_bug_report(map()) :: {:ok, BugReport.t()} | {:error, reason()}
   def create_bug_report(params) when is_map(params) do
@@ -188,6 +197,78 @@ defmodule PlatformPhx.OperatorReports do
   end
 
   defp normalize_page_size(_page_size), do: @default_bug_report_page_size
+
+  defp bug_report_filters(query, filters, now) when is_map(filters) do
+    query
+    |> maybe_filter_status(Map.get(filters, "status"))
+    |> maybe_filter_reporter(Map.get(filters, "reporter"))
+    |> maybe_filter_source(Map.get(filters, "source"))
+    |> maybe_filter_time_window(Map.get(filters, "time_window"), now)
+  end
+
+  defp bug_report_filters(query, _filters, _now), do: query
+
+  defp maybe_filter_status(query, status)
+       when status in ["pending", "fixed", "won't fix", "duplicate"] do
+    where(query, [report], report.status == ^status)
+  end
+
+  defp maybe_filter_status(query, _status), do: query
+
+  defp maybe_filter_reporter(query, "wallet") do
+    where(query, [report], not is_nil(report.reporter_wallet_address))
+  end
+
+  defp maybe_filter_reporter(query, "public") do
+    where(query, [report], is_nil(report.reporter_wallet_address))
+  end
+
+  defp maybe_filter_reporter(query, _reporter), do: query
+
+  defp maybe_filter_source(query, source) when source in ["Techtree", "Autolaunch", "CLI"] do
+    pattern = "%#{source}%"
+
+    where(
+      query,
+      [report],
+      ilike(fragment("coalesce(?, '')", report.reporter_label), ^pattern) or
+        ilike(fragment("coalesce(?, '')", report.summary), ^pattern) or
+        ilike(fragment("coalesce(?, '')", report.details), ^pattern)
+    )
+  end
+
+  defp maybe_filter_source(query, "Website") do
+    source_patterns = ["%Techtree%", "%Autolaunch%", "%CLI%"]
+
+    Enum.reduce(source_patterns, query, fn pattern, acc ->
+      where(
+        acc,
+        [report],
+        not ilike(fragment("coalesce(?, '')", report.reporter_label), ^pattern) and
+          not ilike(fragment("coalesce(?, '')", report.summary), ^pattern) and
+          not ilike(fragment("coalesce(?, '')", report.details), ^pattern)
+      )
+    end)
+  end
+
+  defp maybe_filter_source(query, _source), do: query
+
+  defp maybe_filter_time_window(query, time_window, now) do
+    seconds =
+      case time_window do
+        "24h" -> 24 * 60 * 60
+        "7d" -> 7 * 24 * 60 * 60
+        "30d" -> 30 * 24 * 60 * 60
+        _ -> nil
+      end
+
+    if seconds do
+      since = DateTime.add(now, -seconds, :second)
+      where(query, [report], report.created_at >= ^since)
+    else
+      query
+    end
+  end
 
   defp maybe_put(payload, _key, nil), do: payload
   defp maybe_put(payload, _key, ""), do: payload

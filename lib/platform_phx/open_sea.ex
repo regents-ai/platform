@@ -1,8 +1,10 @@
 defmodule PlatformPhx.OpenSea do
   @moduledoc false
+  require Logger
 
   alias PlatformPhx.Ethereum
   alias PlatformPhx.RuntimeConfig
+  alias PlatformPhx.PublicErrors
 
   @type collection :: :all | String.t()
   @type reason ::
@@ -14,8 +16,8 @@ defmodule PlatformPhx.OpenSea do
   @redeem_collections %{"animata" => "animata", "regent-animata-ii" => "regent-animata-ii"}
   @max_token_count 1_000
   @page_limit 100
-  @cache_table :platform_phx_opensea_cache
-  @cache_ttl_ms :timer.minutes(1)
+  @redeem_stats_cache_key "platform:opensea:redeem-stats:v1"
+  @cache_ttl_seconds 60
 
   @type accumulator :: %{ids: [integer()], count: non_neg_integer()}
 
@@ -38,24 +40,21 @@ defmodule PlatformPhx.OpenSea do
 
   @spec fetch_redeem_stats() :: {:ok, map()} | {:error, reason()}
   def fetch_redeem_stats do
-    with {:miss, table} <- fetch_cached(:redeem_stats),
-         {:ok, api_key} <- api_key(),
-         {:ok, stats} <- fetch_collection_supplies(api_key) do
-      put_cached(table, :redeem_stats, stats)
-      {:ok, stats}
-    else
-      {:hit, stats} -> {:ok, stats}
+    PlatformPhx.Cache.fetch(@redeem_stats_cache_key, @cache_ttl_seconds, fn ->
+      with {:ok, api_key} <- api_key(),
+           {:ok, stats} <- fetch_collection_supplies(api_key) do
+        {:ok, stats}
+      end
+    end)
+    |> case do
+      {:ok, stats} -> {:ok, normalize_redeem_stats(stats)}
       {:error, reason} -> {:error, reason}
     end
   end
 
   @spec clear_cache() :: :ok
   def clear_cache do
-    case :ets.whereis(@cache_table) do
-      :undefined -> :ok
-      table -> :ets.delete_all_objects(table)
-    end
-
+    _ = PlatformPhx.Cache.delete(@redeem_stats_cache_key)
     :ok
   end
 
@@ -68,8 +67,12 @@ defmodule PlatformPhx.OpenSea do
 
   defp api_key do
     case RuntimeConfig.opensea_api_key() do
-      nil -> {:error, {:unavailable, "Server missing OPENSEA_API_KEY"}}
-      api_key -> {:ok, api_key}
+      nil ->
+        Logger.warning("opensea request rejected missing_api_key")
+        {:error, {:unavailable, PublicErrors.collectible_lookup()}}
+
+      api_key ->
+        {:ok, api_key}
     end
   end
 
@@ -106,7 +109,8 @@ defmodule PlatformPhx.OpenSea do
         {:halt, {:error, reason}}
 
       {:exit, reason}, _acc ->
-        {:halt, {:error, {:external, :opensea, "OpenSea request failed: #{inspect(reason)}"}}}
+        Logger.warning("opensea supply request exited #{inspect(%{reason: reason})}")
+        {:halt, {:error, {:external, :opensea, PublicErrors.collectible_lookup()}}}
     end)
   end
 
@@ -130,7 +134,8 @@ defmodule PlatformPhx.OpenSea do
         {:halt, {:error, reason}}
 
       {:exit, reason}, _acc ->
-        {:halt, {:error, {:external, :opensea, "OpenSea request failed: #{inspect(reason)}"}}}
+        Logger.warning("opensea holdings request exited #{inspect(%{reason: reason})}")
+        {:halt, {:error, {:external, :opensea, PublicErrors.collectible_lookup()}}}
     end)
   end
 
@@ -142,7 +147,11 @@ defmodule PlatformPhx.OpenSea do
         handle_collection_supply_response(response)
 
       {:error, error} ->
-        {:error, {:external, :opensea, "OpenSea request failed: #{Exception.message(error)}"}}
+        Logger.warning(
+          "opensea supply request failed #{inspect(%{reason: Exception.message(error)})}"
+        )
+
+        {:error, {:external, :opensea, PublicErrors.collectible_lookup()}}
     end
   end
 
@@ -161,16 +170,18 @@ defmodule PlatformPhx.OpenSea do
        when status in 200..299 and is_binary(total_supply) do
     case Integer.parse(total_supply) do
       {parsed, ""} -> {:ok, parsed}
-      _other -> {:error, {:external, :opensea, "OpenSea response invalid"}}
+      _other -> {:error, {:external, :opensea, PublicErrors.collectible_lookup()}}
     end
   end
 
   defp handle_collection_supply_response(%{status: status, body: body}) when status in 200..299 do
-    {:error, {:external, :opensea, "OpenSea response invalid: #{inspect(body)}"}}
+    Logger.warning("opensea supply response invalid #{inspect(%{body: body})}")
+    {:error, {:external, :opensea, PublicErrors.collectible_lookup()}}
   end
 
   defp handle_collection_supply_response(%{status: status}) do
-    {:error, {:external, :opensea, "OpenSea request failed with status #{status}"}}
+    Logger.warning("opensea supply request failed #{inspect(%{status: status})}")
+    {:error, {:external, :opensea, PublicErrors.collectible_lookup()}}
   end
 
   defp fetch_collection(address, collection, api_key) do
@@ -193,10 +204,15 @@ defmodule PlatformPhx.OpenSea do
         consume_page(address, collection, api_key, body, acc)
 
       {:ok, %{status: status}} ->
-        {:error, {:external, :opensea, "OpenSea request failed with status #{status}"}}
+        Logger.warning("opensea holdings request failed #{inspect(%{status: status})}")
+        {:error, {:external, :opensea, PublicErrors.collectible_lookup()}}
 
       {:error, error} ->
-        {:error, {:external, :opensea, "OpenSea request failed: #{Exception.message(error)}"}}
+        Logger.warning(
+          "opensea holdings request failed #{inspect(%{reason: Exception.message(error)})}"
+        )
+
+        {:error, {:external, :opensea, PublicErrors.collectible_lookup()}}
     end
   end
 
@@ -226,7 +242,7 @@ defmodule PlatformPhx.OpenSea do
   end
 
   defp consume_page(_address, _collection, _api_key, _body, _acc) do
-    {:error, {:external, :opensea, "OpenSea response invalid"}}
+    {:error, {:external, :opensea, PublicErrors.collectible_lookup()}}
   end
 
   defp maybe_append_cursor(uri, nil), do: uri
@@ -243,30 +259,12 @@ defmodule PlatformPhx.OpenSea do
 
   defp parse_identifier(_value), do: nil
 
-  defp fetch_cached(key) do
-    table = ensure_cache_table()
-    now = System.monotonic_time(:millisecond)
-
-    case :ets.lookup(table, key) do
-      [{^key, expires_at, value}] when expires_at > now -> {:hit, value}
-      _stale_or_missing -> {:miss, table}
-    end
-  end
-
-  defp put_cached(table, key, value) do
-    expires_at = System.monotonic_time(:millisecond) + @cache_ttl_ms
-    true = :ets.insert(table, {key, expires_at, value})
-    :ok
-  end
-
-  defp ensure_cache_table do
-    case :ets.whereis(@cache_table) do
-      :undefined ->
-        :ets.new(@cache_table, [:named_table, :public, read_concurrency: true])
-
-      table ->
-        table
-    end
+  defp normalize_redeem_stats(stats) when is_map(stats) do
+    %{
+      "animata" => Map.get(stats, "animata") || Map.get(stats, :animata),
+      "regent-animata-ii" =>
+        Map.get(stats, "regent-animata-ii") || Map.get(stats, :"regent-animata-ii")
+    }
   end
 
   defp http_client do

@@ -137,6 +137,45 @@ defmodule PlatformPhx.OperatorReportsTest do
     assert page_two.has_next == false
   end
 
+  test "bug report pages filter in the database before paging" do
+    {:ok, pending} = create_bug_report("pending website report", "public details")
+    {:ok, fixed} = create_bug_report("fixed CLI report", "CLI details")
+
+    {:ok, anonymous} =
+      OperatorReports.create_bug_report(%{"summary" => "website", "details" => "public details"})
+
+    Repo.update_all(from(report in BugReport, where: report.id == ^pending.id),
+      set: [created_at: ~U[2026-04-01 10:00:00Z]]
+    )
+
+    Repo.update_all(from(report in BugReport, where: report.id == ^fixed.id),
+      set: [status: "fixed", created_at: ~U[2026-04-01 11:00:00Z]]
+    )
+
+    Repo.update_all(from(report in BugReport, where: report.id == ^anonymous.id),
+      set: [created_at: ~U[2026-04-01 12:00:00Z]]
+    )
+
+    fixed_page =
+      OperatorReports.list_bug_reports_page(
+        1,
+        1,
+        %{"status" => "fixed"},
+        ~U[2026-04-23 12:00:00Z]
+      )
+
+    website_page =
+      OperatorReports.list_bug_reports_page(
+        1,
+        10,
+        %{"source" => "Website", "reporter" => "public"},
+        ~U[2026-04-23 12:00:00Z]
+      )
+
+    assert Enum.map(fixed_page.entries, & &1.summary) == ["fixed CLI report"]
+    assert Enum.map(website_page.entries, & &1.summary) == ["website"]
+  end
+
   defp create_bug_report(summary, details) do
     OperatorReports.create_bug_report(%{
       "summary" => summary,

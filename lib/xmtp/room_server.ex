@@ -468,7 +468,7 @@ defmodule Xmtp.RoomServer do
       metadata: metadata,
       added_by_inbox_id: room.agent_inbox_id,
       name: room.room_name,
-      image_url: Map.get(snapshot, "image_url") || Map.get(snapshot, :image_url),
+      image_url: Map.get(snapshot, "image_url"),
       description: room.description || "",
       app_data: room.app_data || "",
       permissions: Types.default_permissions(),
@@ -549,6 +549,7 @@ defmodule Xmtp.RoomServer do
       status: status_override || "This chat is unavailable right now.",
       pending_signature_request_id: pending_request_id,
       member_count: 0,
+      active_member_count: 0,
       seat_count: definition.capacity,
       seats_remaining: definition.capacity,
       messages: []
@@ -571,6 +572,7 @@ defmodule Xmtp.RoomServer do
     ready? = connected_wallet && client_ready?(state, connected_wallet)
     seat_count = room.capacity
     member_count = human_member_count(state.repo, room)
+    active_member_count = active_human_member_count(state.repo, room, definition)
     seats_remaining = max(seat_count - member_count, 0)
 
     %{
@@ -588,6 +590,7 @@ defmodule Xmtp.RoomServer do
       pending_signature_request_id:
         pending_signature_request_id || pending_request_id_for_wallet(state, connected_wallet),
       member_count: member_count,
+      active_member_count: active_member_count,
       seat_count: seat_count,
       seats_remaining: seats_remaining,
       messages: list_panel_messages(state, connected_wallet, moderator?)
@@ -917,6 +920,20 @@ defmodule Xmtp.RoomServer do
     repo
     |> list_joined_memberships(room)
     |> Enum.count(&(&1.principal_kind == "human"))
+  end
+
+  defp active_human_member_count(repo, %Room{} = room, definition) do
+    cutoff =
+      DateTime.utc_now()
+      |> DateTime.add(-div(definition.presence_timeout_ms, 1_000), :second)
+
+    repo
+    |> list_joined_memberships(room)
+    |> Enum.count(fn membership ->
+      membership.principal_kind == "human" and
+        not is_nil(membership.last_seen_at) and
+        DateTime.compare(membership.last_seen_at, cutoff) == :gt
+    end)
   end
 
   defp joined?(%{repo: repo, room: room}, wallet_address) do

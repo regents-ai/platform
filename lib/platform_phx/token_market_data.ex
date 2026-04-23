@@ -3,9 +3,8 @@ defmodule PlatformPhx.TokenMarketData do
 
   alias PlatformPhx.RuntimeConfig
 
-  @cache_key :regent_market_summary
-  @cache_table :platform_phx_token_market_cache
-  @cache_ttl_ms :timer.minutes(1)
+  @cache_key "platform:token-market:regent-summary:v1"
+  @cache_ttl_seconds 60
   @regent_token "0x6f89bca4ea5931edfcb09786267b251dee752b07"
   @redeemer_address "0x71065b775a590c43933f10c0055dc7d74afabb0e"
   @circulating_base_supply Decimal.new("30000000000")
@@ -15,23 +14,20 @@ defmodule PlatformPhx.TokenMarketData do
 
   @spec fetch_summary() :: {:ok, map()} | {:error, reason()}
   def fetch_summary do
-    with {:miss, table} <- fetch_cached(@cache_key),
-         {:ok, summary} <- build_summary() do
-      put_cached(table, @cache_key, summary)
-      {:ok, summary}
-    else
-      {:hit, summary} -> {:ok, summary}
+    PlatformPhx.Cache.fetch(@cache_key, @cache_ttl_seconds, fn ->
+      with {:ok, summary} <- build_summary() do
+        {:ok, encode_summary(summary)}
+      end
+    end)
+    |> case do
+      {:ok, summary} -> {:ok, decode_summary(summary)}
       {:error, reason} -> {:error, reason}
     end
   end
 
   @spec clear_cache() :: :ok
   def clear_cache do
-    case :ets.whereis(@cache_table) do
-      :undefined -> :ok
-      table -> :ets.delete_all_objects(table)
-    end
-
+    _ = PlatformPhx.Cache.delete(@cache_key)
     :ok
   end
 
@@ -118,29 +114,31 @@ defmodule PlatformPhx.TokenMarketData do
     scaled <> suffix
   end
 
-  defp fetch_cached(key) do
-    table = ensure_cache_table()
-    now = System.monotonic_time(:millisecond)
-
-    case :ets.lookup(table, key) do
-      [{^key, expires_at, value}] when expires_at > now -> {:hit, value}
-      _stale_or_missing -> {:miss, table}
-    end
+  defp encode_summary(summary) do
+    %{
+      price_usd: Decimal.to_string(summary.price_usd, :normal),
+      circulating_supply: Decimal.to_string(summary.circulating_supply, :normal),
+      market_cap: Decimal.to_string(summary.market_cap, :normal),
+      fdv: Decimal.to_string(summary.fdv, :normal),
+      market_cap_display: summary.market_cap_display,
+      fdv_display: summary.fdv_display
+    }
   end
 
-  defp put_cached(table, key, value) do
-    expires_at = System.monotonic_time(:millisecond) + @cache_ttl_ms
-    true = :ets.insert(table, {key, expires_at, value})
-    :ok
+  defp decode_summary(summary) do
+    %{
+      price_usd: decimal_field(summary, :price_usd),
+      circulating_supply: decimal_field(summary, :circulating_supply),
+      market_cap: decimal_field(summary, :market_cap),
+      fdv: decimal_field(summary, :fdv),
+      market_cap_display: field(summary, :market_cap_display),
+      fdv_display: field(summary, :fdv_display)
+    }
   end
 
-  defp ensure_cache_table do
-    case :ets.whereis(@cache_table) do
-      :undefined ->
-        :ets.new(@cache_table, [:named_table, :public, read_concurrency: true])
+  defp decimal_field(summary, key), do: summary |> field(key) |> Decimal.new()
 
-      table ->
-        table
-    end
+  defp field(summary, key) do
+    Map.get(summary, key) || Map.get(summary, Atom.to_string(key))
   end
 end

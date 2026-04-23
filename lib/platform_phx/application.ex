@@ -20,6 +20,7 @@ defmodule PlatformPhx.Application do
         # Start to serve requests, typically the last entry
         PlatformPhxWeb.Endpoint
       ]
+      |> maybe_add_dragonfly()
       |> maybe_add_sprite_control_secret()
       |> maybe_add_prometheus_exporter()
 
@@ -68,6 +69,14 @@ defmodule PlatformPhx.Application do
 
       true ->
         children
+    end
+  end
+
+  defp maybe_add_dragonfly(children) do
+    if RegentCache.Dragonfly.enabled?(:platform_phx) do
+      children ++ [RegentCache.Dragonfly.child_spec(:platform_phx)]
+    else
+      children
     end
   end
 end

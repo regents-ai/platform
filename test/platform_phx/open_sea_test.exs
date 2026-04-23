@@ -57,7 +57,7 @@ defmodule PlatformPhx.OpenSeaTest do
       request_url(@address, "animata") => {:error, "timeout"}
     })
 
-    assert {:error, {:external, :opensea, "OpenSea request failed: timeout"}} =
+    assert {:error, {:external, :opensea, "Collectible lookup is unavailable right now."}} =
              OpenSea.fetch_holdings(@address, "animata")
   end
 
@@ -77,7 +77,7 @@ defmodule PlatformPhx.OpenSeaTest do
       collection_url("regent-animata-ii") => {:ok, %{"total_supply" => 319}}
     })
 
-    assert {:error, {:external, :opensea, "OpenSea request failed with status 500"}} =
+    assert {:error, {:external, :opensea, "Collectible lookup is unavailable right now."}} =
              OpenSea.fetch_redeem_stats()
   end
 
