@@ -34,7 +34,7 @@ defmodule PlatformPhx.AgentPlatformTest do
              WorkspaceBootstrap.prompt_template_version()
   end
 
-  test "workspace bootstrap pins runtime source versions" do
+  test "workspace bootstrap tracks latest beta runtime sources" do
     env =
       WorkspaceBootstrap.build_env(
         %Agent{
@@ -51,6 +51,7 @@ defmodule PlatformPhx.AgentPlatformTest do
     assert env["FORMATION_HERMES_AGENT_REF"] == WorkspaceBootstrap.hermes_agent_ref()
     assert env["FORMATION_WORKSPACE_REPO"] == WorkspaceBootstrap.workspace_repo()
     assert env["FORMATION_WORKSPACE_REF"] == WorkspaceBootstrap.workspace_ref()
-    refute env["FORMATION_WORKSPACE_REF"] == "main"
+    assert env["FORMATION_HERMES_AGENT_REF"] == "main"
+    assert env["FORMATION_WORKSPACE_REF"] == "main"
   end
 end

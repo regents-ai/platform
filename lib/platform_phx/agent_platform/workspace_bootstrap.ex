@@ -11,9 +11,9 @@ defmodule PlatformPhx.AgentPlatform.WorkspaceBootstrap do
   @workspace_path "/app/company"
   @hermes_command "/app/bin/hermes-company"
   @prompt_template_version "company-workspace-prompt-v1"
-  @hermes_agent_ref "v2026.4.16"
+  @hermes_agent_ref "main"
   @workspace_repo "https://github.com/outsourc-e/hermes-workspace.git"
-  @workspace_ref "60ee8ea2d0dd9092258246388134125845fbfe2b"
+  @workspace_ref "main"
 
   def bootstrap_version, do: @bootstrap_version
   def workspace_seed_version, do: @workspace_seed_version

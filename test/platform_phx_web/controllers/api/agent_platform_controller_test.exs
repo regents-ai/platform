@@ -292,9 +292,9 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     assert formation.metadata["workspace_path"] == "/app/company"
     assert formation.metadata["workspace_seed_version"] == "company-workspace-v1"
-    assert formation.metadata["workspace_ref"] == "60ee8ea2d0dd9092258246388134125845fbfe2b"
+    assert formation.metadata["workspace_ref"] == "main"
     assert formation.metadata["hermes_command"] == "/app/bin/hermes-company"
-    assert formation.metadata["hermes_agent_ref"] == "v2026.4.16"
+    assert formation.metadata["hermes_agent_ref"] == "main"
     assert formation.metadata["prompt_template_version"] == "company-workspace-prompt-v1"
 
     runtime_response =
