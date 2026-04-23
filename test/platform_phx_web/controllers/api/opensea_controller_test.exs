@@ -80,6 +80,8 @@ defmodule PlatformPhxWeb.Api.OpenseaControllerTest do
 
     assert response["statusMessage"] == "Collectible lookup is unavailable right now."
     refute response["statusMessage"] =~ "500"
+    refute response["statusMessage"] =~ "boom"
+    refute response["statusMessage"] =~ "%{"
   end
 
   test "returns redeem collection supply stats", %{conn: conn} do
@@ -113,6 +115,8 @@ defmodule PlatformPhxWeb.Api.OpenseaControllerTest do
 
     assert response["statusMessage"] == "Collectible lookup is unavailable right now."
     refute response["statusMessage"] =~ "500"
+    refute response["statusMessage"] =~ "boom"
+    refute response["statusMessage"] =~ "%{"
   end
 
   defp request_url(address, collection) do

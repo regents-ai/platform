@@ -2,6 +2,7 @@ defmodule PlatformPhx.Basenames.Reads do
   @moduledoc false
 
   import Ecto.Query, warn: false
+  require Logger
 
   alias PlatformPhx.Basenames
   alias PlatformPhx.Basenames.Mint
@@ -35,6 +36,10 @@ defmodule PlatformPhx.Basenames.Reads do
          "mintingEnabled" => Basenames.repo_enabled?(),
          "ensMintingEnabled" => Basenames.repo_enabled?()
        }}
+    else
+      {:error, reason} ->
+        Logger.warning("basenames config unavailable #{inspect(%{reason: reason})}")
+        {:error, {:unavailable, PlatformPhx.PublicErrors.name_claiming()}}
     end
   end
 

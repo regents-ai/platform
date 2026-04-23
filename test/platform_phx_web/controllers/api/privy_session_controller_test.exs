@@ -17,6 +17,15 @@ defmodule PlatformPhxWeb.Api.PrivySessionControllerTest do
        }}
     end
 
+    def verify_token("bad-human-token") do
+      {:ok,
+       %{
+         privy_user_id: "",
+         wallet_address: "0x1111111111111111111111111111111111111111",
+         wallet_addresses: ["0x1111111111111111111111111111111111111111"]
+       }}
+    end
+
     def verify_token(_token), do: {:error, :invalid_token}
   end
 
@@ -94,6 +103,21 @@ defmodule PlatformPhxWeb.Api.PrivySessionControllerTest do
     end
   end
 
+  test "create hides profile save internals from public errors", %{conn: conn} do
+    response =
+      conn
+      |> init_test_session(%{})
+      |> put_csrf_token()
+      |> put_req_header("authorization", "Bearer bad-human-token")
+      |> post("/api/auth/privy/session", %{display_name: "Regent Operator"})
+      |> json_response(400)
+
+    assert response["statusMessage"] ==
+             "We could not save that profile. Check the name and try again."
+
+    refute_public_leak(response["statusMessage"])
+  end
+
   test "signed-in human can save a shader avatar through the profile route", %{conn: conn} do
     human =
       %HumanUser{}
@@ -132,5 +156,12 @@ defmodule PlatformPhxWeb.Api.PrivySessionControllerTest do
     conn
     |> put_session("_csrf_token", Plug.CSRFProtection.dump_state())
     |> put_req_header("x-csrf-token", token)
+  end
+
+  defp refute_public_leak(message) do
+    refute message =~ "privy_user_id"
+    refute message =~ "can't be blank"
+    refute message =~ "%{"
+    refute message =~ "{:"
   end
 end

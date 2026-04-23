@@ -9,6 +9,7 @@ defmodule PlatformPhx.Agentbook do
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.Agentbook.Link
   alias PlatformPhx.Agentbook.Session
+  alias PlatformPhx.PublicErrors
   alias PlatformPhx.Repo
 
   @world_network "world"
@@ -69,8 +70,15 @@ defmodule PlatformPhx.Agentbook do
                approval_url(base_url, session.session_id, approval_token)
              )}
           else
-            {:error, %Error{} = error} -> {:error, {:bad_request, Exception.message(error)}}
-            {:error, reason} -> {:error, reason}
+            {:error, %Error{} = error} ->
+              Logger.warning(
+                "agentbook world session create failed #{inspect(%{reason: Exception.message(error)})}"
+              )
+
+              {:error, {:bad_request, PublicErrors.trust_approval()}}
+
+            {:error, reason} ->
+              {:error, reason}
           end
       end
     end
@@ -220,11 +228,15 @@ defmodule PlatformPhx.Agentbook do
         {:ok, updated}
 
       {:error, %Error{} = error} ->
-        {:error, {:bad_request, Exception.message(error)}}
+        Logger.warning(
+          "agentbook world proof submission rejected #{inspect(%{reason: Exception.message(error)})}"
+        )
+
+        {:error, {:bad_request, PublicErrors.trust_approval()}}
 
       {:error, reason} ->
         Logger.warning("agentbook world proof submission failed #{inspect(%{reason: reason})}")
-        {:error, {:unavailable, PlatformPhx.PublicErrors.trust_approval()}}
+        {:error, {:unavailable, PublicErrors.trust_approval()}}
     end
   end
 
@@ -493,19 +505,10 @@ defmodule PlatformPhx.Agentbook do
     status = status_string(Map.get(updated, :status))
 
     if status == "proof_ready" do
-      error_text =
-        case Map.get(updated, :error_text) do
-          value when is_binary(value) and value != "" ->
-            "This trust request needs a wallet step that is not available in this approval flow. #{value}"
-
-          _ ->
-            "This trust request needs a wallet step that is not available in this approval flow."
-        end
-
       %{
         status: "failed",
         world_human_id: Map.get(updated, :human_id),
-        error_text: error_text,
+        error_text: "This trust request needs one more wallet step. Start a new approval.",
         connector_uri: Map.get(updated, :connector_uri),
         deep_link_uri: Map.get(updated, :deep_link_uri)
       }

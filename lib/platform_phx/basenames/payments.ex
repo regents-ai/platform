@@ -2,6 +2,7 @@ defmodule PlatformPhx.Basenames.Payments do
   @moduledoc false
 
   import Ecto.Query, warn: false
+  require Logger
 
   alias PlatformPhx.Basenames
   alias PlatformPhx.Basenames.PaymentCredit
@@ -248,7 +249,11 @@ defmodule PlatformPhx.Basenames.Payments do
     if existing do
       {:ok, existing}
     else
-      {:error, {:bad_request, Validation.format_changeset_errors(changeset)}}
+      Logger.warning(
+        "basenames payment credit insert failed #{inspect(%{errors: changeset.errors})}"
+      )
+
+      {:error, {:bad_request, PlatformPhx.PublicErrors.payment_verification()}}
     end
   end
 

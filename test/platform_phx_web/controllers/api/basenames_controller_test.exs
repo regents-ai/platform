@@ -96,6 +96,27 @@ defmodule PlatformPhxWeb.Api.BasenamesControllerTest do
     assert response["statusMessage"] == "Invalid payment tx hash"
   end
 
+  test "credit registration hides missing payment setup details", %{conn: conn} do
+    previous_recipient = System.get_env("AGENT_BASENAME_PAYMENT_RECIPIENT")
+    System.delete_env("AGENT_BASENAME_PAYMENT_RECIPIENT")
+
+    on_exit(fn -> restore_system_env("AGENT_BASENAME_PAYMENT_RECIPIENT", previous_recipient) end)
+
+    response =
+      conn
+      |> post("/api/basenames/credit", %{
+        "address" => @owner_address,
+        "paymentTxHash" => @payment_tx_hash,
+        "paymentChainId" => 1
+      })
+      |> json_response(503)
+
+    assert response["statusMessage"] == "Payment verification is unavailable right now."
+    refute response["statusMessage"] =~ "AGENT_BASENAME_PAYMENT_RECIPIENT"
+    refute response["statusMessage"] =~ "%{"
+    refute response["statusMessage"] =~ "{:"
+  end
+
   test "availability endpoint returns an available payload", %{conn: conn} do
     response =
       conn
@@ -319,4 +340,7 @@ defmodule PlatformPhxWeb.Api.BasenamesControllerTest do
   defp sign_message!(message) do
     PlatformPhx.TestEthereumAdapter.sign_message(@owner_address, message)
   end
+
+  defp restore_system_env(key, nil), do: System.delete_env(key)
+  defp restore_system_env(key, value), do: System.put_env(key, value)
 end

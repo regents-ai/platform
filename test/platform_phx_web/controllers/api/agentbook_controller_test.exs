@@ -67,6 +67,18 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
     end
   end
 
+  defmodule ErrorRegistrationStub do
+    def create_session(_attrs) do
+      {:error,
+       AgentWorld.Error.exception("world approval failed: {:error, %{body: \"raw upstream\"}}")}
+    end
+
+    def submit_proof(_session, _proof_payload, _options) do
+      {:error,
+       AgentWorld.Error.exception("world proof failed: {:error, %{body: \"raw upstream\"}}")}
+    end
+  end
+
   defmodule AgentBookStub do
     def lookup_human(_wallet_address, "world", _options), do: {:ok, "0x1234"}
   end
@@ -380,7 +392,38 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
 
     assert submit_response["session"]["status"] == "failed"
     assert submit_response["session"]["tx_request"] == nil
-    assert submit_response["session"]["error_text"] =~ "wallet step"
+
+    assert submit_response["session"]["error_text"] ==
+             "This trust request needs one more wallet step. Start a new approval."
+
+    refute_public_leak(submit_response["session"]["error_text"])
+  end
+
+  test "unknown World approval errors stay out of the public response", %{conn: conn} do
+    previous_agentbook = Application.get_env(:platform_phx, :agentbook, [])
+
+    Application.put_env(
+      :platform_phx,
+      :agentbook,
+      registration_module: ErrorRegistrationStub,
+      agent_book_module: AgentBookStub
+    )
+
+    on_exit(fn ->
+      Application.put_env(:platform_phx, :agentbook, previous_agentbook)
+    end)
+
+    response =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> put_req_headers(
+        agent_headers("/api/agentbook/sessions", Jason.encode!(%{"source" => "regents-cli"}))
+      )
+      |> post("/api/agentbook/sessions", Jason.encode!(%{"source" => "regents-cli"}))
+      |> json_response(400)
+
+    assert response["statusMessage"] == "Trust approval could not be completed right now."
+    refute_public_leak(response["statusMessage"])
   end
 
   defp complete_session_for_human(human_id, session_id, token) do
@@ -494,5 +537,14 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
     conn
     |> put_session("_csrf_token", Plug.CSRFProtection.dump_state())
     |> put_req_header("x-csrf-token", token)
+  end
+
+  defp refute_public_leak(message) do
+    refute message =~ "raw upstream"
+    refute message =~ "%{"
+    refute message =~ "{:"
+    refute message =~ "world approval failed"
+    refute message =~ "world proof failed"
+    refute message =~ "manual submission requested"
   end
 end
