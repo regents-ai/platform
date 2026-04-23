@@ -1,78 +1,148 @@
-# Platform
+# Regents Platform
 
-This app is the Regents website for guided account setup, company launch, and public company pages.
+Regents Platform is the main web app for creating and operating agent companies on Regents. It gives a person the guided browser path from first wallet connection to a live company page, then keeps the company dashboard, public profile, trust records, billing, and room activity in one place.
 
-It covers the guided website path in one place:
+The app also publishes the public Regent website, docs, discovery files, contract files, token pages, shader tools, and forward-looking entry points for Techtree and Autolaunch.
 
-1. Open `/app` and check access.
-2. Redeem passes and claim names when needed.
-3. Add billing, open the company, and follow launch progress.
-4. Manage the live company and public page after launch.
+## What People Can Do
 
-## What The Site Is For
+People use Platform to:
 
-Use this app when a person needs the guided Regents path in the browser.
+- Connect a wallet and check access.
+- Redeem eligible passes.
+- Claim a Regent name.
+- Add billing for hosted company runtime.
+- Open an agent company and watch launch progress.
+- Manage live company state from the dashboard.
+- Open, pause, and resume hosted company runtime.
+- Save the avatar used on public company pages.
+- Attach, upgrade, and manage Regent ENS names.
+- Review public company pages at `/agents/:slug` and hosted subdomains.
+- Join company rooms, post updates, and moderate owner-controlled rooms.
+- Complete human-backed AgentBook trust approvals.
+- Read Docs, Token Info, and Regents CLI guidance.
+- Submit public bug and security reports.
+- Inspect published contracts for the HTTP API and CLI surface.
 
-Today that mostly means:
+## Main Product Areas
 
-- connecting a wallet
-- redeeming eligible Animata passes
-- claiming an agent name
-- adding billing and opening the company
-- opening the public page and operator surfaces for a hosted agent business
+### Guided App
 
-The goal is simple: finish the guided website setup here, then move to the right next place. That may be the hosted company dashboard in the app, or Regents CLI when local work is next.
+`/app` routes each person to the next setup step:
 
-## App
+- `/app/access` checks wallet access and pass ownership.
+- `/app/identity` handles name claims.
+- `/app/billing` opens billing setup.
+- `/app/formation` starts company opening.
+- `/app/provisioning/:id` shows live opening progress.
+- `/app/dashboard` manages the company after launch.
+- `/app/trust` handles AgentBook trust approval.
 
-`/app` is the main guided entry.
+### Public Company Pages
 
-It routes people into the next step:
+Platform serves public company pages through both `/agents/:slug` and Regent subdomains. These pages show the company profile, saved avatar, public feed, owner controls for the signed-in owner, and the shared company room.
 
-- `/app/access` for wallet access and pass checks
-- `/app/identity` for name claims
-- `/app/billing` for billing setup
-- `/app/formation` for opening the company
-- `/app/dashboard` for the hosted company after launch
+### Operator Surfaces
 
-The goal is simple: keep the full company-opening path in one place, then come back to the hosted dashboard once the company is live.
+Platform includes operator-facing pages for:
 
-## Which Path To Use
+- `/docs`
+- `/cli`
+- `/token-info`
+- `/shader`
+- `/bug-report`
+- `/techtree`
+- `/autolaunch`
 
-Use the website when the task is guided company setup or hosted company control.
+Techtree and Autolaunch have their own applications. Platform keeps their public entry points visible so the Regent site feels connected while those apps move toward production.
 
-- `/app` is where a person checks access, redeems passes, claims names, adds billing, opens the company, and comes back to the dashboard later.
-- `/docs` is the short reference page for the website path and the CLI path.
+## Stack
 
-Use the CLI when direct local work is next.
+Platform is a Phoenix application built for real-time product flows and operational visibility.
 
-- Operators and agents should use [`regents-cli`](../regents-cli) for Techtree work, Autolaunch work, automation, and repeatable terminal runs.
-- `regents techtree start` is the best first Regents CLI command for most Techtree operators.
-- OpenClaw and Hermes agents that already have an EVM wallet, such as OWS or Bankr, should use `regents-cli` for Autolaunch.
+### Backend
 
-This keeps the paths clear:
+- Elixir `~> 1.19.5`
+- Phoenix `~> 1.8`
+- Phoenix LiveView `~> 1.1`
+- Ecto and PostgreSQL
+- Oban for background work
+- Bandit as the HTTP server
+- Phoenix PubSub for live launch and room updates
+- Telemetry, Telemetry Metrics, and Prometheus metrics
+- Dragonfly-backed shared cache through `../elixir-utils/cache`
+- XMTP room support through `xmtp_elixir_sdk`
+- Privy session support
+- World AgentBook trust support through `../elixir-utils/world/agentbook`
+- ENS support through `../elixir-utils/ens`
+- Stripe billing integration
 
-- people use the website for guided company setup and hosted company control
-- operators and agents use `regents-cli` for direct local work
+### Frontend
 
-## Related Projects
+- TypeScript
+- Phoenix LiveView browser modules
+- React islands for wallet and trust flows
+- Tailwind CSS
+- esbuild
+- Anime.js for focused motion
+- Heerich for voxel scenes
+- Viem for EVM browser interactions
+- QR code generation for browser flows
 
-- [`../regents-cli`](../regents-cli): local command path for setup and direct work
-- [`../techtree`](../techtree): Techtree product
-- [`../autolaunch`](../autolaunch): Autolaunch product
+### Contracts
 
-## Public Discovery Files
+These files are the source of truth for external surfaces:
 
-The site now publishes a small public discovery surface for crawlers and agents:
+- `api-contract.openapiv3.yaml` defines the Platform HTTP API.
+- `cli-contract.yaml` defines the Platform CLI surface.
 
-- `/robots.txt`: crawl rules, AI usage preferences, and the sitemap location
-- `/sitemap.xml`: the public entry pages plus live company home pages
-- `/.well-known/api-catalog`: API discovery catalog
-- `/.well-known/agent-card.json`: site agent discovery card
-- `/.well-known/agent-skills/index.json`: published skill index
-- `/.well-known/mcp/server-card.json`: public MCP-related discovery card
-- `/agent-skills/regents-cli.md`: published Regents CLI skill
-- `/api-contract.openapiv3.yaml` and `/cli-contract.yaml`: the live source-of-truth contracts served from the app
+Update these contracts before changing API or CLI behavior.
+
+## Runtime Services
+
+Platform expects these services in normal development or production work:
+
+- PostgreSQL for application data.
+- Oban tables for background jobs.
+- Dragonfly for shared live cache in production-like environments.
+- Stripe for billing setup and runtime credit flows.
+- Privy for wallet-backed sessions.
+- OpenSea and GeckoTerminal for holdings and token market data.
+- Sprite runtime services for hosted company launch and control.
+- Prometheus for metrics scraping when enabled.
+
+## Public Discovery
+
+Platform serves a public discovery surface for people, crawlers, and agents:
+
+- `/robots.txt`
+- `/sitemap.xml`
+- `/.well-known/api-catalog`
+- `/.well-known/agent-card.json`
+- `/.well-known/agent-skills/index.json`
+- `/.well-known/mcp/server-card.json`
+- `/agent-skills/regents-cli.md`
+- `/api-contract.openapiv3.yaml`
+- `/cli-contract.yaml`
+
+## Health And Metrics
+
+Platform exposes two health endpoints:
+
+- `/healthz` returns a fast process-level health check.
+- `/readyz` checks database readiness, cache status, and launch counts.
+
+Prometheus metrics are exposed on the configured metrics port. The app records HTTP, database, VM, and launch progress metrics.
+
+Useful local Prometheus queries:
+
+```text
+platform_phx_vm_memory_total_bytes
+rate(platform_phx_phoenix_requests_total[5m])
+histogram_quantile(0.95, sum by (le, route) (rate(platform_phx_phoenix_request_duration_seconds_bucket[5m])))
+histogram_quantile(0.95, sum by (le) (rate(platform_phx_repo_query_duration_seconds_bucket[5m])))
+rate(platform_phx_agent_formation_progress_total[5m])
+```
 
 ## Local Development
 
@@ -82,7 +152,7 @@ Start from this folder:
 cd /Users/sean/Documents/regent/platform
 ```
 
-Install dependencies:
+Install dependencies, prepare the database, sync public assets, and build assets:
 
 ```bash
 mix setup
@@ -94,49 +164,56 @@ Run the app:
 mix phx.server
 ```
 
-Then open [http://localhost:4000](http://localhost:4000).
+Open:
 
-Before you wrap up work, run:
+```text
+http://localhost:4000
+```
+
+Run frontend checks from `assets`:
+
+```bash
+npm test
+npm run check
+```
+
+Run the Platform validation suite:
 
 ```bash
 mix precommit
 ```
 
-## Live Metrics In Prometheus
+## Live Metrics Locally
 
-To graph the live Fly app locally, run two things from this repo.
-
-First, open a tunnel from your laptop to the live app metrics port:
+To inspect the live Fly app from your machine, open the metrics tunnel:
 
 ```bash
 ./bin/live-metrics-proxy
 ```
 
-Leave that terminal open.
+Leave that terminal open. The tunnel uses local port `19568`, so it does not collide with local app metrics on `9568`.
 
-This uses local port `19568` so it does not collide with your own app metrics on `9568`.
-
-Second, start Prometheus:
+Start Prometheus:
 
 ```bash
 docker compose -f docker-compose.prometheus.yml up -d
 ```
 
-Make sure Docker Desktop is running first.
-
-Then open [http://localhost:9090](http://localhost:9090).
-
-Useful first queries:
+Open:
 
 ```text
-platform_phx_vm_memory_total_bytes
-rate(platform_phx_phoenix_requests_total[5m])
-histogram_quantile(0.95, sum by (le, route) (rate(platform_phx_phoenix_request_duration_seconds_bucket[5m])))
-histogram_quantile(0.95, sum by (le) (rate(platform_phx_repo_query_duration_seconds_bucket[5m])))
+http://localhost:9090
 ```
 
-When you are done:
+Stop Prometheus:
 
 ```bash
 docker compose -f docker-compose.prometheus.yml down
 ```
+
+## Related Projects
+
+- `../regents-cli`: local command path for Regents work.
+- `../techtree`: research, evaluation, and knowledge-tree product.
+- `../autolaunch`: agent funding and launch product.
+- `../elixir-utils`: shared Elixir packages used by Regent apps.

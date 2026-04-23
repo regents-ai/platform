@@ -9,6 +9,9 @@ import Config
 
 config :platform_phx,
   ecto_repos: [PlatformPhx.Repo],
+  dragonfly_enabled: true,
+  dragonfly_host: "localhost",
+  dragonfly_port: 6379,
   generators: [timestamp_type: :utc_datetime]
 
 config :platform_phx, PlatformPhxWeb.BrowserSecurity, env: config_env()
@@ -73,7 +76,7 @@ config :esbuild,
   version: "0.25.4",
   platform_phx: [
     args:
-      ~w(js/app.ts --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
+      ~w(js/app.ts --bundle --splitting --format=esm --target=es2022 --outdir=../priv/static/assets/js --chunk-names=chunks/[name]-[hash] --external:/fonts/* --external:/images/* --alias:@=.),
     cd: Path.expand("../assets", __DIR__),
     env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
   ]

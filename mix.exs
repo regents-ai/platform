@@ -72,6 +72,7 @@ defmodule PlatformPhx.MixProject do
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:oban, "~> 2.19"},
+      {:regent_cache, path: "../elixir-utils/cache"},
       {:ens_elixir, path: "../elixir-utils/ens"},
       {:agent_world, path: "../elixir-utils/world/agentbook"},
       {:yamerl, "~> 0.10", only: :test},

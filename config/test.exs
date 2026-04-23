@@ -19,7 +19,8 @@ config :platform_phx, PlatformPhx.Repo,
 
 config :platform_phx,
   ethereum_adapter: PlatformPhx.TestEthereumAdapter,
-  opensea_client: PlatformPhx.TestOpenSeaClient
+  opensea_client: PlatformPhx.TestOpenSeaClient,
+  dragonfly_enabled: false
 
 config :platform_phx, :siwa, receipt_secret: "platform-test-receipt-secret"
 

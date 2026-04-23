@@ -69,6 +69,17 @@ config :platform_phx, PlatformPhx.Xmtp,
     }
   ]
 
+dragonfly_enabled =
+  System.get_env("DRAGONFLY_ENABLED", "true")
+  |> String.trim()
+  |> String.downcase()
+  |> then(&(&1 in ~w(1 true yes on)))
+
+config :platform_phx,
+  dragonfly_host: System.get_env("DRAGONFLY_HOST", "localhost"),
+  dragonfly_port: String.to_integer(System.get_env("DRAGONFLY_PORT", "6379")),
+  dragonfly_enabled: dragonfly_enabled
+
 config :agent_world, :world_id,
   app_id: System.get_env("WORLD_ID_APP_ID", ""),
   action: System.get_env("WORLD_ID_ACTION", "agentbook-registration"),

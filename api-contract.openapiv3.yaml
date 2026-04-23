@@ -1823,13 +1823,12 @@ components:
           type: string
     AgentbookFrontendRequest:
       type: object
-      required: [app_id, action, signal, rp_context, allow_legacy_proofs]
+      required: [app_id, action, signal, rp_context]
       properties:
         app_id: {type: string}
         action: {type: string}
         signal: {type: string}
         rp_context: {type: object, additionalProperties: true}
-        allow_legacy_proofs: {type: boolean}
     AgentbookTrustSummary:
       type: object
       required:
@@ -1922,7 +1921,7 @@ components:
           $ref: '#/components/schemas/AgentbookLookupResult'
     ClaimedName:
       type: object
-      required: [id, label, fqdn, ens_fqdn, claimed_at, claim_status, formation_agent_slug, attached_agent_slug]
+      required: [id, label, fqdn, ens_fqdn, claimed_at, claim_status, in_use, formation_agent_slug, attached_agent_slug]
       properties:
         id: {type: integer}
         label: {type: string}
@@ -1932,6 +1931,7 @@ components:
         claim_status:
           type: string
           enum: [reserved, upgrade_pending, onchain_live, upgrade_failed]
+        in_use: {type: boolean}
         upgrade_tx_hash: {type: [string, 'null']}
         upgraded_at: {type: [string, 'null'], format: date-time}
         formation_agent_slug: {type: [string, 'null']}
@@ -2423,9 +2423,36 @@ components:
         started_at: {type: [string, 'null'], format: date-time}
         last_heartbeat_at: {type: [string, 'null'], format: date-time}
         completed_at: {type: [string, 'null'], format: date-time}
+    AgentFormationReadinessStep:
+      type: object
+      required: [key, label, status, message, action_label, action_path]
+      properties:
+        key:
+          type: string
+          enum: [identity, wallet, access, name, billing, template, company, launch_queue]
+        label: {type: string}
+        status:
+          type: string
+          enum: [complete, ready, needs_action, waiting]
+        message: {type: string}
+        action_label: {type: [string, 'null']}
+        action_path: {type: [string, 'null']}
+    AgentFormationReadiness:
+      type: object
+      required: [ready, blocked_step, steps]
+      properties:
+        ready: {type: boolean}
+        blocked_step:
+          oneOf:
+            - $ref: '#/components/schemas/AgentFormationReadinessStep'
+            - type: 'null'
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentFormationReadinessStep'
     AgentFormationResponse:
       type: object
-      required: [ok, authenticated, wallet_address, eligible, collections, claimed_names, available_claims, billing_account, owned_companies, active_formations]
+      required: [ok, authenticated, wallet_address, eligible, collections, claimed_names, available_claims, billing_account, owned_companies, active_formations, readiness]
       properties:
         ok: {type: boolean}
         authenticated: {type: boolean}
@@ -2462,6 +2489,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AgentFormation'
+        readiness:
+          $ref: '#/components/schemas/AgentFormationReadiness'
     AgentTemplateService:
       type: object
       required: [slug, name, summary, price_label, payment_rail, public_result_default, sort_order]
