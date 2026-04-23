@@ -87,9 +87,27 @@ defmodule PlatformPhxWeb.DiscoveryControllerTest do
   end
 
   test "health, contracts, and published skill are served from the app", %{conn: conn} do
+    previous_dragonfly_enabled = Application.get_env(:platform_phx, :dragonfly_enabled)
+    Application.put_env(:platform_phx, :dragonfly_enabled, false)
+
+    on_exit(fn ->
+      restore_app_env(:platform_phx, :dragonfly_enabled, previous_dragonfly_enabled)
+    end)
+
     health_conn = get(conn, "/healthz")
     assert response(health_conn, 200) == "ok"
     assert get_resp_header(health_conn, "content-type") == ["text/plain; charset=utf-8"]
+
+    ready_conn =
+      conn
+      |> recycle()
+      |> get("/readyz")
+
+    ready = json_response(ready_conn, 200)
+    assert ready["status"] == "ready"
+    assert ready["checks"]["database"] == "ready"
+    assert ready["checks"]["cache"] in ["ready", "disabled"]
+    assert ready["launch"]["queued"] == 0
 
     api_contract_conn =
       conn
@@ -223,4 +241,7 @@ defmodule PlatformPhxWeb.DiscoveryControllerTest do
 
     agent
   end
+
+  defp restore_app_env(app, key, nil), do: Application.delete_env(app, key)
+  defp restore_app_env(app, key, value), do: Application.put_env(app, key, value)
 end

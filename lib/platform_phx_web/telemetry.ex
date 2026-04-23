@@ -130,6 +130,12 @@ defmodule PlatformPhxWeb.Telemetry do
         reporter_options: [buckets: @query_duration_buckets],
         description: "The total database query duration in seconds"
       ),
+      counter("platform_phx.agent_formation.progress.total",
+        event_name: [:platform_phx, :agent_formation, :progress],
+        measurement: :count,
+        tags: [:step, :status],
+        description: "The total number of emitted company launch progress events"
+      ),
       last_value("platform_phx.vm.memory.total.bytes",
         event_name: [:vm, :memory],
         measurement: :total,

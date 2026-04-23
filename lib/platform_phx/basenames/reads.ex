@@ -261,7 +261,7 @@ defmodule PlatformPhx.Basenames.Reads do
     if Basenames.repo_enabled?() do
       :ok
     else
-      {:error, {:unavailable, "Server missing DATABASE_URL (basenames DB disabled)"}}
+      {:error, {:unavailable, PlatformPhx.PublicErrors.name_claiming()}}
     end
   end
 

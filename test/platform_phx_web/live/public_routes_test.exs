@@ -393,6 +393,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
       })
 
     assert html =~ "You are in the room."
+    assert html =~ "1 active now"
 
     html =
       view

@@ -85,7 +85,7 @@ defmodule PlatformPhxWeb.DocsLive do
               class="border-t border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] px-6 py-7 sm:px-8 sm:py-9 xl:border-l xl:border-t-0"
             >
               <div class="rounded-[1.8rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_90%,var(--card)_10%)] px-6 py-6">
-                <div class="flex items-start justify-between gap-4">
+                <div class="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
                   <div class="space-y-2">
                     <h3 class="font-display text-[1.9rem] leading-none tracking-[-0.05em] text-[color:var(--foreground)]">
                       Where to go next
@@ -99,12 +99,12 @@ defmodule PlatformPhxWeb.DocsLive do
                     id="platform-docs-markdown-copy"
                     type="button"
                     phx-hook="ClipboardCopy"
-                    class="inline-flex h-10 shrink-0 items-center gap-2 rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_94%,var(--card)_6%)] px-3 text-sm text-[color:var(--foreground)] transition duration-200 hover:border-[color:var(--ring)]"
+                    class="inline-flex h-10 max-w-full shrink-0 items-center gap-2 rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_94%,var(--card)_6%)] px-3 text-sm text-[color:var(--foreground)] transition duration-200 hover:border-[color:var(--ring)]"
                     aria-label="Copy Docs page as markdown"
                     title="Copy Docs page as markdown"
                     data-copy-text={@page_markdown}
                   >
-                    <span>Copy page as markdown</span>
+                    <span class="truncate">Copy page as markdown</span>
                     <.icon name="hero-document-duplicate" class="size-4" />
                   </button>
                 </div>

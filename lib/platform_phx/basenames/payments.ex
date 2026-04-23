@@ -95,7 +95,7 @@ defmodule PlatformPhx.Basenames.Payments do
     if Basenames.repo_enabled?() do
       :ok
     else
-      {:error, {:unavailable, "Server missing DATABASE_URL (basenames DB disabled)"}}
+      {:error, {:unavailable, PlatformPhx.PublicErrors.name_claiming()}}
     end
   end
 
@@ -293,8 +293,7 @@ defmodule PlatformPhx.Basenames.Payments do
   defp payment_recipient do
     case RuntimeConfig.basenames_payment_recipient() do
       nil ->
-        {:error,
-         {:unavailable, "Server missing AGENT_BASENAME_PAYMENT_RECIPIENT (paid mints disabled)"}}
+        {:error, {:unavailable, PlatformPhx.PublicErrors.payment_verification()}}
 
       recipient ->
         {:ok, String.downcase(recipient)}
@@ -331,7 +330,7 @@ defmodule PlatformPhx.Basenames.Payments do
         configured = Enum.reject(configured, fn {_chain_id, rpc_url} -> is_nil(rpc_url) end)
 
         if Enum.empty?(configured) do
-          {:error, {:unavailable, "Server missing RPC URL(s)"}}
+          {:error, {:unavailable, PlatformPhx.PublicErrors.payment_verification()}}
         else
           {:ok, configured}
         end

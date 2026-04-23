@@ -44,6 +44,7 @@ defmodule PlatformPhxWeb.Router do
     get "/.well-known/agent-skills/index.json", DiscoveryController, :agent_skills_index
     get "/.well-known/mcp/server-card.json", DiscoveryController, :mcp_server_card
     get "/healthz", DiscoveryController, :healthz
+    get "/readyz", DiscoveryController, :readyz
     get "/api-contract.openapiv3.yaml", DiscoveryController, :api_contract
     get "/cli-contract.yaml", DiscoveryController, :cli_contract
     get "/agent-skills/regents-cli.md", DiscoveryController, :regents_cli_skill

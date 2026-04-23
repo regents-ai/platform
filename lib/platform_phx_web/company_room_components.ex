@@ -36,6 +36,9 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
             <span class="rounded-full border border-[color:var(--border)] px-3 py-1">
               {Integer.to_string(@room.member_count)}/{Integer.to_string(@room.seat_count)} seats filled
             </span>
+            <span class="rounded-full border border-[color:var(--border)] px-3 py-1">
+              {active_member_copy(@room)}
+            </span>
             <span
               :if={@room.connected_wallet}
               class="rounded-full border border-[color:var(--border)] px-3 py-1"
@@ -221,6 +224,13 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
   def room_state_label(%{membership_state: :kicked}), do: "Removed"
   def room_state_label(%{connected_wallet: nil}), do: "Watch only"
   def room_state_label(_room), do: "Ready"
+
+  def active_member_copy(%{active_member_count: 1}), do: "1 active now"
+
+  def active_member_copy(%{active_member_count: count}) when is_integer(count),
+    do: "#{count} active now"
+
+  def active_member_copy(_room), do: "0 active now"
 
   def sender_label(:agent), do: "Agent"
   def sender_label(_kind), do: "Person"

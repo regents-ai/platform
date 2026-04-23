@@ -7,19 +7,27 @@ defmodule PlatformPhxWeb.BugReportLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    pagination = OperatorReports.list_bug_reports_page(1, @page_size)
     filters = default_filters()
+    now = DateTime.utc_now()
+    pagination = OperatorReports.list_bug_reports_page(1, @page_size, filters, now)
+    stats = report_stats(pagination.entries, now)
 
     {:ok,
      socket
      |> assign(:page_title, "Bug report ledger")
      |> assign(:filters, filters)
      |> assign(:filter_form, filters_form(filters))
-     |> assign(:loaded_page, 1)
      |> assign(:next_page, 2)
      |> assign(:has_next, pagination.has_next)
-     |> assign(:now, DateTime.utc_now())
-     |> refresh_visible_reports(nil)}
+     |> assign(:now, now)
+     |> assign(:report_count, length(pagination.entries))
+     |> assign(:status_totals, stats.status_totals)
+     |> assign(:source_totals, stats.source_totals)
+     |> assign(:reports_today_count, stats.reports_today_count)
+     |> assign(:newest_report_at, newest_report_at(pagination.entries))
+     |> assign(:expanded_report_id, first_report_id(pagination.entries))
+     |> assign(:expanded_report, List.first(pagination.entries))
+     |> stream(:reports, pagination.entries, reset: true)}
   end
 
   @impl true
@@ -33,50 +41,76 @@ defmodule PlatformPhxWeb.BugReportLive do
   end
 
   def handle_event("load-more", _params, socket) do
-    pagination = OperatorReports.list_bug_reports_page(socket.assigns.next_page, @page_size)
+    now = DateTime.utc_now()
+
+    pagination =
+      OperatorReports.list_bug_reports_page(
+        socket.assigns.next_page,
+        @page_size,
+        socket.assigns.filters,
+        now
+      )
+
+    stats = report_stats(pagination.entries, now)
 
     {:noreply,
      socket
-     |> assign(:loaded_page, socket.assigns.loaded_page + 1)
      |> assign(:next_page, socket.assigns.next_page + 1)
      |> assign(:has_next, pagination.has_next)
-     |> assign(:now, DateTime.utc_now())
-     |> refresh_visible_reports(socket.assigns.expanded_report_id)}
+     |> assign(:now, now)
+     |> assign(:report_count, socket.assigns.report_count + length(pagination.entries))
+     |> assign(:status_totals, merge_totals(socket.assigns.status_totals, stats.status_totals))
+     |> assign(:source_totals, merge_totals(socket.assigns.source_totals, stats.source_totals))
+     |> assign(
+       :reports_today_count,
+       socket.assigns.reports_today_count + stats.reports_today_count
+     )
+     |> stream(:reports, pagination.entries)}
   end
 
   def handle_event("change-filters", %{"filters" => filter_params}, socket) do
     filters = normalize_filters(filter_params)
+    now = DateTime.utc_now()
+    pagination = OperatorReports.list_bug_reports_page(1, @page_size, filters, now)
 
     {:noreply,
      socket
      |> assign(:filters, filters)
      |> assign(:filter_form, filters_form(filters))
-     |> assign(:now, DateTime.utc_now())
-     |> refresh_visible_reports(nil)}
+     |> reset_reports(pagination, now)}
   end
 
   def handle_event("reset-filters", _params, socket) do
     filters = default_filters()
+    now = DateTime.utc_now()
+    pagination = OperatorReports.list_bug_reports_page(1, @page_size, filters, now)
 
     {:noreply,
      socket
      |> assign(:filters, filters)
      |> assign(:filter_form, filters_form(filters))
-     |> assign(:now, DateTime.utc_now())
-     |> refresh_visible_reports(nil)}
+     |> reset_reports(pagination, now)}
   end
 
   def handle_event("toggle-report", %{"report-id" => report_id}, socket) do
-    expanded_report_id =
+    {expanded_report_id, expanded_report} =
       case Integer.parse(report_id) do
         {parsed_id, ""} ->
-          if socket.assigns.expanded_report_id == parsed_id, do: nil, else: parsed_id
+          if socket.assigns.expanded_report_id == parsed_id do
+            {nil, nil}
+          else
+            report = OperatorReports.get_bug_report(parsed_id)
+            {report && report.id, report}
+          end
 
         _ ->
-          socket.assigns.expanded_report_id
+          {socket.assigns.expanded_report_id, socket.assigns.expanded_report}
       end
 
-    {:noreply, refresh_visible_reports(socket, expanded_report_id)}
+    {:noreply,
+     socket
+     |> assign(:expanded_report_id, expanded_report_id)
+     |> assign(:expanded_report, expanded_report)}
   end
 
   @impl true
@@ -367,16 +401,19 @@ defmodule PlatformPhxWeb.BugReportLive do
                 <p class="text-sm text-[color:var(--muted-foreground)]">
                   Showing newest {Integer.to_string(@report_count)} reports in this view
                 </p>
-                <button
-                  :if={@has_next}
-                  id="bug-report-load-more"
-                  type="button"
-                  phx-click="load-more"
-                  class="inline-flex items-center gap-2 rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:var(--background)] px-4 py-3 text-sm text-[color:var(--brand-ink)] transition duration-200 hover:border-[color:var(--ring)]"
-                >
-                  <.icon name="hero-arrow-down" class="size-4" />
-                  <span>Load more reports</span>
-                </button>
+                <div :if={@has_next} class="grid justify-items-end gap-2">
+                  <button
+                    id="bug-report-load-more"
+                    type="button"
+                    phx-click="load-more"
+                    class="inline-flex items-center gap-2 rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:var(--background)] px-4 py-3 text-sm text-[color:var(--brand-ink)] transition duration-200 hover:border-[color:var(--ring)]"
+                  >
+                    <.icon name="hero-arrow-down" class="size-4" />
+                    <span>Load more reports</span>
+                  </button>
+                  <span id="bug-report-load-sentinel" data-bug-report-sentinel class="h-px w-px">
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -437,9 +474,7 @@ defmodule PlatformPhxWeb.BugReportLive do
                 <dl class="mt-4 space-y-3 text-sm">
                   <div class="flex items-center justify-between gap-3">
                     <dt class="text-[color:var(--muted-foreground)]">Reports today</dt>
-                    <dd class="text-[color:var(--foreground)]">
-                      {reports_today(@visible_reports, @now)}
-                    </dd>
+                    <dd class="text-[color:var(--foreground)]">{@reports_today_count}</dd>
                   </div>
                   <div class="flex items-center justify-between gap-3">
                     <dt class="text-[color:var(--muted-foreground)]">Open requiring attention</dt>
@@ -450,9 +485,9 @@ defmodule PlatformPhxWeb.BugReportLive do
                     <dd class="text-[color:#1a915b]">{Map.get(@status_totals, "fixed", 0)}</dd>
                   </div>
                   <div class="flex items-center justify-between gap-3">
-                    <dt class="text-[color:var(--muted-foreground)]">Median time shown</dt>
+                    <dt class="text-[color:var(--muted-foreground)]">Newest shown</dt>
                     <dd class="text-[color:var(--foreground)]">
-                      {median_age_label(@visible_reports, @now)}
+                      {newest_report_label(@newest_report_at, @now)}
                     </dd>
                   </div>
                 </dl>
@@ -502,50 +537,39 @@ defmodule PlatformPhxWeb.BugReportLive do
     """
   end
 
-  defp refresh_visible_reports(socket, expanded_report_id) do
-    loaded_reports = loaded_reports(socket.assigns.loaded_page)
-
-    visible_reports =
-      apply_filters(loaded_reports, socket.assigns.filters, socket.assigns.now)
-
-    expanded_report = expanded_report(visible_reports, expanded_report_id)
-    status_totals = status_totals(visible_reports)
-    source_totals = source_totals(visible_reports)
+  defp reset_reports(socket, pagination, now) do
+    stats = report_stats(pagination.entries, now)
 
     socket
-    |> assign(:visible_reports, visible_reports)
-    |> assign(:report_count, length(visible_reports))
-    |> assign(:status_totals, status_totals)
-    |> assign(:source_totals, source_totals)
-    |> assign(:expanded_report_id, expanded_report && expanded_report.id)
-    |> assign(:expanded_report, expanded_report)
-    |> stream(:reports, visible_reports, reset: true)
+    |> assign(:next_page, 2)
+    |> assign(:has_next, pagination.has_next)
+    |> assign(:now, now)
+    |> assign(:report_count, length(pagination.entries))
+    |> assign(:status_totals, stats.status_totals)
+    |> assign(:source_totals, stats.source_totals)
+    |> assign(:reports_today_count, stats.reports_today_count)
+    |> assign(:newest_report_at, newest_report_at(pagination.entries))
+    |> assign(:expanded_report_id, first_report_id(pagination.entries))
+    |> assign(:expanded_report, List.first(pagination.entries))
+    |> stream(:reports, pagination.entries, reset: true)
   end
 
-  defp loaded_reports(loaded_page) when is_integer(loaded_page) and loaded_page > 0 do
-    1..loaded_page
-    |> Enum.flat_map(fn page ->
-      OperatorReports.list_bug_reports_page(page, @page_size).entries
-    end)
+  defp first_report_id([report | _reports]), do: report.id
+  defp first_report_id([]), do: nil
+
+  defp newest_report_at([report | _reports]), do: report.created_at
+  defp newest_report_at([]), do: nil
+
+  defp report_stats(reports, now) do
+    %{
+      status_totals: status_totals(reports),
+      source_totals: source_totals(reports),
+      reports_today_count: reports_today(reports, now)
+    }
   end
 
-  defp loaded_reports(_loaded_page), do: []
-
-  defp expanded_report([], _expanded_report_id), do: nil
-
-  defp expanded_report(visible_reports, nil), do: List.first(visible_reports)
-
-  defp expanded_report(visible_reports, expanded_report_id) do
-    Enum.find(visible_reports, List.first(visible_reports), &(&1.id == expanded_report_id))
-  end
-
-  defp apply_filters(reports, filters, now) do
-    Enum.filter(reports, fn report ->
-      matches_status?(report, filters["status"]) and
-        matches_source?(report, filters["source"]) and
-        matches_reporter?(report, filters["reporter"]) and
-        matches_time_window?(report, filters["time_window"], now)
-    end)
+  defp merge_totals(left, right) do
+    Map.merge(left, right, fn _key, left_count, right_count -> left_count + right_count end)
   end
 
   defp default_filters do
@@ -602,17 +626,6 @@ defmodule PlatformPhxWeb.BugReportLive do
       {"Last 30 days", "30d"}
     ]
   end
-
-  defp matches_status?(_report, "all"), do: true
-  defp matches_status?(report, status), do: report.status == status
-
-  defp matches_source?(_report, "all"), do: true
-  defp matches_source?(report, source), do: inferred_source(report) == source
-
-  defp matches_reporter?(_report, "all"), do: true
-  defp matches_reporter?(report, "wallet"), do: present?(report.reporter_wallet_address)
-  defp matches_reporter?(report, "public"), do: not present?(report.reporter_wallet_address)
-  defp matches_reporter?(_report, _other), do: true
 
   defp matches_time_window?(_report, "all", _now), do: true
 
@@ -785,23 +798,10 @@ defmodule PlatformPhxWeb.BugReportLive do
     end)
   end
 
-  defp median_age_label([], _now), do: "0m"
+  defp newest_report_label(nil, _now), do: "None"
 
-  defp median_age_label(reports, now) do
-    seconds =
-      reports
-      |> Enum.map(fn report ->
-        case report.created_at do
-          %DateTime{} = created_at -> DateTime.diff(now, created_at, :second)
-          _ -> 0
-        end
-      end)
-      |> Enum.sort()
-
-    seconds
-    |> Enum.at(div(length(seconds), 2), 0)
-    |> duration_label()
-  end
+  defp newest_report_label(%DateTime{} = created_at, now),
+    do: duration_label(DateTime.diff(now, created_at, :second))
 
   defp relative_time(report, now) do
     case report.created_at do

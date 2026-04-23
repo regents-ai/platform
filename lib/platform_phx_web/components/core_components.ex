@@ -450,9 +450,9 @@ defmodule PlatformPhxWeb.CoreComponents do
   def show(js \\ %JS{}, selector) do
     JS.show(js,
       to: selector,
-      time: 300,
+      time: 220,
       transition:
-        {"transition-all ease-out duration-300",
+        {"transition-[opacity,transform] ease-[cubic-bezier(0.23,1,0.32,1)] duration-200",
          "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95",
          "opacity-100 translate-y-0 sm:scale-100"}
     )
@@ -461,9 +461,10 @@ defmodule PlatformPhxWeb.CoreComponents do
   def hide(js \\ %JS{}, selector) do
     JS.hide(js,
       to: selector,
-      time: 200,
+      time: 160,
       transition:
-        {"transition-all ease-in duration-200", "opacity-100 translate-y-0 sm:scale-100",
+        {"transition-[opacity,transform] ease-[cubic-bezier(0.23,1,0.32,1)] duration-150",
+         "opacity-100 translate-y-0 sm:scale-100",
          "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"}
     )
   end

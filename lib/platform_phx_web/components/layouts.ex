@@ -45,7 +45,7 @@ defmodule PlatformPhxWeb.Layouts do
       id="platform-layout-root"
       class={[
         @theme_class,
-        "pp-platform-layout min-h-screen"
+        "pp-platform-layout min-h-[100svh]"
       ]}
       phx-hook="ColorModeToggle"
     >
@@ -83,7 +83,7 @@ defmodule PlatformPhxWeb.Layouts do
           <div
             id="platform-shell-frame"
             class={[
-              "relative flex min-h-[calc(100vh-1.5rem)] overflow-hidden rounded-[1.6rem] border border-[color:color-mix(in_oklch,var(--border)_86%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_98%,var(--card)_2%)] shadow-[0_28px_72px_-48px_color-mix(in_oklch,var(--brand-ink)_28%,transparent)]",
+              "relative flex min-h-[calc(100svh-1.5rem)] overflow-hidden rounded-[1.6rem] border border-[color:color-mix(in_oklch,var(--border)_86%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_98%,var(--card)_2%)] shadow-[0_28px_72px_-48px_color-mix(in_oklch,var(--brand-ink)_28%,transparent)]",
               @active_nav == "token-info" && "pp-platform-content-shell--token"
             ]}
           >
@@ -673,7 +673,7 @@ defmodule PlatformPhxWeb.Layouts do
     ~H"""
     <form
       id={"layout-quick-search-#{@id_prefix}"}
-      class="group flex h-11 items-center gap-3 overflow-hidden rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] px-3 shadow-[inset_0_1px_0_color-mix(in_oklch,var(--background)_18%,transparent)] transition duration-200 focus-within:border-[color:var(--ring)] focus-within:shadow-[0_0_0_1px_color-mix(in_oklch,var(--ring)_55%,transparent)]"
+      class="group relative flex h-11 items-center gap-3 rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] px-3 shadow-[inset_0_1px_0_color-mix(in_oklch,var(--background)_18%,transparent)] transition duration-200 focus-within:border-[color:var(--ring)] focus-within:shadow-[0_0_0_1px_color-mix(in_oklch,var(--ring)_55%,transparent)]"
       phx-hook="QuickSearch"
       data-search-items={@items_json}
       data-search-default={~p"/docs"}
@@ -705,6 +705,22 @@ defmodule PlatformPhxWeb.Layouts do
       >
         Find
       </button>
+      <div
+        data-quick-search-panel
+        class="absolute left-0 right-0 top-[calc(100%+0.65rem)] z-40 rounded-[1.1rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[linear-gradient(180deg,color-mix(in_oklch,var(--background)_98%,var(--card)_2%),color-mix(in_oklch,var(--background)_92%,var(--card)_8%))] p-2 shadow-[0_26px_64px_-44px_color-mix(in_oklch,var(--foreground)_34%,transparent)]"
+        role="listbox"
+        hidden
+      >
+        <div
+          data-quick-search-results
+          class="grid gap-1"
+          aria-label="Suggested pages"
+        >
+        </div>
+        <p class="px-3 pb-2 pt-3 text-[0.68rem] uppercase tracking-[0.22em] text-[color:color-mix(in_oklch,var(--foreground)_45%,var(--muted-foreground)_55%)]">
+          Press ⌘K, then Enter
+        </p>
+      </div>
     </form>
     """
   end

@@ -5,30 +5,18 @@ defmodule PlatformPhxWeb.AgentSiteLive do
   alias PlatformPhx.AgentPlatform.Formation
   alias PlatformPhx.Accounts.AvatarSelection
   alias PlatformPhxWeb.CompanyRoomComponents
-  alias PlatformPhxWeb.CompanyRoomSupport
+  alias PlatformPhxWeb.PublicCompanyPage
 
   @impl true
   def mount(%{"slug" => slug}, _session, socket) do
     agent = AgentPlatform.get_public_agent(slug)
-    {owner_company, billing_account} = owner_panel(agent, socket.assigns.current_human)
-    room_agent = room_agent(agent, socket.assigns.current_human)
-
-    if connected?(socket) and room_agent do
-      :ok = PlatformPhx.Xmtp.subscribe(PlatformPhx.Xmtp.company_room_key(room_agent))
-    end
+    :ok = PublicCompanyPage.subscribe(socket, agent)
 
     {:ok,
      socket
-     |> assign(:page_title, route_title(agent, slug))
-     |> assign(:agent, agent)
-     |> assign(:owner_company, owner_company)
-     |> assign(:billing_account, billing_account)
-     |> assign(
-       :xmtp_room,
-       CompanyRoomSupport.load_room_panel(room_agent, socket.assigns.current_human)
-     )
-     |> CompanyRoomSupport.assign_message_form()
-     |> assign(:slug, slug)}
+     |> assign(:slug, slug)
+     |> PublicCompanyPage.assign_company_state(agent, :agent, agent, route_title(agent, slug))
+     |> PublicCompanyPage.assign_message_form()}
   end
 
   @impl true
@@ -40,8 +28,8 @@ defmodule PlatformPhxWeb.AgentSiteLive do
          |> put_flash(:info, "Company paused.")
          |> reload_agent_preview()}
 
-      {:error, {_status, message}} ->
-        {:noreply, put_flash(socket, :error, message)}
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, PublicCompanyPage.runtime_error_message(reason))}
     end
   end
 
@@ -54,14 +42,14 @@ defmodule PlatformPhxWeb.AgentSiteLive do
          |> put_flash(:info, "Company running again.")
          |> reload_agent_preview()}
 
-      {:error, {_status, message}} ->
-        {:noreply, put_flash(socket, :error, message)}
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, PublicCompanyPage.runtime_error_message(reason))}
     end
   end
 
   @impl true
   def handle_event("xmtp_join", _params, socket) do
-    xmtp_join(socket)
+    PublicCompanyPage.handle_xmtp_join(socket, socket.assigns.agent)
   end
 
   @impl true
@@ -70,39 +58,37 @@ defmodule PlatformPhxWeb.AgentSiteLive do
         %{"request_id" => request_id, "signature" => signature},
         socket
       ) do
-    xmtp_join_signature_signed(socket, request_id, signature)
+    PublicCompanyPage.handle_xmtp_join_signature_signed(
+      socket,
+      socket.assigns.agent,
+      request_id,
+      signature
+    )
   end
 
   @impl true
   def handle_event("xmtp_join_signature_failed", %{"message" => message}, socket) do
-    {:noreply, CompanyRoomSupport.put_status_override(socket, message)}
+    {:noreply, PublicCompanyPage.put_xmtp_status(socket, message)}
   end
 
   @impl true
   def handle_event("xmtp_send", %{"xmtp_room" => %{"body" => body}}, socket) do
-    xmtp_send(socket, body)
+    PublicCompanyPage.handle_xmtp_send(socket, socket.assigns.agent, body)
   end
 
   @impl true
   def handle_event("xmtp_delete_message", %{"message_id" => message_id}, socket) do
-    xmtp_delete_message(socket, message_id)
+    PublicCompanyPage.handle_xmtp_delete_message(socket, socket.assigns.agent, message_id)
   end
 
   @impl true
   def handle_event("xmtp_kick_user", %{"target" => target}, socket) do
-    xmtp_kick_user(socket, target)
+    PublicCompanyPage.handle_xmtp_kick_user(socket, socket.assigns.agent, target)
   end
 
   @impl true
   def handle_event("xmtp_heartbeat", _params, socket) do
-    case room_key(socket) do
-      room_key when is_binary(room_key) ->
-        :ok = PlatformPhx.Xmtp.heartbeat(socket.assigns.current_human, room_key)
-        {:noreply, socket}
-
-      _ ->
-        {:noreply, socket}
-    end
+    PublicCompanyPage.handle_xmtp_heartbeat(socket, socket.assigns.agent)
   end
 
   @impl true
@@ -517,34 +503,15 @@ defmodule PlatformPhxWeb.AgentSiteLive do
 
   defp reload_agent_preview(socket) do
     agent = AgentPlatform.get_public_agent(socket.assigns.slug)
-    {owner_company, billing_account} = owner_panel(agent, socket.assigns.current_human)
-    room_agent = room_agent(agent, socket.assigns.current_human)
 
     socket
-    |> assign(:agent, agent)
-    |> assign(:page_title, route_title(agent, socket.assigns.slug))
-    |> assign(:owner_company, owner_company)
-    |> assign(:billing_account, billing_account)
-    |> assign(
-      :xmtp_room,
-      CompanyRoomSupport.load_room_panel(room_agent, socket.assigns.current_human)
+    |> PublicCompanyPage.assign_company_state(
+      agent,
+      :agent,
+      agent,
+      route_title(agent, socket.assigns.slug)
     )
   end
-
-  defp owner_panel(%{owner_human_id: owner_human_id, slug: slug}, %{id: human_id} = current_human)
-       when owner_human_id == human_id do
-    owned_agent = AgentPlatform.get_owned_agent(current_human, slug)
-    owner_company = owned_agent && AgentPlatform.serialize_agent(owned_agent, :private)
-
-    billing_account =
-      current_human
-      |> AgentPlatform.get_billing_account()
-      |> AgentPlatform.billing_account_payload(List.wrap(owned_agent))
-
-    {owner_company, billing_account}
-  end
-
-  defp owner_panel(_agent, _current_human), do: {nil, nil}
 
   defp owner_company_paused?(company) do
     company.desired_runtime_state == "paused" or company.runtime_status == "paused"
@@ -555,12 +522,6 @@ defmodule PlatformPhxWeb.AgentSiteLive do
   end
 
   defp billing_balance(_billing_account), do: "$0.00"
-
-  defp room_agent(%{slug: slug}, %{} = current_human),
-    do: AgentPlatform.get_owned_agent(current_human, slug) || AgentPlatform.get_public_agent(slug)
-
-  defp room_agent(%{slug: slug}, _current_human), do: AgentPlatform.get_public_agent(slug)
-  defp room_agent(_agent, _current_human), do: nil
 
   defp route_title(%{name: name}, _slug) when is_binary(name) and name != "", do: name
   defp route_title(_agent, slug), do: "Public company #{slug}"
@@ -772,138 +733,6 @@ defmodule PlatformPhxWeb.AgentSiteLive do
       end
     else
       _ -> "Just now"
-    end
-  end
-
-  defp room_key(socket) do
-    socket
-    |> room_agent_from_socket()
-    |> case do
-      nil -> nil
-      agent -> PlatformPhx.Xmtp.company_room_key(agent)
-    end
-  end
-
-  defp room_agent_from_socket(socket),
-    do: room_agent(socket.assigns.agent, socket.assigns.current_human)
-
-  defp xmtp_join(socket) do
-    with room_key when is_binary(room_key) <- room_key(socket),
-         response <- PlatformPhx.Xmtp.request_join(socket.assigns.current_human, room_key, %{}) do
-      case response do
-        {:ok, panel} ->
-          {:noreply, assign(socket, :xmtp_room, Map.put(panel, :status_override, nil))}
-
-        {:needs_signature,
-         %{request_id: request_id, signature_text: signature_text, panel: panel}} ->
-          {:noreply,
-           socket
-           |> assign(:xmtp_room, Map.put(panel, :status_override, nil))
-           |> push_event("xmtp:sign-request", %{
-             request_id: request_id,
-             signature_text: signature_text,
-             wallet_address: panel.connected_wallet
-           })}
-
-        {:error, reason} ->
-          {:noreply,
-           CompanyRoomSupport.put_status_override(
-             socket,
-             CompanyRoomSupport.reason_message(reason)
-           )}
-      end
-    else
-      _ -> {:noreply, socket}
-    end
-  end
-
-  defp xmtp_join_signature_signed(socket, request_id, signature) do
-    with room_key when is_binary(room_key) <- room_key(socket),
-         response <-
-           PlatformPhx.Xmtp.complete_join_signature(
-             socket.assigns.current_human,
-             request_id,
-             signature,
-             room_key,
-             %{}
-           ) do
-      case response do
-        {:ok, panel} ->
-          {:noreply, assign(socket, :xmtp_room, Map.put(panel, :status_override, nil))}
-
-        {:error, reason} ->
-          {:noreply,
-           CompanyRoomSupport.put_status_override(
-             socket,
-             CompanyRoomSupport.reason_message(reason)
-           )}
-      end
-    else
-      _ -> {:noreply, socket}
-    end
-  end
-
-  defp xmtp_send(socket, body) do
-    with room_key when is_binary(room_key) <- room_key(socket),
-         response <- PlatformPhx.Xmtp.send_message(socket.assigns.current_human, body, room_key) do
-      case response do
-        {:ok, panel} ->
-          {:noreply,
-           socket
-           |> assign(:xmtp_room, Map.put(panel, :status_override, nil))
-           |> CompanyRoomSupport.assign_message_form()}
-
-        {:error, reason} ->
-          {:noreply,
-           socket
-           |> CompanyRoomSupport.assign_message_form(body)
-           |> CompanyRoomSupport.put_status_override(CompanyRoomSupport.reason_message(reason))}
-      end
-    else
-      _ -> {:noreply, socket}
-    end
-  end
-
-  defp xmtp_delete_message(socket, message_id) do
-    with room_key when is_binary(room_key) <- room_key(socket),
-         response <-
-           PlatformPhx.Xmtp.moderator_delete_message(
-             socket.assigns.current_human,
-             message_id,
-             room_key
-           ) do
-      case response do
-        {:ok, panel} ->
-          {:noreply, assign(socket, :xmtp_room, Map.put(panel, :status_override, nil))}
-
-        {:error, reason} ->
-          {:noreply,
-           CompanyRoomSupport.put_status_override(
-             socket,
-             CompanyRoomSupport.reason_message(reason)
-           )}
-      end
-    else
-      _ -> {:noreply, socket}
-    end
-  end
-
-  defp xmtp_kick_user(socket, target) do
-    with room_key when is_binary(room_key) <- room_key(socket),
-         response <- PlatformPhx.Xmtp.kick_user(socket.assigns.current_human, target, room_key) do
-      case response do
-        {:ok, panel} ->
-          {:noreply, assign(socket, :xmtp_room, Map.put(panel, :status_override, nil))}
-
-        {:error, reason} ->
-          {:noreply,
-           CompanyRoomSupport.put_status_override(
-             socket,
-             CompanyRoomSupport.reason_message(reason)
-           )}
-      end
-    else
-      _ -> {:noreply, socket}
     end
   end
 end

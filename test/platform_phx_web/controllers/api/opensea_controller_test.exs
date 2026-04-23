@@ -60,7 +60,8 @@ defmodule PlatformPhxWeb.Api.OpenseaControllerTest do
       |> get("/api/opensea", %{address: @address})
       |> json_response(503)
 
-    assert response["statusMessage"] == "Server missing OPENSEA_API_KEY"
+    assert response["statusMessage"] == "Collectible lookup is unavailable right now."
+    refute response["statusMessage"] =~ "OPENSEA_API_KEY"
   end
 
   test "returns 502 when opensea fails upstream", %{conn: conn} do
@@ -77,7 +78,8 @@ defmodule PlatformPhxWeb.Api.OpenseaControllerTest do
       |> get("/api/opensea", %{address: @address})
       |> json_response(502)
 
-    assert response["statusMessage"] == "OpenSea request failed with status 500"
+    assert response["statusMessage"] == "Collectible lookup is unavailable right now."
+    refute response["statusMessage"] =~ "500"
   end
 
   test "returns redeem collection supply stats", %{conn: conn} do
@@ -109,7 +111,8 @@ defmodule PlatformPhxWeb.Api.OpenseaControllerTest do
       |> get("/api/opensea/redeem-stats")
       |> json_response(502)
 
-    assert response["statusMessage"] == "OpenSea request failed with status 500"
+    assert response["statusMessage"] == "Collectible lookup is unavailable right now."
+    refute response["statusMessage"] =~ "500"
   end
 
   defp request_url(address, collection) do

@@ -270,7 +270,7 @@ html {
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: 100svh;
   background:
     radial-gradient(circle at 14% 14%, var(--page-spot-1), transparent 30%),
     radial-gradient(circle at 84% 12%, var(--page-spot-2), transparent 36%),
@@ -536,11 +536,11 @@ body,
   background: color-mix(in oklch, var(--card-elevated) 92%, var(--background) 8%);
   color: var(--foreground);
   transition:
-    border-color 180ms ease,
-    background 180ms ease,
-    color 180ms ease,
-    transform 180ms ease,
-    box-shadow 180ms ease;
+    border-color 180ms var(--ease-out-quart),
+    background 180ms var(--ease-out-quart),
+    color 180ms var(--ease-out-quart),
+    transform 180ms var(--ease-out-quart),
+    box-shadow 180ms var(--ease-out-quart);
 }
 
 .pp-shell-search-submit {
@@ -654,9 +654,9 @@ html[data-color-mode="dark"] .pp-shell-action-icon-moon {
   background: color-mix(in oklch, var(--background) 36%, transparent);
   color: var(--foreground);
   transition:
-    border-color 180ms ease,
-    background 180ms ease,
-    transform 180ms ease;
+    border-color 180ms var(--ease-out-quart),
+    background 180ms var(--ease-out-quart),
+    transform 180ms var(--ease-out-quart);
 }
 
 .pp-shell-popover-link:hover,
@@ -664,7 +664,6 @@ html[data-color-mode="dark"] .pp-shell-action-icon-moon {
   transform: translateY(-1px);
   border-color: var(--ring);
   background: color-mix(in oklch, var(--accent) 10%, var(--card) 90%);
-}
 }
 
 .pp-wallet-shell {
@@ -907,6 +906,9 @@ html[data-color-mode="dark"] .pp-shell-action-icon-moon {
 .pp-wallet-pill:active,
 .pp-wallet-drawer-action:active,
 .pp-wallet-icon-button:active,
+.pp-shell-search-submit:active,
+.pp-shell-action-button:active,
+.pp-shell-popover-link:active,
 .pp-mobile-nav-link:active,
 .pp-sidebar-utility-link:active,
 .pp-link-button:active,
@@ -1159,12 +1161,12 @@ html[data-color-mode="dark"] .pp-voxel-background-svg {
 }
 
 .pp-scene-demo-shell {
-  min-height: 100vh;
+  min-height: 100svh;
   background: var(--demo-shell-background);
 }
 
 .pp-scene-demo-stage {
-  min-height: 100vh;
+  min-height: 100svh;
   width: min(1500px, 100%);
   margin: 0 auto;
   display: grid;
@@ -1249,14 +1251,14 @@ html[data-color-mode="dark"] .pp-voxel-background-svg {
     flex-direction: column;
     position: sticky;
     top: 1rem;
-    max-block-size: calc(100vh - 2rem);
+    max-block-size: calc(100svh - 2rem);
   }
 
   .pp-sidebar-shell {
     display: flex;
     flex-direction: column;
     min-block-size: 0;
-    max-block-size: calc(100vh - 2rem);
+    max-block-size: calc(100svh - 2rem);
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
@@ -2709,9 +2711,9 @@ html[data-color-mode="dark"]
   font-size: 0.9rem;
   color: var(--foreground);
   transition:
-    transform 180ms ease,
-    border-color 180ms ease,
-    background 180ms ease;
+    transform 180ms var(--ease-out-quart),
+    border-color 180ms var(--ease-out-quart),
+    background 180ms var(--ease-out-quart);
 }
 
 html[data-color-mode="dark"] .pp-entry-link-visual,
@@ -5030,7 +5032,7 @@ html[data-color-mode="dark"] .pp-preview-link {
   --pp-heerich-shell-centerwash-edge: rgba(251, 244, 222, 0);
   --pp-heerich-shell-lane-border: rgba(212, 167, 86, 0.2);
   position: relative;
-  min-height: 100vh;
+  min-height: 100svh;
   overflow: clip;
   isolation: isolate;
   background:
@@ -5127,7 +5129,7 @@ html[data-color-mode="dark"] .pp-preview-link {
 .pp-heerich-shell-content {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
+  min-height: 100svh;
   display: grid;
   place-items: center;
   padding: clamp(5.5rem, 10vw, 8rem) clamp(1rem, 4vw, 2.5rem)
@@ -5378,6 +5380,44 @@ html[data-color-mode="dark"] .pp-heerich-shell-list li {
       color-mix(in oklch, var(--background) 96%, var(--card) 4%),
       color-mix(in oklch, var(--background) 92%, var(--card) 8%)
     );
+}
+
+@media (max-width: 480px) {
+  #platform-shell-header-mobile {
+    padding-inline: 0.85rem;
+  }
+
+  #platform-shell-header-mobile [data-wallet-shell] {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #platform-shell-header-mobile [data-wallet-sign-in],
+  #platform-shell-header-mobile [data-wallet-trigger] {
+    min-width: 0;
+    max-width: calc(100vw - 1.7rem);
+  }
+
+  #platform-shell-header-mobile [data-wallet-sign-in-label],
+  #platform-shell-header-mobile [data-wallet-trigger] > span:nth-of-type(2) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #platform-shell-header-mobile [data-wallet-trigger] {
+    gap: 0.55rem;
+    padding-inline: 0.75rem;
+  }
+
+  #platform-shell-header-mobile [data-wallet-trigger] > span:nth-of-type(2) {
+    max-width: min(7.25rem, 34vw);
+  }
+
+  #platform-shell-header-mobile [data-wallet-drawer] {
+    right: 0;
+    width: min(18rem, calc(100vw - 1.7rem));
+  }
 }
 
 #platform-trust-root .pp-route-panel,

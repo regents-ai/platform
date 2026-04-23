@@ -64,6 +64,7 @@ defmodule PlatformPhxWeb.BugReportLiveTest do
     assert html =~ "report-051"
     refute html =~ "report-001"
     assert has_element?(view, "#platform-bug-ledger-stream[phx-update=\"stream\"]")
+    assert has_element?(view, "#bug-report-load-sentinel[data-bug-report-sentinel]")
 
     html_two =
       view

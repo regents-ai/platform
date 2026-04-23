@@ -2,6 +2,7 @@ defmodule PlatformPhxWeb.DiscoveryController do
   @moduledoc false
   use PlatformPhxWeb, :controller
 
+  alias PlatformPhx.LaunchHealth
   alias PlatformPhxWeb.Discovery
 
   def robots(conn, _params) do
@@ -30,6 +31,15 @@ defmodule PlatformPhxWeb.DiscoveryController do
 
   def healthz(conn, _params) do
     send_text(conn, "text/plain; charset=utf-8", "ok")
+  end
+
+  def readyz(conn, _params) do
+    snapshot = LaunchHealth.snapshot()
+    status = if snapshot.status == "ready", do: 200, else: 503
+
+    conn
+    |> put_status(status)
+    |> send_json("application/json; charset=utf-8", snapshot)
   end
 
   def api_contract(conn, _params) do

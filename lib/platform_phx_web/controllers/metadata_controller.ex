@@ -1,5 +1,6 @@
 defmodule PlatformPhxWeb.MetadataController do
   use PlatformPhxWeb, :controller
+  require Logger
 
   @spec show(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def show(conn, %{"token_id" => token_id}) do
@@ -13,7 +14,8 @@ defmodule PlatformPhxWeb.MetadataController do
         send_resp(conn, :not_found, "Not Found")
 
       {:error, reason} ->
-        raise "unable to read metadata #{path}: #{inspect(reason)}"
+        Logger.error("metadata read failed #{inspect(%{path: path, reason: reason})}")
+        send_resp(conn, :internal_server_error, "Metadata is unavailable right now.")
     end
   end
 
