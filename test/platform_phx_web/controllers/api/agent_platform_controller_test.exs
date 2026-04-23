@@ -380,6 +380,23 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert {"resume_runtime", "succeeded", "human_user", "formation_api_resume"} in sprite_actions
   end
 
+  test "billing setup hides missing Stripe setup details", %{conn: conn} do
+    human = insert_human!()
+    System.delete_env("STRIPE_SECRET_KEY")
+
+    response =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
+      |> post("/api/agent-platform/billing/setup/checkout", %{claimedLabel: "quiet"})
+      |> json_response(503)
+
+    assert response["statusMessage"] == "Billing is unavailable right now."
+    refute response["statusMessage"] =~ "STRIPE_SECRET_KEY"
+    refute response["statusMessage"] =~ "Server missing"
+    refute_public_leak(response["statusMessage"])
+  end
+
   test "top-up checkout stores the Stripe customer for a fresh billing account", %{conn: conn} do
     human = insert_human!()
 
@@ -602,7 +619,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     refute Repo.get_by!(Mint, label: "duplicate").is_in_use
   end
 
-  test "pause and resume surface sprite runtime failures instead of reporting success", %{
+  test "pause and resume hide sprite runtime failure details", %{
     conn: conn
   } do
     human = insert_human!()
@@ -634,7 +651,8 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       |> post("/api/agent-platform/sprites/#{agent.slug}/pause")
       |> json_response(502)
 
-    assert pause_response["statusMessage"] =~ "stop failed"
+    assert pause_response["statusMessage"] == "Company controls are unavailable right now."
+    refute_public_leak(pause_response["statusMessage"])
     assert Repo.get!(PlatformPhx.AgentPlatform.Agent, agent.id).runtime_status == "failed"
 
     Application.put_env(:platform_phx, :sprite_runtime_stop_result, :ok)
@@ -652,7 +670,8 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       |> post("/api/agent-platform/sprites/#{agent.slug}/resume")
       |> json_response(502)
 
-    assert resume_response["statusMessage"] =~ "start failed"
+    assert resume_response["statusMessage"] == "Company controls are unavailable right now."
+    refute_public_leak(resume_response["statusMessage"])
     assert Repo.get!(PlatformPhx.AgentPlatform.Agent, agent.id).runtime_status == "failed"
   end
 
@@ -1179,6 +1198,13 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
   defp restore_system_env(key, nil), do: System.delete_env(key)
   defp restore_system_env(key, value), do: System.put_env(key, value)
+
+  defp refute_public_leak(message) do
+    refute message =~ "stop failed"
+    refute message =~ "start failed"
+    refute message =~ "%{"
+    refute message =~ "{:"
+  end
 
   defp put_csrf_token(conn) do
     token = Plug.CSRFProtection.get_csrf_token()

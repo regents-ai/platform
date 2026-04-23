@@ -16,6 +16,9 @@ defmodule PlatformPhx.PublicErrors do
   def payment_verification,
     do: "Payment verification is unavailable right now."
 
+  def billing,
+    do: "Billing is unavailable right now."
+
   def trust_approval,
     do: "Trust approval could not be completed right now."
 

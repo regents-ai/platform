@@ -163,6 +163,8 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
     assert response["statusMessage"] == "Could not prepare that staking action right now."
     refute response["statusMessage"] =~ "external"
     refute response["statusMessage"] =~ "500"
+    refute response["statusMessage"] =~ "upstream"
+    refute response["statusMessage"] =~ "%{"
   end
 
   test "deposit prepare returns a multisig payload", %{conn: conn} do

@@ -2,6 +2,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   @moduledoc false
 
   import Ecto.Query, warn: false
+  require Logger
 
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform
@@ -16,6 +17,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   alias PlatformPhx.AgentPlatform.Subdomain
   alias PlatformPhx.AgentPlatform.Workers.RunFormationWorker
   alias PlatformPhx.Basenames.Mint
+  alias PlatformPhx.PublicErrors
   alias PlatformPhx.Repo
   alias PlatformPhxWeb.Endpoint
   alias Oban
@@ -244,7 +246,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
       {:ok, %{ok: true, sprite: sprite_runtime_control_payload(updated)}}
     else
       nil -> {:error, {:not_found, "Company not found"}}
-      {:error, _reason} = error -> error
+      {:error, reason} -> runtime_control_error(reason, "pause")
     end
   end
 
@@ -267,7 +269,8 @@ defmodule PlatformPhx.AgentPlatform.Formation do
        }}
     else
       nil -> {:error, {:not_found, "Company not found"}}
-      {:error, _reason} = error -> error
+      {:error, {:payment_required, _message}} = error -> error
+      {:error, reason} -> runtime_control_error(reason, "resume")
     end
   end
 
@@ -449,6 +452,15 @@ defmodule PlatformPhx.AgentPlatform.Formation do
       nil -> {:error, {:unavailable, "Customer start template is missing"}}
       template -> {:ok, template}
     end
+  end
+
+  defp runtime_control_error({:unauthorized, _message} = reason, _action), do: {:error, reason}
+  defp runtime_control_error({:not_found, _message} = reason, _action), do: {:error, reason}
+
+  defp runtime_control_error(reason, action) do
+    Logger.warning("company runtime #{action} failed #{inspect(%{reason: reason})}")
+
+    {:error, {:external, :sprite, PublicErrors.company_runtime()}}
   end
 
   defp readiness_payload(context) do

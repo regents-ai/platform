@@ -1,8 +1,10 @@
 defmodule PlatformPhx.AgentPlatform.StripeBilling do
   @moduledoc false
+  require Logger
 
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.SpriteUsageRecord
+  alias PlatformPhx.PublicErrors
   alias PlatformPhx.RuntimeConfig
 
   def create_billing_setup_checkout_session(%BillingAccount{} = account, human_user_id, opts) do
@@ -89,22 +91,37 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
 
   defp fetch_secret_key do
     case RuntimeConfig.stripe_secret_key() do
-      nil -> {:error, {:unavailable, "Server missing STRIPE_SECRET_KEY"}}
-      value -> {:ok, value}
+      nil ->
+        Logger.warning("stripe billing unavailable missing_config name=STRIPE_SECRET_KEY")
+        {:error, {:unavailable, PublicErrors.billing()}}
+
+      value ->
+        {:ok, value}
     end
   end
 
   defp fetch_webhook_secret do
     case RuntimeConfig.stripe_webhook_secret() do
-      nil -> {:error, {:unavailable, "Server missing STRIPE_WEBHOOK_SECRET"}}
-      value -> {:ok, value}
+      nil ->
+        Logger.warning("stripe webhook unavailable missing_config name=STRIPE_WEBHOOK_SECRET")
+        {:error, {:unavailable, PublicErrors.billing()}}
+
+      value ->
+        {:ok, value}
     end
   end
 
   defp fetch_pricing_plan_id do
     case RuntimeConfig.stripe_billing_pricing_plan_id() do
-      nil -> {:error, {:unavailable, "Server missing STRIPE_BILLING_PRICING_PLAN_ID"}}
-      value -> {:ok, value}
+      nil ->
+        Logger.warning(
+          "stripe billing unavailable missing_config name=STRIPE_BILLING_PRICING_PLAN_ID"
+        )
+
+        {:error, {:unavailable, PublicErrors.billing()}}
+
+      value ->
+        {:ok, value}
     end
   end
 
@@ -114,28 +131,50 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
         {:ok, value}
 
       _ ->
-        {:error, {:unavailable, "Server missing billing setup return URL"}}
+        Logger.warning("stripe billing unavailable missing_setup_url key=#{key}")
+        {:error, {:unavailable, PublicErrors.billing()}}
     end
   end
 
   defp fetch_topup_success_url do
     case RuntimeConfig.stripe_billing_topup_success_url() do
-      nil -> {:error, {:unavailable, "Server missing STRIPE_BILLING_TOPUP_SUCCESS_URL"}}
-      value -> {:ok, value}
+      nil ->
+        Logger.warning(
+          "stripe billing unavailable missing_config name=STRIPE_BILLING_TOPUP_SUCCESS_URL"
+        )
+
+        {:error, {:unavailable, PublicErrors.billing()}}
+
+      value ->
+        {:ok, value}
     end
   end
 
   defp fetch_topup_cancel_url do
     case RuntimeConfig.stripe_billing_topup_cancel_url() do
-      nil -> {:error, {:unavailable, "Server missing STRIPE_BILLING_TOPUP_CANCEL_URL"}}
-      value -> {:ok, value}
+      nil ->
+        Logger.warning(
+          "stripe billing unavailable missing_config name=STRIPE_BILLING_TOPUP_CANCEL_URL"
+        )
+
+        {:error, {:unavailable, PublicErrors.billing()}}
+
+      value ->
+        {:ok, value}
     end
   end
 
   defp fetch_runtime_meter_event_name do
     case RuntimeConfig.stripe_runtime_meter_event_name() do
-      nil -> {:error, {:unavailable, "Server missing STRIPE_RUNTIME_METER_EVENT_NAME"}}
-      value -> {:ok, value}
+      nil ->
+        Logger.warning(
+          "stripe runtime billing unavailable missing_config name=STRIPE_RUNTIME_METER_EVENT_NAME"
+        )
+
+        {:error, {:unavailable, PublicErrors.billing()}}
+
+      value ->
+        {:ok, value}
     end
   end
 
@@ -215,6 +254,10 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
 
   defmodule HttpClient do
     @moduledoc false
+    require Logger
+
+    alias PlatformPhx.PublicErrors
+
     @checkout_preview_header "2025-09-30.preview;checkout_product_catalog_preview=v1"
 
     def create_billing_setup_checkout_session(params) do
@@ -248,12 +291,16 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
           {:ok, %{url: url, customer_id: body["customer"]}}
 
         {:ok, %{status: status, body: body}} ->
-          {:error,
-           {:external, :stripe,
-            "Stripe billing setup failed with status #{status}: #{inspect(body)}"}}
+          Logger.warning("stripe billing setup failed #{inspect(%{status: status, body: body})}")
+
+          {:error, {:external, :stripe, PublicErrors.billing()}}
 
         {:error, error} ->
-          {:error, {:external, :stripe, Exception.message(error)}}
+          Logger.warning(
+            "stripe billing setup request failed #{inspect(%{reason: Exception.message(error)})}"
+          )
+
+          {:error, {:external, :stripe, PublicErrors.billing()}}
       end
     end
 
@@ -290,11 +337,16 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
           {:ok, %{url: url, customer_id: body["customer"]}}
 
         {:ok, %{status: status, body: body}} ->
-          {:error,
-           {:external, :stripe, "Stripe top-up failed with status #{status}: #{inspect(body)}"}}
+          Logger.warning("stripe top-up failed #{inspect(%{status: status, body: body})}")
+
+          {:error, {:external, :stripe, PublicErrors.billing()}}
 
         {:error, error} ->
-          {:error, {:external, :stripe, Exception.message(error)}}
+          Logger.warning(
+            "stripe top-up request failed #{inspect(%{reason: Exception.message(error)})}"
+          )
+
+          {:error, {:external, :stripe, PublicErrors.billing()}}
       end
     end
 
@@ -321,12 +373,16 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
           {:ok, %{credit_grant_id: id}}
 
         {:ok, %{status: status, body: body}} ->
-          {:error,
-           {:external, :stripe,
-            "Stripe credit grant failed with status #{status}: #{inspect(body)}"}}
+          Logger.warning("stripe credit grant failed #{inspect(%{status: status, body: body})}")
+
+          {:error, {:external, :stripe, PublicErrors.billing()}}
 
         {:error, error} ->
-          {:error, {:external, :stripe, Exception.message(error)}}
+          Logger.warning(
+            "stripe credit grant request failed #{inspect(%{reason: Exception.message(error)})}"
+          )
+
+          {:error, {:external, :stripe, PublicErrors.billing()}}
       end
     end
 
@@ -359,12 +415,18 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
           {:ok, %{meter_event_id: identifier}}
 
         {:ok, %{status: status, body: body}} ->
-          {:error,
-           {:external, :stripe,
-            "Stripe runtime reporting failed with status #{status}: #{inspect(body)}"}}
+          Logger.warning(
+            "stripe runtime reporting failed #{inspect(%{status: status, body: body})}"
+          )
+
+          {:error, {:external, :stripe, PublicErrors.billing()}}
 
         {:error, error} ->
-          {:error, {:external, :stripe, Exception.message(error)}}
+          Logger.warning(
+            "stripe runtime reporting request failed #{inspect(%{reason: Exception.message(error)})}"
+          )
+
+          {:error, {:external, :stripe, PublicErrors.billing()}}
       end
     end
 
