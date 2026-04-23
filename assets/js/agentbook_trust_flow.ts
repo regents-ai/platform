@@ -37,6 +37,10 @@ const QR_OPTIONS = {
   },
 };
 
+const WORLD_CURRENT_PROOF_OPTIONS = {
+  allow_legacy_proofs: false,
+} as const;
+
 const parseSession = (raw: string | undefined): AgentbookTrustSession | null => {
   if (!raw) return null;
 
@@ -115,7 +119,7 @@ async function runAgentbookTrustFlow(hook: AgentbookTrustHookInstance): Promise<
         expires_at: number;
         signature: string;
       },
-      allow_legacy_proofs: false,
+      ...WORLD_CURRENT_PROOF_OPTIONS,
     });
 
     const request = await builder.constraints(

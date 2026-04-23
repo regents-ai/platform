@@ -106,6 +106,7 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
     assert create_response["session"]["status"] == "pending"
     assert create_response["session"]["wallet_address"] == @signed_wallet_address
     assert create_response["session"]["approval_url"] =~ "/app/trust?session_id=sess-"
+    refute Map.has_key?(create_response["session"]["frontend_request"], "allow_legacy_proofs")
 
     show_response =
       build_conn()
@@ -304,7 +305,6 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
           "expires_at" => 4_070_908_800,
           "signature" => "0xsig"
         },
-        allow_legacy_proofs: false,
         status: "pending",
         expires_at: ~U[2099-01-01 00:00:00Z],
         inserted_at: DateTime.utc_now(),

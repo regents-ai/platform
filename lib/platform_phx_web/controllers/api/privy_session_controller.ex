@@ -6,6 +6,7 @@ defmodule PlatformPhxWeb.Api.PrivySessionController do
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.Privy
   alias PlatformPhxWeb.ApiErrors
+  alias PlatformPhx.PublicErrors
 
   def csrf(conn, _params) do
     token = Plug.CSRFProtection.get_csrf_token()
@@ -35,7 +36,7 @@ defmodule PlatformPhxWeb.Api.PrivySessionController do
           "privy session create rejected invalid human payload #{inspect(%{errors: changeset.errors})}"
         )
 
-        ApiErrors.error(conn, {:bad_request, inspect(changeset.errors)})
+        ApiErrors.error(conn, {:bad_request, PublicErrors.profile_save()})
 
       {:error, :invalid_authorization_header} ->
         Logger.warning(

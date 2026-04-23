@@ -28,6 +28,9 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
        }}
     end
 
+    def stake(%{"amount" => "explode"}, _human),
+      do: {:error, {:external, %{status: 500, body: %{"error" => "upstream"}}}}
+
     def stake(_params, _human), do: {:error, :amount_required}
 
     def unstake(_params, _human) do
@@ -147,6 +150,19 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
              "ok" => true,
              "tx_request" => %{"chain_id" => 8453, "data" => "0x7acb7757"}
            } = json_response(conn, 200)
+  end
+
+  test "stake hides unexpected internal errors", %{conn: conn} do
+    response =
+      conn
+      |> init_test_session(%{})
+      |> put_csrf_token()
+      |> post("/api/regent/staking/stake", %{"amount" => "explode"})
+      |> json_response(400)
+
+    assert response["statusMessage"] == "Could not prepare that staking action right now."
+    refute response["statusMessage"] =~ "external"
+    refute response["statusMessage"] =~ "500"
   end
 
   test "deposit prepare returns a multisig payload", %{conn: conn} do

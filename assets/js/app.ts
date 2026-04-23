@@ -4,18 +4,9 @@ import { Socket } from "phoenix";
 import { LiveSocket, type HooksOptions } from "phoenix_live_view";
 import { Heerich } from "heerich";
 import topbar from "../vendor/topbar.cjs";
-import {
-  bindDashboardNameClaim,
-  bindDashboardRedeem,
-  bindDashboardWallet,
-  mountDashboardPrivyBridge,
-  unmountDashboardPrivyBridge,
-} from "./dashboard/islands";
 import { mountBoundHook } from "./dashboard/hook_lifecycle";
 import { DashboardXmtpRoomHook } from "./dashboard/xmtp_room";
 import { TokenStakingHook } from "./token_staking";
-import { mountShaderRoot, unmountShaderRoot } from "./shader/root";
-import { mountTokenCardRoot, unmountTokenCardRoot, updateTokenCardRoot } from "./shader/token_card_root";
 import { mountClipboardCopy } from "./clipboard_copy";
 import { createCleanupHook } from "./hook_cleanup";
 import {
@@ -39,7 +30,31 @@ import { mountOverviewMode } from "./overview";
 import { mountColorModeToggle } from "./color_mode";
 import { VoxelBackgroundHook } from "./voxel_background";
 import { registerWebMCP } from "./webmcp";
-import { AgentbookTrustFlow } from "./agentbook_trust_flow";
+
+let dashboardIslandsPromise: Promise<typeof import("./dashboard/islands")> | undefined;
+let shaderRootPromise: Promise<typeof import("./shader/root")> | undefined;
+let tokenCardRootPromise: Promise<typeof import("./shader/token_card_root")> | undefined;
+let agentbookTrustFlowPromise: Promise<typeof import("./agentbook_trust_flow")> | undefined;
+
+function loadDashboardIslands() {
+  dashboardIslandsPromise ??= import("./dashboard/islands");
+  return dashboardIslandsPromise;
+}
+
+function loadShaderRoot() {
+  shaderRootPromise ??= import("./shader/root");
+  return shaderRootPromise;
+}
+
+function loadTokenCardRoot() {
+  tokenCardRootPromise ??= import("./shader/token_card_root");
+  return tokenCardRootPromise;
+}
+
+function loadAgentbookTrustFlow() {
+  agentbookTrustFlowPromise ??= import("./agentbook_trust_flow");
+  return agentbookTrustFlowPromise;
+}
 
 type HookContext = {
   el: Element;
@@ -69,19 +84,27 @@ function createRevealHook(
 
 const DashboardPrivyBridgeHook = {
   mounted(this: HookContext) {
-    mountDashboardPrivyBridge(this.el);
+    void loadDashboardIslands().then(({ mountDashboardPrivyBridge }) => {
+      if (this.el.isConnected) mountDashboardPrivyBridge(this.el);
+    });
   },
   destroyed(this: HookContext) {
-    unmountDashboardPrivyBridge(this.el);
+    void loadDashboardIslands().then(({ unmountDashboardPrivyBridge }) => {
+      unmountDashboardPrivyBridge(this.el);
+    });
   },
 };
 
 const DashboardWalletHook = {
   mounted(this: HookContext) {
-    mountBoundHook(this, bindDashboardWallet);
+    void loadDashboardIslands().then(({ bindDashboardWallet }) => {
+      if (this.el.isConnected) mountBoundHook(this, bindDashboardWallet);
+    });
   },
   updated(this: HookContext) {
-    mountBoundHook(this, bindDashboardWallet);
+    void loadDashboardIslands().then(({ bindDashboardWallet }) => {
+      if (this.el.isConnected) mountBoundHook(this, bindDashboardWallet);
+    });
   },
   destroyed(this: HookContext) {
     this.__dashboardCleanup?.();
@@ -90,10 +113,14 @@ const DashboardWalletHook = {
 
 const DashboardNameClaimHook = {
   mounted(this: HookContext) {
-    mountBoundHook(this, bindDashboardNameClaim);
+    void loadDashboardIslands().then(({ bindDashboardNameClaim }) => {
+      if (this.el.isConnected) mountBoundHook(this, bindDashboardNameClaim);
+    });
   },
   updated(this: HookContext) {
-    mountBoundHook(this, bindDashboardNameClaim);
+    void loadDashboardIslands().then(({ bindDashboardNameClaim }) => {
+      if (this.el.isConnected) mountBoundHook(this, bindDashboardNameClaim);
+    });
   },
   destroyed(this: HookContext) {
     this.__dashboardCleanup?.();
@@ -102,10 +129,14 @@ const DashboardNameClaimHook = {
 
 const DashboardRedeemHook = {
   mounted(this: HookContext) {
-    mountBoundHook(this, bindDashboardRedeem);
+    void loadDashboardIslands().then(({ bindDashboardRedeem }) => {
+      if (this.el.isConnected) mountBoundHook(this, bindDashboardRedeem);
+    });
   },
   updated(this: HookContext) {
-    mountBoundHook(this, bindDashboardRedeem);
+    void loadDashboardIslands().then(({ bindDashboardRedeem }) => {
+      if (this.el.isConnected) mountBoundHook(this, bindDashboardRedeem);
+    });
   },
   destroyed(this: HookContext) {
     this.__dashboardCleanup?.();
@@ -147,13 +178,19 @@ const LaunchProgressHook = {
 
 const ShaderRootHook = {
   mounted(this: HookContext) {
-    mountShaderRoot(this.el);
+    void loadShaderRoot().then(({ mountShaderRoot }) => {
+      if (this.el.isConnected) mountShaderRoot(this.el);
+    });
   },
   updated(this: HookContext) {
-    mountShaderRoot(this.el);
+    void loadShaderRoot().then(({ mountShaderRoot }) => {
+      if (this.el.isConnected) mountShaderRoot(this.el);
+    });
   },
   destroyed(this: HookContext) {
-    unmountShaderRoot(this.el);
+    void loadShaderRoot().then(({ unmountShaderRoot }) => {
+      unmountShaderRoot(this.el);
+    });
   },
 };
 const HomeRevealHook = createRevealHook(mountHomeReveal);
@@ -181,6 +218,13 @@ const ClipboardCopyHook = {
 type QuickSearchItem = {
   href: string;
   label: string;
+};
+
+type QuickSearchState = {
+  activeIndex: number;
+  cleanup: Array<() => void>;
+  items: QuickSearchItem[];
+  visibleItems: QuickSearchItem[];
 };
 
 function normalizeQuickSearchValue(value: string): string {
@@ -228,26 +272,192 @@ function resolveQuickSearchTarget(
   return fuzzyMatch?.href ?? fallback;
 }
 
+function quickSearchMatches(value: string, items: QuickSearchItem[]): QuickSearchItem[] {
+  const normalizedValue = normalizeQuickSearchValue(value);
+
+  if (!normalizedValue) return items.slice(0, 6);
+
+  return items
+    .map((item) => {
+      const label = normalizeQuickSearchValue(item.label);
+      const href = normalizeQuickSearchValue(item.href);
+      const exact = label === normalizedValue || href === normalizedValue ? 0 : 1;
+      const starts = label.startsWith(normalizedValue) ? 0 : 1;
+      const contains = label.includes(normalizedValue) || href.includes(normalizedValue) ? 0 : 1;
+
+      return { item, score: exact + starts + contains };
+    })
+    .filter(({ score }) => score < 3)
+    .sort((left, right) => left.score - right.score)
+    .map(({ item }) => item)
+    .slice(0, 6);
+}
+
+function quickSearchNavigate(form: HTMLFormElement, href: string): void {
+  form.ownerDocument.defaultView?.location.assign(href);
+}
+
+function renderQuickSearchResults(
+  form: HTMLFormElement,
+  resultsRoot: HTMLElement,
+  state: QuickSearchState,
+): void {
+  resultsRoot.replaceChildren();
+
+  state.visibleItems.forEach((item, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.quickSearchResult = item.href;
+    button.dataset.active = String(index === state.activeIndex);
+    button.className =
+      "flex w-full items-center gap-3 rounded-[0.85rem] px-3 py-2.5 text-left text-sm transition duration-150 data-[active=true]:bg-[color:color-mix(in_oklch,var(--brand-ink)_10%,var(--background)_90%)] data-[active=true]:text-[color:var(--foreground)] text-[color:var(--muted-foreground)] hover:bg-[color:color-mix(in_oklch,var(--brand-ink)_8%,var(--background)_92%)] hover:text-[color:var(--foreground)]";
+
+    const icon = document.createElement("span");
+    icon.className =
+      "flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.7rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_94%,var(--card)_6%)]";
+    icon.textContent = ">";
+
+    const label = document.createElement("span");
+    label.className = "min-w-0 flex-1";
+
+    const title = document.createElement("span");
+    title.className = "block truncate text-[color:var(--foreground)]";
+    title.textContent = item.label;
+
+    const href = document.createElement("span");
+    href.className =
+      "mt-0.5 block truncate text-[0.72rem] text-[color:color-mix(in_oklch,var(--foreground)_48%,var(--muted-foreground)_52%)]";
+    href.textContent = item.href;
+
+    label.append(title, href);
+    button.append(icon, label);
+    button.addEventListener("mousedown", (event) => event.preventDefault());
+    button.addEventListener("click", () => quickSearchNavigate(form, item.href));
+    resultsRoot.append(button);
+  });
+}
+
+function showQuickSearchPanel(panel: HTMLElement): void {
+  if (!panel.hidden) return;
+
+  panel.hidden = false;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  animate(panel, {
+    opacity: [0, 1],
+    translateY: [-6, 0],
+    duration: 180,
+    ease: "outQuart",
+  });
+}
+
 const QuickSearchHook = {
-  mounted(this: HookContext & { __quickSearchSubmit?: (event: Event) => void }) {
+  mounted(
+    this: HookContext & {
+      __quickSearchState?: QuickSearchState;
+      __quickSearchSubmit?: (event: Event) => void;
+    },
+  ) {
     const form = this.el as HTMLFormElement;
     const input = form.querySelector<HTMLInputElement>("input[name='search']");
+    const panel = form.querySelector<HTMLElement>("[data-quick-search-panel]");
+    const resultsRoot = form.querySelector<HTMLElement>("[data-quick-search-results]");
     const fallback = form.dataset.searchDefault ?? "/docs";
     const items = JSON.parse(form.dataset.searchItems ?? "[]") as QuickSearchItem[];
+    const state: QuickSearchState = {
+      activeIndex: 0,
+      cleanup: [],
+      items,
+      visibleItems: quickSearchMatches("", items),
+    };
+    this.__quickSearchState = state;
+
+    const sync = () => {
+      if (!panel || !resultsRoot) return;
+      state.visibleItems = quickSearchMatches(input?.value ?? "", state.items);
+      state.activeIndex = Math.min(state.activeIndex, Math.max(state.visibleItems.length - 1, 0));
+      renderQuickSearchResults(form, resultsRoot, state);
+      showQuickSearchPanel(panel);
+    };
+
+    const close = () => {
+      if (panel) panel.hidden = true;
+    };
 
     this.__quickSearchSubmit = (event: Event) => {
       event.preventDefault();
 
-      const target = resolveQuickSearchTarget(input?.value ?? "", items, fallback);
-      form.ownerDocument.defaultView?.location.assign(target);
+      const target = state.visibleItems[state.activeIndex]?.href ??
+        resolveQuickSearchTarget(input?.value ?? "", items, fallback);
+      quickSearchNavigate(form, target);
+    };
+
+    const onInput = () => {
+      state.activeIndex = 0;
+      sync();
+    };
+
+    const onFocus = () => sync();
+
+    const onKeydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        close();
+        input?.blur();
+        return;
+      }
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        state.activeIndex = Math.min(state.activeIndex + 1, state.visibleItems.length - 1);
+        sync();
+        return;
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        state.activeIndex = Math.max(state.activeIndex - 1, 0);
+        sync();
+      }
+    };
+
+    const onDocumentKeydown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        input?.focus();
+        input?.select();
+        sync();
+      }
+    };
+
+    const onDocumentPointerDown = (event: PointerEvent) => {
+      if (!form.contains(event.target as Node)) close();
     };
 
     form.addEventListener("submit", this.__quickSearchSubmit);
+    input?.addEventListener("input", onInput);
+    input?.addEventListener("focus", onFocus);
+    input?.addEventListener("keydown", onKeydown);
+    document.addEventListener("keydown", onDocumentKeydown);
+    document.addEventListener("pointerdown", onDocumentPointerDown);
+
+    state.cleanup.push(
+      () => input?.removeEventListener("input", onInput),
+      () => input?.removeEventListener("focus", onFocus),
+      () => input?.removeEventListener("keydown", onKeydown),
+      () => document.removeEventListener("keydown", onDocumentKeydown),
+      () => document.removeEventListener("pointerdown", onDocumentPointerDown),
+    );
   },
-  destroyed(this: HookContext & { __quickSearchSubmit?: (event: Event) => void }) {
+  destroyed(
+    this: HookContext & {
+      __quickSearchState?: QuickSearchState;
+      __quickSearchSubmit?: (event: Event) => void;
+    },
+  ) {
     if (this.__quickSearchSubmit) {
       (this.el as HTMLFormElement).removeEventListener("submit", this.__quickSearchSubmit);
     }
+    this.__quickSearchState?.cleanup.forEach((cleanup) => cleanup());
   },
 };
 
@@ -423,10 +633,14 @@ function mountFormationPassGallery(root: HTMLElement): () => void {
 
   const budget = Math.max(1, Number.parseInt(root.dataset.tokenCardBudget ?? "10", 10) || 10);
   const chunkSize = Math.max(1, Number.parseInt(root.dataset.tokenCardChunk ?? "2", 10) || 2);
+  let tokenCards: Awaited<ReturnType<typeof loadTokenCardRoot>> | undefined;
+  let cancelled = false;
   let frameId = 0;
 
   const syncActiveWindow = () => {
     frameId = 0;
+    if (!tokenCards) return;
+    const activeTokenCards = tokenCards;
 
     const viewportTop = 0;
     const firstVisibleIndex = cardRoots.findIndex((cardRoot) => {
@@ -446,7 +660,7 @@ function mountFormationPassGallery(root: HTMLElement): () => void {
       if (cardRoot.dataset.tokenCardActive === nextValue) return;
 
       cardRoot.dataset.tokenCardActive = nextValue;
-      updateTokenCardRoot(cardRoot);
+      activeTokenCards.updateTokenCardRoot(cardRoot);
     });
   };
 
@@ -455,23 +669,33 @@ function mountFormationPassGallery(root: HTMLElement): () => void {
     frameId = window.requestAnimationFrame(syncActiveWindow);
   };
 
-  cardRoots.forEach((cardRoot, index) => {
-    cardRoot.dataset.tokenCardActive = index < budget ? "true" : "false";
-    mountTokenCardRoot(cardRoot);
+  void loadTokenCardRoot().then((module) => {
+    if (cancelled) return;
+    tokenCards = module;
+
+    cardRoots.forEach((cardRoot, index) => {
+      cardRoot.dataset.tokenCardActive = index < budget ? "true" : "false";
+      module.mountTokenCardRoot(cardRoot);
+    });
+
+    requestSync();
   });
 
-  requestSync();
   window.addEventListener("scroll", requestSync, { passive: true });
   window.addEventListener("resize", requestSync);
 
   return () => {
+    cancelled = true;
+
     if (frameId) {
       window.cancelAnimationFrame(frameId);
     }
 
     window.removeEventListener("scroll", requestSync);
     window.removeEventListener("resize", requestSync);
-    cardRoots.forEach((cardRoot) => unmountTokenCardRoot(cardRoot));
+    if (tokenCards) {
+      cardRoots.forEach((cardRoot) => tokenCards?.unmountTokenCardRoot(cardRoot));
+    }
   };
 }
 
@@ -665,15 +889,52 @@ const ColorModeToggleHook = {
   ...createCleanupHook("__colorModeCleanup", mountColorModeToggle),
 } satisfies HooksOptions[string];
 
+const AgentbookTrustFlowHook = {
+  mounted(this: HookContext) {
+    void loadAgentbookTrustFlow().then(({ AgentbookTrustFlow }) => {
+      if (!this.el.isConnected) return;
+      const mounted = AgentbookTrustFlow.mounted;
+      if (mounted) (mounted as (this: HookContext) => void).call(this);
+    });
+  },
+  updated(this: HookContext) {
+    void loadAgentbookTrustFlow().then(({ AgentbookTrustFlow }) => {
+      if (!this.el.isConnected) return;
+      const updated = AgentbookTrustFlow.updated;
+      if (updated) (updated as (this: HookContext) => void).call(this);
+    });
+  },
+  destroyed(this: HookContext) {
+    void loadAgentbookTrustFlow().then(({ AgentbookTrustFlow }) => {
+      const destroyed = AgentbookTrustFlow.destroyed;
+      if (destroyed) (destroyed as (this: HookContext) => void).call(this);
+    });
+  },
+} satisfies HooksOptions[string];
+
 function mountStaticTokenCardRoots() {
-  document.querySelectorAll("[data-token-card-root][data-token-card-autoload]").forEach((el) => {
-    mountTokenCardRoot(el);
+  const elements = Array.from(
+    document.querySelectorAll("[data-token-card-root][data-token-card-autoload]"),
+  );
+
+  if (elements.length === 0) return;
+
+  void loadTokenCardRoot().then(({ mountTokenCardRoot }) => {
+    elements.forEach((el) => {
+      if (el.isConnected) mountTokenCardRoot(el);
+    });
   });
 }
 
 function unmountStaticTokenCardRoots() {
-  document.querySelectorAll("[data-token-card-root][data-token-card-autoload]").forEach((el) => {
-    unmountTokenCardRoot(el);
+  const elements = Array.from(
+    document.querySelectorAll("[data-token-card-root][data-token-card-autoload]"),
+  );
+
+  if (elements.length === 0) return;
+
+  void loadTokenCardRoot().then(({ unmountTokenCardRoot }) => {
+    elements.forEach((el) => unmountTokenCardRoot(el));
   });
 }
 
@@ -715,7 +976,7 @@ const hooks: HooksOptions = {
   OverviewMode: OverviewModeHook,
   ColorModeToggle: ColorModeToggleHook,
   VoxelBackground: VoxelBackgroundHook,
-  AgentbookTrustFlow,
+  AgentbookTrustFlow: AgentbookTrustFlowHook,
 };
 
 const liveSocket = new LiveSocket("/live", Socket, {

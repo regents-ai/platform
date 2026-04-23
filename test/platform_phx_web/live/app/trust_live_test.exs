@@ -45,7 +45,6 @@ defmodule PlatformPhxWeb.App.TrustLiveTest do
           "expires_at" => 1_712_000_300,
           "signature" => "0xsig"
         },
-        allow_legacy_proofs: false,
         status: "pending",
         expires_at: ~U[2999-01-01 00:00:00Z],
         inserted_at: DateTime.utc_now(),
@@ -99,6 +98,7 @@ defmodule PlatformPhxWeb.App.TrustLiveTest do
     assert html =~ "Connection states"
     assert html =~ "phx-hook=\"AgentbookTrustFlow\""
     assert html =~ "data-session="
+    refute html =~ "allow_legacy_proofs"
   end
 
   test "expired approval link no longer opens the trust flow", %{

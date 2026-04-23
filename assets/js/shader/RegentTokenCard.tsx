@@ -6,11 +6,12 @@ import { classNames, prefersReducedMotion } from "./utils.ts";
 
 const TOKEN_CARD_STYLE = `
 .rtc-page {
-  min-height: 100vh;
+  min-height: 100svh;
   display: grid;
   place-items: center;
   padding: clamp(1rem, 3vw, 2rem);
   background: transparent;
+  overflow-x: clip;
 }
 
 html[data-color-mode="dark"] .rtc-page {
@@ -18,7 +19,7 @@ html[data-color-mode="dark"] .rtc-page {
 }
 
 .rtc-stage {
-  width: 24rem;
+  width: min(100%, 24rem);
   max-width: 24rem;
   flex: 0 0 auto;
 }
@@ -211,6 +212,22 @@ html[data-color-mode="dark"] .rtc-token-line {
 
 .rtc-card-shell[data-rtc-variant="static-image"] .rtc-token-id {
   letter-spacing: 0.02em;
+}
+
+@media (max-width: 380px) {
+  .rtc-page {
+    padding: 0.85rem;
+  }
+
+  .rtc-card {
+    border-radius: 1.2rem;
+    padding: 0.45rem;
+  }
+
+  .rtc-title {
+    font-size: 24px;
+    line-height: 23px;
+  }
 }
 `;
 

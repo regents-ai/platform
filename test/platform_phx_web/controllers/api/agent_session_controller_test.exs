@@ -77,26 +77,6 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
       conn
       |> init_test_session(%{
         agent_session: %{
-          "session_id" => "expired-platform-session",
-          "audience" => "platform",
-          "wallet_address" => @wallet_address,
-          "chain_id" => @chain_id,
-          "registry_address" => @registry_address,
-          "token_id" => @token_id,
-          "issued_at" => "2026-04-17T00:00:00Z",
-          "expires_at" => "2026-04-17T00:00:01Z"
-        }
-      })
-      |> get("/api/auth/agent/session")
-
-    assert %{"ok" => true, "session" => nil} = json_response(expired_conn, 200)
-  end
-
-  test "show clears an expired local agent session created with atom keys", %{conn: conn} do
-    expired_conn =
-      conn
-      |> init_test_session(%{
-        agent_session: %{
           session_id: "expired-platform-session",
           audience: "platform",
           wallet_address: @wallet_address,
@@ -167,7 +147,7 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
       |> put_req_headers(agent_headers("/api/auth/agent/session", body, "techtree-receipt"))
       |> post("/api/auth/agent/session", body)
 
-    assert %{"ok" => false, "error" => %{"code" => "siwa_auth_denied"}} =
+    assert %{"statusMessage" => "Signed agent authentication failed"} =
              json_response(session_conn, 401)
   end
 

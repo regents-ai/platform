@@ -85,7 +85,7 @@ defmodule PlatformPhxWeb.Api.AgentSessionController do
   end
 
   defp session_expires_at(session) when is_map(session) do
-    case Map.get(session, :expires_at) || Map.get(session, "expires_at") do
+    case Map.get(session, :expires_at) do
       expires_at when is_binary(expires_at) ->
         case DateTime.from_iso8601(expires_at) do
           {:ok, value, _offset} -> {:ok, value}

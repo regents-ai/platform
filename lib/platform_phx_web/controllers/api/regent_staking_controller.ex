@@ -1,8 +1,10 @@
 defmodule PlatformPhxWeb.Api.RegentStakingController do
   use PlatformPhxWeb, :controller
+  require Logger
 
   alias PlatformPhx.RegentStaking
   alias PlatformPhxWeb.ApiErrors
+  alias PlatformPhx.PublicErrors
 
   def show(conn, _params) do
     render_result(conn, context_module().overview(current_human(conn)))
@@ -80,7 +82,8 @@ defmodule PlatformPhxWeb.Api.RegentStakingController do
     do: ApiErrors.error(conn, {:bad_request, "Source tag or source reference is invalid"})
 
   defp render_result(conn, {:error, reason}) do
-    ApiErrors.error(conn, {:bad_request, inspect(reason)})
+    Logger.warning("regent staking request failed #{inspect(%{reason: reason})}")
+    ApiErrors.error(conn, {:bad_request, PublicErrors.staking_action()})
   end
 
   defp context_module do
