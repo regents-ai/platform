@@ -2188,14 +2188,19 @@ defmodule PlatformPhxWeb.AppComponents do
         copy: "We reserve the identity and lock in the selected name."
       },
       %{
-        key: "bootstrap_sprite",
+        key: "create_sprite",
         title: "Prepare hosted company",
         copy: "The hosted environment is being set up for launch."
       },
       %{
-        key: "create_company",
-        title: "Build company home",
-        copy: "The company page and controls are being assembled."
+        key: "bootstrap_workspace",
+        title: "Build company workspace",
+        copy: "The company workspace and assistant are being prepared."
+      },
+      %{
+        key: "verify_runtime",
+        title: "Check company response",
+        copy: "We confirm the company is responding before opening it."
       },
       %{
         key: "activate_subdomain",
@@ -2209,7 +2214,7 @@ defmodule PlatformPhxWeb.AppComponents do
       }
     ]
 
-    current_step = if formation, do: formation.current_step, else: nil
+    current_step = formation && launch_progress_step_key(formation.current_step)
     current_index = Enum.find_index(steps, &(&1.key == current_step)) || 0
 
     steps
@@ -2499,9 +2504,8 @@ defmodule PlatformPhxWeb.AppComponents do
       "reserve_claim" -> "Saving your company name"
       "create_sprite" -> "Starting your company"
       "bootstrap_sprite" -> "Preparing your company"
-      "bootstrap_workspace" -> "Connecting your company workspace"
-      "create_company" -> "Building your company home"
-      "create_hermes" -> "Getting the company assistant ready"
+      "bootstrap_workspace" -> "Building your company workspace"
+      "verify_runtime" -> "Checking your company"
       "create_checkpoint" -> "Saving your first restore point"
       "activate_subdomain" -> "Opening your public page"
       "finalize" -> "Opening the dashboard"
@@ -2513,11 +2517,16 @@ defmodule PlatformPhxWeb.AppComponents do
 
   defp launch_step_copy(formation) do
     case formation.current_step do
+      "verify_runtime" -> "We’re checking that the company is responding before opening it."
       "activate_subdomain" -> "Your public page is being opened now."
       "finalize" -> "Everything is almost ready. The dashboard comes next."
       _ -> "We’re working through the setup steps now."
     end
   end
+
+  defp launch_progress_step_key("bootstrap_sprite"), do: "create_sprite"
+  defp launch_progress_step_key("create_checkpoint"), do: "verify_runtime"
+  defp launch_progress_step_key(step), do: step
 
   def billing_stage_ready?(%{authenticated: true, available_claims: claims})
       when is_list(claims) and claims != [] do

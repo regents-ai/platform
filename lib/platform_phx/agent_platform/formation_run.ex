@@ -55,9 +55,6 @@ defmodule PlatformPhx.AgentPlatform.FormationRun do
       "create_sprite",
       "bootstrap_sprite",
       "bootstrap_workspace",
-      "create_company",
-      "create_hermes",
-      "create_checkpoint",
       "verify_runtime",
       "activate_subdomain",
       "finalize"

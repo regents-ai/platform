@@ -20,8 +20,6 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
     "create_sprite",
     "bootstrap_sprite",
     "bootstrap_workspace",
-    "create_company",
-    "create_hermes",
     "create_checkpoint"
   ]
 
@@ -288,9 +286,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
 
   defp success_message_for_step("create_sprite"), do: "The first launch step is complete."
   defp success_message_for_step("bootstrap_sprite"), do: "Your company setup is in place."
-  defp success_message_for_step("bootstrap_workspace"), do: "Your company workspace is connected."
-  defp success_message_for_step("create_company"), do: "Your company home is built."
-  defp success_message_for_step("create_hermes"), do: "Your company assistant is ready."
+  defp success_message_for_step("bootstrap_workspace"), do: "Your company workspace is ready."
   defp success_message_for_step("create_checkpoint"), do: "Your first restore point is saved."
   defp success_message_for_step(_step), do: "This launch step is complete."
 
