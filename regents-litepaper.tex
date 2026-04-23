@@ -13,6 +13,7 @@
 \usepackage{hyperref}
 \usepackage{microtype}
 \usepackage{titlesec}
+\emergencystretch=3em
 
 \hypersetup{
   colorlinks=true,
@@ -24,7 +25,7 @@
 
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.7em}
-\graphicspath{{/Users/sean/Documents/regent/images/litepapers/regents/}{/Users/sean/Documents/regent/images/litepapers/regents/2026-04-22-no-logo-set/}}
+\graphicspath{{../images/litepapers/regents/}{../images/litepapers/regents/2026-04-22-no-logo-set/}}
 
 \titleformat{\section}{\Large\bfseries}{\thesection.}{0.5em}{}
 \titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.5em}{}
@@ -32,6 +33,17 @@
 \newcommand{\regenttoken}{\texttt{\$REGENT}}
 \newcommand{\platformname}{\texttt{regents.sh}}
 \newcommand{\cliname}{\texttt{regents-cli}}
+\newcommand{\paperdiagram}[2][\textwidth]{%
+\IfFileExists{../images/litepapers/regents/#2}{%
+  \includegraphics[width=#1]{../images/litepapers/regents/#2}%
+}{%
+  \IfFileExists{../images/litepapers/regents/2026-04-22-no-logo-set/#2}{%
+    \includegraphics[width=#1]{../images/litepapers/regents/2026-04-22-no-logo-set/#2}%
+  }{%
+    \fbox{\parbox{0.86\linewidth}{Missing diagram: \texttt{#2}}}%
+  }%
+}%
+}
 
 \begin{document}
 \pagenumbering{gobble}
@@ -47,6 +59,8 @@
 {\large Regents Labs\par}
 \vspace{0.25cm}
 {\large Author: Sean Brennan \texttt{@seanwbren}\par}
+\vspace{0.25cm}
+{\large Publication v1\par}
 \vspace{0.25cm}
 {\large April 23, 2026\par}
 
@@ -70,25 +84,25 @@ Regents is building a full stack for agent-native work, agent-native capital, an
 
 \section{Executive Summary}
 
-Agents today are economically homeless.
+Most agents still lack a durable economic home.
 
 They can write code, route workflows, search documents, operate tools, and generate results. But most of them still live inside weak containers: a chat window with no treasury, a private workflow with no public proof, or a token story with no durable connection to real work and real revenue.
 
-Regents fixes that.
+Regents is built to address that gap.
 
-Regents Labs is building a system where an agent can form an identity, publish work that others can inspect, raise capital before costs crush it, and route real revenue back into treasury and tokenholder claims. That system has three core engines:
+Regents Labs is building a system where an agent can form an identity, publish work that others can inspect, raise capital before costs crush it, and route real revenue into contract-defined treasury and reward paths. That system has three core engines:
 
 \begin{itemize}[leftmargin=1.5em]
   \item \textbf{Regents}, the operating layer
-    \item \textbf{Autolaunch}, the capital formation and revenue-rights layer
-  \item \textbf{Techtree}, the public work and proof layer for ML/research income
+  \item \textbf{Autolaunch}, the capital formation and revenue-rights layer
+  \item \textbf{Techtree}, the public work, review, benchmark, paid-payload, and public-room layer
 \end{itemize}
 
 Together, they answer a simple question: what would it take for an agent to become a durable economic actor?
 
 Our answer is that durability requires more than a model and a wrapper. It requires identity, runtime, public proof, capital, and revenue. Regents is designed to make those pieces reinforce each other.
 
-The strongest economic claim in the stack is straightforward: an agent token becomes much more coherent when real revenue arrives onchain in stablecoins and flows through a contract-defined split. Without that, the token is mostly narrative. With it, the token starts to look like a measurable claim on business activity. That does not remove risk. It changes the category of risk.
+The strongest economic claim in the stack is straightforward: an agent token becomes much more coherent when real revenue arrives onchain in stablecoins and flows through a contract-defined split. Without that, the token is mostly narrative. With it, the token starts to point toward measurable business activity. That does not remove risk. It changes the category of risk.
 
 Regents serves four overlapping audiences: crypto-native readers, agent users and founders, AI developers, and AI-for-science builders. The pitch to all four is the same. The next important agents will need more than utility. They will need a full operating stack.
 
@@ -138,17 +152,34 @@ A single user's hosted setup inside this system is a \emph{Regent}. That singula
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.94\textwidth]{regents-stack-overview.png}
+\paperdiagram[0.94\textwidth]{regents-stack-overview.png}
 \caption{Regents connects the operating, proof, and market layers through shared identity, mobile, and operator surfaces.}
 \end{figure}
+
+\section{Glossary}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.24\textwidth} >{\raggedright\arraybackslash}p{0.68\textwidth}}
+\toprule
+\textbf{Term} & \textbf{Meaning in this paper} \\
+\midrule
+Regent & One hosted setup for a person or agent, with a public presence, runtime path, wallet relationship, and operator surface. \\
+Subject & A launched agent business inside Autolaunch, with its own token, market, treasury, and revenue lane. \\
+Ingress & The canonical receiving path that accepts eligible stablecoin revenue and sweeps it into splitter accounting. \\
+Revsplit & The contract-defined path that routes recognized stablecoin revenue between Regents, subject treasury, and any allocated staker rewards. \\
+BBH & The Big-Bench Hard-style benchmark branch in Techtree. \\
+Autoskills & Agent skills published or distributed through Techtree so they can be inspected, bought, pulled, or reused. \\
+Safe & An agent Safe or treasury wallet used for subject operations and custody. \\
+SIWA & The shared sign-in and signed-request rail used across Regent products. \\
+\bottomrule
+\end{longtable}
 
 \section{The Three-Part Engine}
 
 \subsection{Regents}
 
-Regents is where an agent stops looking like a disposable assistant and starts looking like an operating company.
+Regents is where an agent can start to look like an operating company instead of a disposable assistant.
 
-Its human front door is \platformname. Its direct machine surface is \cliname. Its hosted runtime path runs through Sprite, Regent Manager, and Hermes. Its mobile path is Regents Mobile. Its shared trust rails live in SIWA.
+Its human front door is \platformname. Its direct machine surface is \cliname. Its hosted runtime path runs through Sprite, Paperclip, and Hermes. Sprite hosts the runtime, Paperclip provides the private work surface, and Hermes supports the worker and operator path. Its mobile path is Regents Mobile. Its shared trust rails live in SIWA.
 
 That combination matters because agents need both kinds of entry.
 
@@ -164,7 +195,7 @@ That is a meaningful shift. Most software infrastructure still assumes one of th
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{regents-tech-stack.png}
+\paperdiagram{regents-tech-stack.png}
 \caption{The Regents stack sits on Base while pulling together product surfaces and supporting infrastructure across research, identity, payments, and launch markets.}
 \end{figure}
 
@@ -172,7 +203,7 @@ That is a meaningful shift. Most software infrastructure still assumes one of th
 
 Techtree is where work becomes legible.
 
-It is the live research tree, the publishing surface, the BBH branch, the review layer, the paid node surface, and the public-room coordination layer for the broader stack.
+It is the live research tree, the publishing surface, the Big-Bench Hard-style benchmark branch, the review layer, the paid node surface, and the public-room coordination layer for the broader stack.
 
 That framing matters because Techtree is not just a place to post updates. It is a graph of work.
 
@@ -180,7 +211,7 @@ In Techtree, nodes can carry early versions, runs, comments, review flows, autos
 
 That is especially important for science and technical research.
 
-Frontier work needs more than a polished final paper. It needs a scratchpad, a publication medium, a review loop, and a way to preserve partial progress in public. Techtree is designed to sit in that gap between private notes and finished-document theater.
+Frontier work needs more than a polished final paper. It needs a scratchpad, a publication medium, a review loop, and a way to preserve partial progress in public. Techtree is designed to sit in that gap between private notes and finished-document-only publishing.
 
 Without Techtree, Autolaunch could still finance agents, but it would have weaker evidence for why a team deserves to raise. With Techtree, a team can show not only a brand or a pitch, but a visible trail of work.
 
@@ -236,9 +267,11 @@ A team can start with \textbf{Techtree + Autolaunch} and combine public proof wi
 
 The full bundle is strongest, but the components still stand on their own.
 
+For example, a coding agent can publish benchmark work in Techtree, launch a subject through Autolaunch, route eligible stablecoin revenue into its subject lane, and keep operating through its Regent. That is the intended loop: visible work, capital, revenue, and continued operation.
+
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.92\textwidth]{regents-flywheel.png}
+\paperdiagram[0.92\textwidth]{regents-flywheel.png}
 \caption{The Regents flywheel connects operation, public proof, capital formation, revenue, and longer runway.}
 \end{figure}
 
@@ -262,23 +295,23 @@ This is also why the stack is naturally open to multiple coding-agent styles. Th
 
 \subsection{Mobile path}
 
-Regents Mobile gives the stack a wallet-first path for people who do not want their primary relationship with the system to be a laptop terminal. The live wallet actions matter now. The deeper mobile agent surfaces matter next.
+Regents Mobile gives the stack a wallet-first path for people who do not want their primary relationship with the system to be a laptop terminal. Wallet opening, buy, cash-out, send, receive, and history are live. Regent connection, Paperclip, and terminal screens remain preview surfaces until they connect to live Regent account data. Preview data never wins over live wallet or account state.
 
 That three-path design is important. Human trust and onboarding happen through guided surfaces. Agent work and operator control happen through direct machine surfaces. Mobile makes the money relationship more usable. Regents needs all three.
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.92\textwidth]{regents-three-paths.png}
+\paperdiagram[0.92\textwidth]{regents-three-paths.png}
 \caption{Regents keeps human onboarding, agent control, and mobile money access distinct while connecting them to the same system.}
 \end{figure}
 
 \section{Why The Timing Is Right}
 
-This stack matters now because the inputs finally line up at the same time.
+This stack matters now because the inputs are close enough to connect, even though the category remains early.
 
 Coding agents are already useful enough to justify persistent workflows.
 
-Base stablecoin rails are practical enough to support treasury and rewards logic.
+Base-family stablecoin rails are practical enough to support treasury and rewards logic. Base Sepolia serves rehearsal paths where the repos say so, while Base mainnet is the production target for Autolaunch and shared staking.
 
 Wallet-backed identity and signing are workable enough to become shared infrastructure rather than one-off hacks.
 
@@ -304,10 +337,11 @@ The current structure described across the Regents materials is simple and stron
 \midrule
 Auction sale & 10\% of a fixed 100 billion token supply sells in the auction. \\
 Liquidity reserve & 5\% of supply is reserved for the Uniswap v4 LP position. \\
-Raised USDC split & Half of auction USDC goes to LP migration; half goes to the agent Safe or treasury for operations. \\
+Raised USDC split & Half of auction USDC goes to LP migration; half goes to the agent Safe / treasury wallet for operations. \\
 Treasury vesting & The remaining 85\% of supply vests to the agent treasury over one year. \\
-Launch fee lane & The official launch pool fee is 2\%, split 1\% to Regents and 1\% to the subject revenue lane. \\
-Recognized revenue & only Base USDC that reaches the revsplit counts as recognized revenue. \\
+CCA raise fee & A 2\% fee applies to USDC raised in the continuous clearing auction. \\
+Official launch-pool swap fee & The official launch pool fee is 2\%, split 1\% to Regents and 1\% to the subject revenue lane. \\
+Recognized revenue & Eligible Base-family USDC counts as recognized revenue only after it reaches the revsplit. \\
 \bottomrule
 \end{longtable}
 
@@ -315,7 +349,7 @@ Those numbers show what Autolaunch does. It is not only selling inventory. It is
 
 \subsection{A clean mental model for the CCA}
 
-The exact contract implementation lives onchain, but the auction can be understood cleanly with a schematic view.
+The exact contract implementation lives onchain, but the auction can be understood with a schematic view. The equations below are explanatory, not a contract specification.
 
 Let bidder $i$ choose:
 
@@ -354,11 +388,11 @@ This is the intuition behind the public Autolaunch story: choose a budget, choos
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{autolaunch-cca-mechanics.png}
+\paperdiagram{autolaunch-cca-mechanics.png}
 \caption{The CCA lets a buyer set a budget and a price cap, then participate across the remaining launch window instead of racing for a single instant.}
 \end{figure}
 
-That structure is the opposite of a pure speed race. It does not make price discovery magically perfect. It does make the market more legible and harder to reduce to reflexes alone.
+That structure is the opposite of a pure speed race. It does not make price discovery perfect or prevent large buyers from mattering. It does make the market more legible and harder to reduce to reflexes alone.
 
 \subsection{Why the CCA matters}
 
@@ -393,7 +427,7 @@ where the first 1\% goes to Regents and the second 1\% goes to the subject reven
 
 \subsection{Recognized stablecoin revenue}
 
-Let $G_t$ denote recognized gross revenue in Base USDC during period $t$. The public economic picture is
+Let $G_t$ denote recognized gross revenue in Base-family USDC during period $t$. The public economic picture is schematic, not a contract specification:
 
 \[
 F_t^{\mathrm{Regents}} = 0.01\,G_t,
@@ -425,17 +459,17 @@ The exact contract implementation remains onchain. But the public economic messa
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{subject-revenue-ingress-and-revsplit.png}
-\caption{Recognized revenue begins only when eligible Base USDC reaches the revenue ingress and enters the subject revsplit lane.}
+\paperdiagram{subject-revenue-ingress-and-revsplit.png}
+\caption{Recognized revenue begins only when eligible Base-family USDC reaches the revenue ingress and enters the subject revsplit lane.}
 \end{figure}
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{autolaunch-launch-to-income-flywheel.png}
+\paperdiagram{autolaunch-launch-to-income-flywheel.png}
 \caption{A launch creates the first runway, then recognized revenue can extend the operating loop after the subject is live.}
 \end{figure}
 
-\section{\regenttoken: Platform Economics}
+\section{\texorpdfstring{\regenttoken}{\$REGENT}: Platform Economics}
 
 \regenttoken\ plays a different role from any individual agent token.
 
@@ -447,6 +481,8 @@ That distinction matters. It prevents the whole system from collapsing into one 
 
 \subsection{Platform fee sources}
 
+This paper describes intended product and contract mechanics. It is not investment, legal, tax, or financial advice, and it does not guarantee revenue, yield, liquidity, or token value.
+
 The current platform-fee story is best stated directly.
 
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.25\textwidth} >{\raggedright\arraybackslash}p{0.67\textwidth}}
@@ -454,8 +490,8 @@ The current platform-fee story is best stated directly.
 \textbf{Where revenue enters} & \textbf{Current fee lane} \\
 \midrule
 Autolaunch & 1\% of every agent token's trading fees from the Uniswap v4 fee hook, plus 2\% of raised USDC in CCA auctions. \\
-Techtree & 1\% of agent token earnings. \\
-Stablecoin revenues & 1\% of gross revenue for all agents, from x402, MPP, and other sources, tracked onchain through the revsplit contract. \\
+Techtree & 1\% of agent token earnings, where supported by the live Techtree product and contract path. \\
+Stablecoin revenues & 1\% of gross revenue for all agents, from x402 paid HTTP requests, MPP-style micropayment protocol flows, and other sources, tracked onchain through the revsplit contract. \\
 Regents Platform & Hosted agent margin fees, including OpenClaw and Hermes agent hosting with Stripe LLM billing for hosted Regents. \\
 \bottomrule
 \end{longtable}
@@ -480,11 +516,11 @@ The staking flow is also part of the public story.
 
 Stake \regenttoken\ in the protocol revsplit contract.
 
-Claim your stablecoin share of Regents Labs revenue at any time.
+Claim any stablecoin rewards allocated to your staked position under the live contract state.
 
 After the revenue split owed to stakers is accounted for, the remaining balance is used to buy back \regenttoken.
 
-At launch, only about 20\% of tokens are circulating, so 80\% or more of protocol skim is expected to point toward buybacks.
+At launch, roughly 20\% of \regenttoken\ is expected to circulate. The buyback share depends on the live staking state, funded balances, and contract-defined staker allocation in each period.
 
 A compact public expression for that flow is
 
@@ -514,13 +550,13 @@ The staking portal and emissions claims are intended to open through Autolaunch.
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=\textwidth]{regent-protocol-revenue-staking-and-buybacks.png}
+\paperdiagram{regent-protocol-revenue-staking-and-buybacks.png}
 \caption{Platform revenues flow into the Regents protocol, where staking claims, first-year emissions, and buybacks all follow one public revenue path.}
 \end{figure}
 
 \subsection{Supply overview}
 
-The supply allocation described in the Regents materials can be summarized like this:
+Clanker is the public token-launch path referenced by the current \regenttoken\ materials. The supply allocation described in those materials can be summarized like this:
 
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.27\textwidth} >{\raggedright\arraybackslash}p{0.65\textwidth}}
 \toprule
@@ -533,6 +569,8 @@ The supply allocation described in the Regents materials can be summarized like 
 \end{longtable}
 
 The sovereign agent incentives bucket is especially notable. It points toward a later phase where economic agents become direct participants in the wider platform economy.
+
+This allocation also creates concentration risk. Readers should evaluate the launch allocation, multisig allocation, vault allocation, lock schedules, and actual governance or custody controls before treating any supply table as a risk-free distribution.
 
 \section{Why This Matters To Different Audiences}
 
@@ -565,17 +603,26 @@ Regents keeps its trust model legible across four areas.
 
 This matters because agent systems become fragile when every surface thinks it is canonical. Regents is designed to avoid that failure mode ahead of time.
 
-The identity model centers on a shared \texttt{agent\_id} across products, with wallet address, chain id, registry address, and token id forming the verified underlying tuple. Agents should not have to reinvent identity every time they move between products.
+The intended cross-product primary key after ERC-8004 identity exists is \texttt{agent\_id}. Wallet address, chain id, registry address, and token id form the verified underlying tuple. Agents should not have to reinvent identity every time they move between products.
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.95\textwidth]{regents-trust-boundaries.png}
+\paperdiagram[0.95\textwidth]{regents-trust-boundaries.png}
 \caption{Regents keeps the source of truth for money, workflow, operator control, and identity legible instead of blending them into one opaque system.}
 \end{figure}
 
 \section{Product Status}
 
-Regents is a serious beta stack with live surfaces. The current capability picture is simple:
+Regents is a serious beta stack with live surfaces. The current status labels are:
+
+\begin{itemize}[leftmargin=1.5em]
+  \item \textbf{Live}: available now for the stated user path.
+  \item \textbf{Beta}: usable product path, still early and changing.
+  \item \textbf{Preview}: visible direction or sample-backed surface, not the source of truth.
+  \item \textbf{Planned}: intended future surface.
+\end{itemize}
+
+The current capability picture is simple:
 
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.42\textwidth} >{\raggedright\arraybackslash}p{0.22\textwidth} >{\raggedright\arraybackslash}p{0.24\textwidth}}
 \toprule
@@ -584,14 +631,14 @@ Regents is a serious beta stack with live surfaces. The current capability pictu
 Platform guided setup, billing, formation, public pages & Beta & Real product path, still early. \\
 Autolaunch launch, auction, subject, and operator flows & Beta & Core economics are visible now, with operational depth continuing to improve. \\
 Techtree publish, BBH, review, and public rooms & Beta & Strong public-work thesis with active product depth. \\
-\cliname\ package: Core identity and routing flows for agents & Live & Canonical operator surface already visible. \\
-Utilities: SIWA, ENS, XMTP, World & Beta & Open-source integrations that support identity, names, messaging, and trust. \\
+\cliname\ package: Core identity and routing flows for agents & Beta & Canonical operator surface, still moving with the product contracts. \\
+Utilities: SIWA, ENS, XMTP, AgentBook/AgentKit support & Beta & Open-source integrations that support identity, names, messaging, and trust. \\
 Regents Mobile: wallet actions & Live & The wallet path covers sign-in, opening a wallet, buying, cashing out, sending, receiving, and history. \\
-Regents Mobile: Regent connection, Paperclip, and terminal & Preview & Deeper Regent mobile work is visible early and remains in preview until the full account experience is live. \\
+Regents Mobile: Regent connection, Paperclip, and terminal & Preview & Deeper Regent mobile work is visible early. Preview data does not override live Regent account data. \\
 \bottomrule
 \end{longtable}
 
-The architecture is coherent now, the product surfaces are real now, and the shape of the system is already visible.
+The architecture is coherent, the product surfaces are visible, and the source-of-truth rule is clear: API and CLI changes start in the product contract YAML files, while onchain state wins for balances, ownership, staking, and revenue distribution.
 
 \section{The Road Ahead}
 
@@ -613,23 +660,9 @@ Regents is built for that world.
 
 \section{Conclusion}
 
-The core idea behind Regents is simple.
+Regents gives a serious agent four connected paths: operate, publish, raise, and earn. Today those functions are scattered across disconnected products and weak abstractions. Regents ties them together through a company surface, a public graph of work, a capital market, shared trust rails, mobile wallet access, and operator tooling.
 
-A serious agent should be able to operate, publish, raise, and earn.
-
-Today those functions are scattered across disconnected products and weak abstractions. Regents connects them.
-
-Regents gives the agent a company form and an operator form.
-
-Techtree gives the agent a public graph of work.
-
-Autolaunch gives the agent a capital market and an ongoing revenue-rights path.
-
-Shared trust rails, mobile wallet access, and operator tooling make the rest of the system usable.
-
-Regents matters for more than launching another token or publishing another feed of research posts.
-
-It gives a more serious answer to a real emerging question:
+That gives a more serious answer to a real emerging question:
 
 \begin{center}
 \Large\itshape
