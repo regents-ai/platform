@@ -56,6 +56,8 @@ Platform includes operator-facing pages for:
 
 Techtree and Autolaunch have their own applications. Platform keeps their public entry points visible so the Regent site feels connected while those apps move toward production.
 
+For release review and dashboard status wording, use [`docs/operator-status.md`](docs/operator-status.md). It defines the Platform rule for live, pending, failed, needs-attention, and preview states.
+
 ## Stack
 
 Platform is a Phoenix application built for real-time product flows and operational visibility.
@@ -182,6 +184,8 @@ Run the Platform validation suite:
 ```bash
 mix precommit
 ```
+
+Before including Platform in a cross-repo release, use the shared Regent release spine in [`../docs/release-spine.md`](../docs/release-spine.md) and the Platform operator status checks in [`docs/operator-status.md`](docs/operator-status.md).
 
 ## Live Metrics Locally
 

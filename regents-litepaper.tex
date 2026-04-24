@@ -50,7 +50,10 @@
 
 \begin{titlepage}
 \centering
-\vspace*{2cm}
+\vspace*{0.2cm}
+
+\includegraphics[width=0.82\textwidth]{regents-title-logo.png}\par
+\vspace{1.1cm}
 
 {\Huge \bfseries Regents Litepaper\par}
 \vspace{0.5cm}
@@ -163,12 +166,12 @@ A single user's hosted setup inside this system is a \emph{Regent}. That singula
 \textbf{Term} & \textbf{Meaning in this paper} \\
 \midrule
 Regent & One hosted setup for a person or agent, with a public presence, runtime path, wallet relationship, and operator surface. \\
-Subject & A launched agent business inside Autolaunch, with its own token, market, treasury, and revenue lane. \\
+Subject & A technical contract term for a launched agent business inside Autolaunch. In plain English, it means the agent or agent-owned business being launched. \\
 Ingress & The canonical receiving path that accepts eligible stablecoin revenue and sweeps it into splitter accounting. \\
-Revsplit & The contract-defined path that routes recognized stablecoin revenue between Regents, subject treasury, and any allocated staker rewards. \\
+Revsplit & The contract-defined path that routes recognized stablecoin revenue between Regents, the agent treasury, and any allocated staker rewards. \\
 BBH & The Big-Bench Hard-style benchmark branch in Techtree. \\
 Autoskills & Agent skills published or distributed through Techtree so they can be inspected, bought, pulled, or reused. \\
-Safe & An agent Safe or treasury wallet used for subject operations and custody. \\
+Safe & An agent Safe or treasury wallet used for operations and custody. \\
 SIWA & The shared sign-in and signed-request rail used across Regent products. \\
 \bottomrule
 \end{longtable}
@@ -267,7 +270,7 @@ A team can start with \textbf{Techtree + Autolaunch} and combine public proof wi
 
 The full bundle is strongest, but the components still stand on their own.
 
-For example, a coding agent can publish benchmark work in Techtree, launch a subject through Autolaunch, route eligible stablecoin revenue into its subject lane, and keep operating through its Regent. That is the intended loop: visible work, capital, revenue, and continued operation.
+For example, a coding agent can publish benchmark work in Techtree, launch through Autolaunch, route eligible stablecoin revenue into its agent-owned revenue lane, and keep operating through its Regent. That is the intended loop: visible work, capital, revenue, and continued operation.
 
 \begin{figure}[ht]
 \centering
@@ -311,7 +314,7 @@ This stack matters now because the inputs are close enough to connect, even thou
 
 Coding agents are already useful enough to justify persistent workflows.
 
-Base-family stablecoin rails are practical enough to support treasury and rewards logic. Base Sepolia serves rehearsal paths where the repos say so, while Base mainnet is the production target for Autolaunch and shared staking.
+Base USDC rails are practical enough to support treasury and rewards logic. Base Sepolia serves rehearsal paths where the repos say so, while Base mainnet is the production target for Autolaunch and shared staking.
 
 Wallet-backed identity and signing are workable enough to become shared infrastructure rather than one-off hacks.
 
@@ -340,8 +343,8 @@ Liquidity reserve & 5\% of supply is reserved for the Uniswap v4 LP position. \\
 Raised USDC split & Half of auction USDC goes to LP migration; half goes to the agent Safe / treasury wallet for operations. \\
 Treasury vesting & The remaining 85\% of supply vests to the agent treasury over one year. \\
 CCA raise fee & A 2\% fee applies to USDC raised in the continuous clearing auction. \\
-Official launch-pool swap fee & The official launch pool fee is 2\%, split 1\% to Regents and 1\% to the subject revenue lane. \\
-Recognized revenue & Eligible Base-family USDC counts as recognized revenue only after it reaches the revsplit. \\
+Official launch-pool swap fee & The official launch pool fee is 2\%, split 1\% to Regents and 1\% to the agent-owned revenue lane. \\
+Recognized revenue & Eligible Base USDC counts as recognized revenue only after it reaches the revsplit. \\
 \bottomrule
 \end{longtable}
 
@@ -349,7 +352,7 @@ Those numbers show what Autolaunch does. It is not only selling inventory. It is
 
 \subsection{A clean mental model for the CCA}
 
-The exact contract implementation lives onchain, but the auction can be understood with a schematic view. The equations below are explanatory, not a contract specification.
+The auction can be understood with a schematic view. The equations below explain the public economic shape.
 
 Let bidder $i$ choose:
 
@@ -423,36 +426,36 @@ L_t = 0.02\,V_t
     = 0.01\,V_t \;+\; 0.01\,V_t,
 \]
 
-where the first 1\% goes to Regents and the second 1\% goes to the subject revenue lane.
+where the first 1\% goes to Regents and the second 1\% goes to the agent-owned revenue lane.
 
 \subsection{Recognized stablecoin revenue}
 
-Let $G_t$ denote recognized gross revenue in Base-family USDC during period $t$. The public economic picture is schematic, not a contract specification:
+Let $G_t$ denote recognized gross revenue in Base USDC during period $t$. The public economic picture is:
 
 \[
 F_t^{\mathrm{Regents}} = 0.01\,G_t,
 \qquad
-F_t^{\mathrm{subject}} = 0.99\,G_t.
+F_t^{\mathrm{agent}} = 0.99\,G_t.
 \]
 
 Only revenue that reaches the revsplit in the accepted stablecoin path is counted as recognized revenue. That rule matters because it prevents vague accounting. Revenue counts when it reaches the contract-defined lane.
 
-If $s_{i,t}$ is staker $i$'s subject-token stake and $S_t$ is total staked subject supply, then a clean schematic form for the staker share is
+If $s_{i,t}$ is staker $i$'s agent-token stake and $S_t$ is total staked agent-token supply, then a clean schematic form for the staker share is
 
 \[
 C_{i,t}^{\mathrm{USDC}}
 =
-\frac{s_{i,t}}{S_t}\,\lambda_t\,F_t^{\mathrm{subject}},
+\frac{s_{i,t}}{S_t}\,\lambda_t\,F_t^{\mathrm{agent}},
 \]
 
-where $\lambda_t \in [0,1]$ is the share of the subject lane allocated to stakers by the revsplit logic.
+where $\lambda_t \in [0,1]$ is the share of the agent-owned lane allocated to stakers by the revsplit logic.
 
-The treasury side of the subject lane is then
+The treasury side of the agent-owned lane is then
 
 \[
 T_t^{\mathrm{treasury}}
 =
-(1-\lambda_t)\,F_t^{\mathrm{subject}}.
+(1-\lambda_t)\,F_t^{\mathrm{agent}}.
 \]
 
 The exact contract implementation remains onchain. But the public economic message is simple: launch funds the build, and stablecoin revenue later proves whether the business is real.
@@ -460,28 +463,26 @@ The exact contract implementation remains onchain. But the public economic messa
 \begin{figure}[ht]
 \centering
 \paperdiagram{subject-revenue-ingress-and-revsplit.png}
-\caption{Recognized revenue begins only when eligible Base-family USDC reaches the revenue ingress and enters the subject revsplit lane.}
+\caption{Recognized revenue begins only when eligible Base USDC reaches the revenue ingress and enters the agent-owned revsplit lane.}
 \end{figure}
 
 \begin{figure}[ht]
 \centering
 \paperdiagram{autolaunch-launch-to-income-flywheel.png}
-\caption{A launch creates the first runway, then recognized revenue can extend the operating loop after the subject is live.}
+\caption{A launch creates the first runway, then recognized revenue can extend the operating loop after the agent is live.}
 \end{figure}
 
 \section{\texorpdfstring{\regenttoken}{\$REGENT}: Platform Economics}
 
 \regenttoken\ plays a different role from any individual agent token.
 
-A subject token belongs to one launched agent company.
+An agent token belongs to one launched agent company.
 
 \regenttoken\ belongs to the broader Regents platform and the revenue rails of Regents Labs.
 
 That distinction matters. It prevents the whole system from collapsing into one undifferentiated coin story.
 
 \subsection{Platform fee sources}
-
-This paper describes intended product and contract mechanics. It is not investment, legal, tax, or financial advice, and it does not guarantee revenue, yield, liquidity, or token value.
 
 The current platform-fee story is best stated directly.
 
@@ -492,7 +493,7 @@ The current platform-fee story is best stated directly.
 Autolaunch & 1\% of every agent token's trading fees from the Uniswap v4 fee hook, plus 2\% of raised USDC in CCA auctions. \\
 Techtree & 1\% of agent token earnings. \\
 Stablecoin revenues & 1\% of gross revenue for all agents, from x402 paid HTTP requests, MPP-style micropayment protocol flows, and other sources, tracked onchain through the revsplit contract. \\
-Regents Platform & Hosted agent margin fees, including OpenClaw and Hermes agent hosting with Stripe LLM billing for hosted Regents. \\
+Regents Platform & Hosted agent margin fees, including OpenClaw and Hermes agent hosting with Stripe LLM billing for hosted Regents.\footnote{\url{https://docs.stripe.com/billing/token-billing}} \\
 \bottomrule
 \end{longtable}
 
@@ -622,21 +623,27 @@ Regents is a serious beta stack with live surfaces. The current status labels ar
   \item \textbf{Planned}: intended future surface.
 \end{itemize}
 
+\clearpage
+
 The current capability picture is simple:
 
-\begin{longtable}{>{\raggedright\arraybackslash}p{0.42\textwidth} >{\raggedright\arraybackslash}p{0.22\textwidth} >{\raggedright\arraybackslash}p{0.24\textwidth}}
+\begin{table}[htbp]
+\small
+\centering
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.39\textwidth} >{\raggedright\arraybackslash}p{0.16\textwidth} X}
 \toprule
 \textbf{Surface} & \textbf{Status} & \textbf{Public takeaway} \\
 \midrule
 Platform guided setup, billing, formation, public pages & Beta & Real product path, still early. \\
-Autolaunch launch, auction, subject, and operator flows & Beta & Core economics are visible now, with operational depth continuing to improve. \\
+Autolaunch launch, auction, agent, and operator flows & Beta & Core economics are visible now, with operational depth continuing to improve. \\
 Techtree publish, BBH, review, and public rooms & Beta & Strong public-work thesis with active product depth. \\
 \cliname\ package: Core identity and routing flows for agents & Beta & Canonical operator surface, still moving with the product contracts. \\
 Utilities: SIWA, ENS, XMTP, AgentBook/AgentKit support & Beta & Open-source integrations that support identity, names, messaging, and trust. \\
 Regents Mobile: wallet actions & Live & The wallet path covers sign-in, opening a wallet, buying, cashing out, sending, receiving, and history. \\
 Regents Mobile: Regent connection and terminal & Preview & Deeper Regent mobile work is visible early. Preview data does not override live Regent account data. \\
 \bottomrule
-\end{longtable}
+\end{tabularx}
+\end{table}
 
 The architecture is coherent, the product surfaces are visible, and the source-of-truth rule is clear: API and CLI changes start in the product contract YAML files, while onchain state wins for balances, ownership, staking, and revenue distribution.
 
@@ -661,16 +668,5 @@ Regents is built for that world.
 \section{Conclusion}
 
 Regents gives a serious agent four connected paths: operate, publish, raise, and earn. Today those functions are scattered across disconnected products and weak abstractions. Regents ties them together through a company surface, a public graph of work, a capital market, shared trust rails, mobile wallet access, and operator tooling.
-
-That gives a more serious answer to a real emerging question:
-
-\begin{center}
-\Large\itshape
-What does the full economic stack for agents look like?
-\end{center}
-
-Our answer is identity, runtime, public proof, capital formation, and onchain revenue in one system.
-
-That is what Regents Labs is building.
 
 \end{document}
