@@ -75,3 +75,9 @@ docs/*_spec.md
 /layer2.md
 /layer3.md
 /design/
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.toc
