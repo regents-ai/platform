@@ -22,6 +22,7 @@ defmodule PlatformPhx.RuntimeConfig do
   def stripe_billing_topup_success_url, do: fetch("STRIPE_BILLING_TOPUP_SUCCESS_URL")
   def stripe_billing_topup_cancel_url, do: fetch("STRIPE_BILLING_TOPUP_CANCEL_URL")
   def stripe_runtime_meter_event_name, do: fetch("STRIPE_RUNTIME_METER_EVENT_NAME")
+  def agent_formation_enabled?, do: fetch_bool("AGENT_FORMATION_ENABLED", formation_default())
   def welcome_credit_enabled?, do: fetch_bool("WELCOME_CREDIT_ENABLED", true)
   def welcome_credit_limit, do: fetch_integer("WELCOME_CREDIT_LIMIT", 100)
   def welcome_credit_amount_usd_cents, do: fetch_integer("WELCOME_CREDIT_AMOUNT_USD_CENTS", 500)
@@ -31,6 +32,7 @@ defmodule PlatformPhx.RuntimeConfig do
   def workspace_http_port, do: fetch("WORKSPACE_HTTP_PORT") || "3000"
   def regent_staking_rpc_url, do: fetch("REGENT_STAKING_RPC_URL") || base_rpc_url()
   def regent_staking_contract_address, do: fetch("REGENT_STAKING_CONTRACT_ADDRESS")
+  def regent_staking_operator_wallets, do: fetch_csv("REGENT_STAKING_OPERATOR_WALLETS")
   def regent_staking_chain_id, do: fetch_integer("REGENT_STAKING_CHAIN_ID", 8453)
   def regent_staking_chain_label, do: fetch("REGENT_STAKING_CHAIN_LABEL") || "Base"
   def basename_parent_name, do: fetch("AGENT_BASENAME_PARENT_NAME") || "agent.base.eth"
@@ -97,5 +99,26 @@ defmodule PlatformPhx.RuntimeConfig do
       "NO" -> false
       _ -> default
     end
+  end
+
+  defp fetch_csv(name) do
+    name
+    |> fetch()
+    |> case do
+      nil ->
+        []
+
+      value ->
+        value
+        |> String.split(",")
+        |> Enum.map(&String.trim/1)
+        |> Enum.reject(&(&1 == ""))
+        |> Enum.map(&String.downcase/1)
+        |> Enum.uniq()
+    end
+  end
+
+  defp formation_default do
+    Application.get_env(:platform_phx, :agent_formation_enabled, false)
   end
 end

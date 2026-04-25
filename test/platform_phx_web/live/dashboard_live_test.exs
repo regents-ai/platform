@@ -22,13 +22,19 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     previous_stripe_client = Application.get_env(:platform_phx, :stripe_billing_client)
     previous_sprite_runner = Application.get_env(:platform_phx, :agent_platform_sprite_runner)
     previous_sprite_runtime_client = Application.get_env(:platform_phx, :sprite_runtime_client)
+
+    previous_agent_formation_enabled =
+      Application.get_env(:platform_phx, :agent_formation_enabled)
+
     previous_api_key = System.get_env("OPENSEA_API_KEY")
     previous_stripe_secret_key = System.get_env("STRIPE_SECRET_KEY")
     previous_pricing_plan_id = System.get_env("STRIPE_BILLING_PRICING_PLAN_ID")
+    previous_agent_formation_enabled_env = System.get_env("AGENT_FORMATION_ENABLED")
 
     Application.put_env(:platform_phx, :opensea_http_client, PlatformPhx.OpenSeaFakeClient)
     Application.put_env(:platform_phx, :opensea_fake_responses, %{})
     Application.put_env(:platform_phx, :stripe_billing_client, PlatformPhx.StripeLlmFakeClient)
+    Application.put_env(:platform_phx, :agent_formation_enabled, true)
 
     Application.put_env(
       :platform_phx,
@@ -45,6 +51,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     System.put_env("OPENSEA_API_KEY", "test-key")
     System.put_env("STRIPE_SECRET_KEY", "sk_test_agent_formation")
     System.put_env("STRIPE_BILLING_PRICING_PLAN_ID", "pp_test_agent_formation")
+    System.delete_env("AGENT_FORMATION_ENABLED")
     OpenSea.clear_cache()
 
     on_exit(fn ->
@@ -53,9 +60,11 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       restore_app_env(:platform_phx, :stripe_billing_client, previous_stripe_client)
       restore_app_env(:platform_phx, :agent_platform_sprite_runner, previous_sprite_runner)
       restore_app_env(:platform_phx, :sprite_runtime_client, previous_sprite_runtime_client)
+      restore_app_env(:platform_phx, :agent_formation_enabled, previous_agent_formation_enabled)
       restore_system_env("OPENSEA_API_KEY", previous_api_key)
       restore_system_env("STRIPE_SECRET_KEY", previous_stripe_secret_key)
       restore_system_env("STRIPE_BILLING_PRICING_PLAN_ID", previous_pricing_plan_id)
+      restore_system_env("AGENT_FORMATION_ENABLED", previous_agent_formation_enabled_env)
       OpenSea.clear_cache()
     end)
 
@@ -157,7 +166,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     {:ok, _dashboard, html} = live(conn, "/app/dashboard")
 
     assert html =~ "Open a company to make this your home."
-    assert html =~ "Open Agent Formation"
+    assert html =~ "Open company setup"
     assert html =~ "Techtree"
     assert html =~ "Autolaunch"
     refute html =~ "Pause company"
@@ -203,10 +212,67 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
 
     assert html =~ "Open a company to make this your home."
     assert html =~ "Claim a name before adding billing."
-    assert html =~ "Open Agent Formation"
+    assert html =~ "Open company setup"
     assert html =~ "Techtree"
     assert html =~ "Autolaunch"
     refute html =~ "Pause company"
+  end
+
+  test "dashboard points to staking when company opening is paused", %{conn: conn} do
+    Application.put_env(:platform_phx, :agent_formation_enabled, false)
+
+    {:ok, _dashboard, html} = live(conn, "/app/dashboard")
+
+    assert html =~ "Open $REGENT staking"
+    refute html =~ "Open company setup"
+  end
+
+  test "formation page blocks company opening when company opening is paused", %{conn: conn} do
+    Application.put_env(:platform_phx, :agent_formation_enabled, false)
+
+    human = insert_human!("active")
+    insert_billing_account!(human, 900)
+    insert_claimed_name!(human, "staking-launch")
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "7"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    {:ok, view, html} =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> live("/app/formation?claimedLabel=staking-launch")
+
+    assert html =~ "Company opening is not available yet"
+    assert html =~ "Company opening is coming soon."
+    assert has_element?(view, "button[disabled][title='Coming soon']", "Open company")
+  end
+
+  test "billing page blocks billing setup when company opening is paused", %{conn: conn} do
+    Application.put_env(:platform_phx, :agent_formation_enabled, false)
+
+    human = insert_human!("not_connected")
+    insert_claimed_name!(human, "billing-paused")
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "7"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    {:ok, view, html} =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> live("/app/billing?claimedLabel=billing-paused")
+
+    assert html =~ "Billing is not available yet"
+    assert html =~ "Billing is coming soon."
+    assert has_element?(view, "button[disabled][title='Coming soon']", "Set up billing")
+    refute has_element?(view, "#app-billing-form")
   end
 
   test "formation opens provisioning and dashboard shows company controls", %{conn: conn} do
@@ -372,7 +438,6 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     assert dashboard_html =~ "Gold border rule"
     assert dashboard_html =~ "Collection I"
     assert dashboard_html =~ "Collection II"
-    assert dashboard_html =~ "Open shader studio"
     assert dashboard_html =~ "dashboard-avatar-animata-pass-11"
   end
 

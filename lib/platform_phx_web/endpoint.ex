@@ -8,12 +8,13 @@ defmodule PlatformPhxWeb.Endpoint do
     store: :cookie,
     key: "_platform_phx_key",
     signing_salt: "IM0znkZQ",
-    same_site: "Lax"
+    same_site: "Lax",
+    secure: Application.compile_env(:platform_phx, :secure_session_cookie, false)
   ]
 
   socket "/live", Phoenix.LiveView.Socket,
     websocket: [connect_info: [session: @session_options], check_origin: :conn],
-    longpoll: [connect_info: [session: @session_options], check_origin: :conn]
+    longpoll: false
 
   # Serve at "/" the static files from "priv/static" directory.
   #

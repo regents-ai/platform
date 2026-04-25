@@ -122,15 +122,13 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     refute html =~ "No published agent lives on this host yet."
   end
 
-  test "demo route renders", %{conn: conn} do
-    {:ok, _demo, html} = live(conn, "/demo")
-
-    assert html =~ "platform-demo-shell"
-    assert html =~ "platform-demo-stage"
-    assert html =~ "demo-surface-techtree"
-    assert html =~ "demo-surface-dashboard"
-    assert html =~ "demo-surface-autolaunch"
-    assert html =~ "Regents voxel demo"
+  test "internal demo and design routes are not served", %{conn: conn} do
+    for path <- ["/demo", "/heerich-demo", "/logos", "/shader"] do
+      conn
+      |> recycle()
+      |> get(path)
+      |> response(404)
+    end
   end
 
   test "app access route renders", %{conn: conn} do
@@ -310,7 +308,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
 
     assert html =~ "Owner controls"
     assert html =~ "Manage your company from here"
-    assert html =~ "Runtime balance"
+    assert html =~ "Work balance"
     assert html =~ "Owner admin"
     assert has_element?(view, "#agent-owner-pause")
 
@@ -404,17 +402,6 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
 
     assert html =~ "Owner update from the company page."
     assert html =~ "Owner admin"
-  end
-
-  test "shader route renders", %{conn: conn} do
-    {:ok, _shader, html} = live(conn, "/shader")
-
-    assert html =~ "Shader"
-    assert html =~ "shader-root"
-    assert html =~ "phx-hook=\"ShaderRoot\""
-    assert html =~ "platform-shader-shell"
-    assert html =~ "platform-layout-root"
-    assert html =~ "platform-footer-voxel-classic"
   end
 
   test "browser routes emit enforced csp and script nonce", %{conn: conn} do
@@ -534,33 +521,6 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     refute body =~ "Jason"
     refute body =~ "%{"
     refute body =~ "{:"
-  end
-
-  test "heerich demo route renders", %{conn: conn} do
-    {:ok, view, _html} = live(conn, "/heerich-demo")
-
-    assert has_element?(
-             view,
-             "#platform-heerich-shell-background[phx-hook=\"Demo2Tunnel\"][data-demo2-layout=\"shell\"][data-demo2-variant=\"regent-shell\"]"
-           )
-
-    assert has_element?(view, "#platform-heerich-shell-route")
-    assert has_element?(view, "#platform-heerich-shell-scene")
-    assert has_element?(view, "#platform-heerich-shell-content")
-    assert has_element?(view, ".pp-heerich-shell-panel-hero")
-    assert render(view) =~ "A full-page Regent shell with the content held in the middle."
-    refute render(view) =~ "platform-demo2-panel-ember-hall"
-  end
-
-  test "logos route renders", %{conn: conn} do
-    {:ok, _logos, html} = live(conn, "/logos")
-
-    assert html =~ "Four study families, sixteen voxel reads each, one live theme switch."
-    assert html =~ "platform-logo-root"
-    assert html =~ "platform-logo-section-regents"
-    assert html =~ "platform-logo-section-autolaunch"
-    assert html =~ "Download PNG"
-    assert html =~ "Download SVG"
   end
 
   test "techtree route renders", %{conn: conn} do

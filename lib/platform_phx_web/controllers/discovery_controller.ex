@@ -65,12 +65,12 @@ defmodule PlatformPhxWeb.DiscoveryController do
   defp send_json(conn, content_type, body) do
     conn
     |> put_resp_header("content-type", content_type)
-    |> send_resp(200, Jason.encode!(body))
+    |> send_resp(conn.status || 200, Jason.encode!(body))
   end
 
   defp send_text(conn, content_type, body) do
     conn
     |> put_resp_header("content-type", content_type)
-    |> send_resp(200, body)
+    |> send_resp(conn.status || 200, body)
   end
 end

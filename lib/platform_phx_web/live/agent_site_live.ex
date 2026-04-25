@@ -4,6 +4,7 @@ defmodule PlatformPhxWeb.AgentSiteLive do
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Formation
   alias PlatformPhx.Accounts.AvatarSelection
+  alias PlatformPhx.RuntimeConfig
   alias PlatformPhxWeb.CompanyRoomComponents
   alias PlatformPhxWeb.PublicCompanyPage
 
@@ -224,17 +225,20 @@ defmodule PlatformPhxWeb.AgentSiteLive do
                   <div class="space-y-2">
                     <p class="pp-home-kicker">Owner controls</p>
                     <p class="text-[0.98rem] leading-7 text-[color:var(--muted-foreground)]">
-                      This page is the public home for the company. You can still manage runtime and billing from here.
+                      This page is the public home for the company. You can still review billing from here.
                     </p>
                   </div>
 
                   <div class="flex flex-wrap gap-3">
                     <div class="rounded-[0.95rem] border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_94%,var(--card)_6%)] px-4 py-3 text-sm text-[color:var(--foreground)]">
-                      Runtime balance: {billing_balance(@billing_account)}
+                      Work balance: {billing_balance(@billing_account)}
                     </div>
 
                     <button
-                      :if={owner_company_paused?(@owner_company)}
+                      :if={
+                        RuntimeConfig.agent_formation_enabled?() and
+                          owner_company_paused?(@owner_company)
+                      }
                       id="agent-owner-resume"
                       type="button"
                       phx-click="resume_company"
@@ -245,7 +249,10 @@ defmodule PlatformPhxWeb.AgentSiteLive do
                     </button>
 
                     <button
-                      :if={!owner_company_paused?(@owner_company)}
+                      :if={
+                        RuntimeConfig.agent_formation_enabled?() and
+                          !owner_company_paused?(@owner_company)
+                      }
                       id="agent-owner-pause"
                       type="button"
                       phx-click="pause_company"
@@ -253,6 +260,25 @@ defmodule PlatformPhxWeb.AgentSiteLive do
                       class="pp-link-button pp-link-button-ghost pp-link-button-slim"
                     >
                       Pause company
+                    </button>
+
+                    <button
+                      :if={!RuntimeConfig.agent_formation_enabled?()}
+                      type="button"
+                      disabled
+                      title="Coming soon"
+                      aria-label={
+                        if owner_company_paused?(@owner_company),
+                          do: "Resume company, coming soon",
+                          else: "Pause company, coming soon"
+                      }
+                      class="pp-link-button pp-link-button-ghost pp-link-button-slim cursor-not-allowed opacity-65"
+                    >
+                      <%= if owner_company_paused?(@owner_company) do %>
+                        Resume company
+                      <% else %>
+                        Pause company
+                      <% end %>
                     </button>
 
                     <.link

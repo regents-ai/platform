@@ -1,6 +1,12 @@
 defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
   use PlatformPhxWeb.ConnCase, async: false
 
+  alias PlatformPhx.Accounts.HumanUser
+  alias PlatformPhx.Repo
+
+  @operator_wallet "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  @other_wallet "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
   defmodule RegentStakingStub do
     def overview(_human) do
       {:ok,
@@ -114,8 +120,14 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
 
   setup do
     original = Application.get_env(:platform_phx, :regent_staking_api, [])
+    previous_operator_wallets = System.get_env("REGENT_STAKING_OPERATOR_WALLETS")
     Application.put_env(:platform_phx, :regent_staking_api, context_module: RegentStakingStub)
-    on_exit(fn -> Application.put_env(:platform_phx, :regent_staking_api, original) end)
+
+    on_exit(fn ->
+      Application.put_env(:platform_phx, :regent_staking_api, original)
+      restore_system_env("REGENT_STAKING_OPERATOR_WALLETS", previous_operator_wallets)
+    end)
+
     :ok
   end
 
@@ -167,10 +179,46 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
     refute response["statusMessage"] =~ "%{"
   end
 
-  test "deposit prepare returns a multisig payload", %{conn: conn} do
+  test "deposit prepare requires an operator wallet", %{conn: conn} do
     conn =
       conn
       |> init_test_session(%{})
+      |> put_csrf_token()
+      |> post("/api/regent/staking/deposit-usdc/prepare", %{
+        "amount" => "250.5",
+        "source_tag" => "base_manual",
+        "source_ref" => "2026-04"
+      })
+
+    assert json_response(conn, 401)["statusMessage"] ==
+             "Sign in before preparing treasury actions"
+  end
+
+  test "deposit prepare rejects a signed-in non-operator", %{conn: conn} do
+    System.put_env("REGENT_STAKING_OPERATOR_WALLETS", @operator_wallet)
+    human = insert_human!(@other_wallet)
+
+    conn =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
+      |> post("/api/regent/staking/deposit-usdc/prepare", %{
+        "amount" => "250.5",
+        "source_tag" => "base_manual",
+        "source_ref" => "2026-04"
+      })
+
+    assert json_response(conn, 403)["statusMessage"] ==
+             "This wallet is not allowed to prepare treasury actions"
+  end
+
+  test "deposit prepare returns a multisig payload for an operator", %{conn: conn} do
+    System.put_env("REGENT_STAKING_OPERATOR_WALLETS", @operator_wallet)
+    human = insert_human!(@operator_wallet)
+
+    conn =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
       |> put_csrf_token()
       |> post("/api/regent/staking/deposit-usdc/prepare", %{
         "amount" => "250.5",
@@ -186,6 +234,18 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
              }
            } = json_response(conn, 200)
   end
+
+  defp insert_human!(wallet_address) do
+    Repo.insert!(%HumanUser{
+      privy_user_id: "privy-#{System.unique_integer([:positive])}",
+      wallet_address: String.downcase(wallet_address),
+      wallet_addresses: [String.downcase(wallet_address)],
+      display_name: "Operator"
+    })
+  end
+
+  defp restore_system_env(name, nil), do: System.delete_env(name)
+  defp restore_system_env(name, value), do: System.put_env(name, value)
 
   defp put_csrf_token(conn) do
     token = Plug.CSRFProtection.get_csrf_token()

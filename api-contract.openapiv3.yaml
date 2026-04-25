@@ -6,16 +6,6 @@ info:
 servers:
   - url: /
 paths:
-  /metrics:
-    get:
-      operationId: prometheusMetrics
-      responses:
-        '200':
-          description: Prometheus scrape payload for app and runtime metrics
-          content:
-            text/plain:
-              schema:
-                type: string
   /healthz:
     get:
       operationId: healthz
@@ -26,6 +16,22 @@ paths:
             text/plain:
               schema:
                 type: string
+  /readyz:
+    get:
+      operationId: readyz
+      responses:
+        '200':
+          description: Readiness snapshot for public discovery
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyzSnapshot'
+        '503':
+          description: Readiness snapshot when one or more checks are unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyzSnapshot'
   /robots.txt:
     get:
       operationId: robotsTxt
@@ -116,6 +122,34 @@ paths:
             text/markdown:
               schema:
                 type: string
+  /metadata/{token_id}:
+    get:
+      operationId: tokenMetadata
+      parameters:
+        - name: token_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Public token metadata
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Token metadata not found
+          content:
+            text/plain:
+              schema:
+                type: string
+        '500':
+          description: Token metadata unavailable
+          content:
+            text/plain:
+              schema:
+                type: string
   /api/basenames/config:
     get:
       operationId: basenamesConfig
@@ -178,6 +212,8 @@ paths:
                 $ref: '#/components/schemas/BasenamesAvailability'
         '400':
           $ref: '#/components/responses/StatusMessage400'
+        '429':
+          $ref: '#/components/responses/StatusMessage429'
         '503':
           $ref: '#/components/responses/StatusMessage503'
   /api/basenames/credits:
@@ -270,6 +306,8 @@ paths:
           $ref: '#/components/responses/StatusMessage400'
         '409':
           $ref: '#/components/responses/StatusMessage409'
+        '429':
+          $ref: '#/components/responses/StatusMessage429'
         '503':
           $ref: '#/components/responses/StatusMessage503'
         '502':
@@ -316,6 +354,8 @@ paths:
           $ref: '#/components/responses/StatusMessage402'
         '409':
           $ref: '#/components/responses/StatusMessage409'
+        '429':
+          $ref: '#/components/responses/StatusMessage429'
         '503':
           $ref: '#/components/responses/StatusMessage503'
         '502':
@@ -354,6 +394,8 @@ paths:
           $ref: '#/components/responses/StatusMessage404'
         '409':
           $ref: '#/components/responses/StatusMessage409'
+        '429':
+          $ref: '#/components/responses/StatusMessage429'
         '503':
           $ref: '#/components/responses/StatusMessage503'
         '502':
@@ -395,6 +437,8 @@ paths:
                 $ref: '#/components/schemas/BugReportResponse'
         '400':
           $ref: '#/components/responses/StatusMessage400'
+        '429':
+          $ref: '#/components/responses/StatusMessage429'
   /api/security-report:
     post:
       operationId: createSecurityReport
@@ -413,6 +457,8 @@ paths:
                 $ref: '#/components/schemas/SecurityReportResponse'
         '400':
           $ref: '#/components/responses/StatusMessage400'
+        '429':
+          $ref: '#/components/responses/StatusMessage429'
   /v1/agent/bug-report:
     post:
       operationId: createAgentBugReport
@@ -870,6 +916,10 @@ paths:
                 $ref: '#/components/schemas/RegentStakingPrepareResponse'
         '400':
           $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '403':
+          $ref: '#/components/responses/StatusMessage403'
         '503':
           $ref: '#/components/responses/StatusMessage503'
   /api/regent/staking/withdraw-treasury/prepare:
@@ -891,6 +941,10 @@ paths:
                 $ref: '#/components/schemas/RegentStakingPrepareResponse'
         '400':
           $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '403':
+          $ref: '#/components/responses/StatusMessage403'
         '503':
           $ref: '#/components/responses/StatusMessage503'
   /api/agent-platform/formation:
@@ -1007,6 +1061,8 @@ paths:
           $ref: '#/components/responses/StatusMessage403'
         '409':
           $ref: '#/components/responses/StatusMessage409'
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
   /api/agent-platform/agents/{slug}/runtime:
     get:
       operationId: agentPlatformFormationRuntime
@@ -1323,6 +1379,8 @@ paths:
           $ref: '#/components/responses/StatusMessage401'
         '403':
           $ref: '#/components/responses/StatusMessage403'
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
   /api/agent-platform/stripe/webhooks:
     post:
       operationId: agentPlatformStripeWebhook
@@ -1368,6 +1426,8 @@ paths:
           $ref: '#/components/responses/StatusMessage403'
         '404':
           $ref: '#/components/responses/StatusMessage404'
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
   /api/agent-platform/sprites/{slug}/resume:
     post:
       operationId: agentPlatformResumeSprite
@@ -1400,6 +1460,8 @@ paths:
           $ref: '#/components/responses/StatusMessage403'
         '404':
           $ref: '#/components/responses/StatusMessage404'
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
   /api/opensea:
     get:
       operationId: openSeaHoldings
@@ -1424,6 +1486,24 @@ paths:
                 $ref: '#/components/schemas/OpenSeaHoldings'
         '400':
           $ref: '#/components/responses/StatusMessage400'
+        '502':
+          $ref: '#/components/responses/StatusMessage502'
+        '429':
+          $ref: '#/components/responses/StatusMessage429'
+        '503':
+          $ref: '#/components/responses/StatusMessage503'
+  /api/opensea/redeem-stats:
+    get:
+      operationId: openSeaRedeemStats
+      responses:
+        '200':
+          description: OpenSea collection supply stats for redeemable collections
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenSeaRedeemStats'
+        '429':
+          $ref: '#/components/responses/StatusMessage429'
         '502':
           $ref: '#/components/responses/StatusMessage502'
         '503':
@@ -1473,6 +1553,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/StatusMessage'
+    StatusMessage429:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StatusMessage'
     StatusMessage502:
       description: Upstream dependency failure
       content:
@@ -1510,6 +1596,27 @@ components:
       properties:
         statusMessage:
           type: string
+    ReadyzChecks:
+      type: object
+      additionalProperties: false
+      required: [database, cache]
+      properties:
+        database:
+          type: string
+          enum: [ready, unavailable]
+        cache:
+          type: string
+          enum: [ready, disabled, unavailable]
+    ReadyzSnapshot:
+      type: object
+      additionalProperties: false
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [ready, unavailable]
+        checks:
+          $ref: '#/components/schemas/ReadyzChecks'
     OkEnvelope:
       type: object
       required: [ok]
@@ -2747,3 +2854,9 @@ components:
         animataPass:
           type: array
           items: {type: integer}
+    OpenSeaRedeemStats:
+      type: object
+      required: [animata, regent-animata-ii]
+      properties:
+        animata: {type: integer}
+        regent-animata-ii: {type: integer}

@@ -22,7 +22,7 @@ defmodule PlatformPhxWeb.Plugs.RequireAgentSiwa do
              "method" => conn.method,
              "path" => conn.request_path,
              "headers" => headers,
-             "body" => conn.assigns[:raw_body]
+             "body" => conn.assigns[:raw_body] || ""
            },
            audience: audience
          ) do

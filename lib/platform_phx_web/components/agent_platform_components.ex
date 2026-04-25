@@ -5,6 +5,7 @@ defmodule PlatformPhxWeb.AgentPlatformComponents do
   use Regent
 
   alias PlatformPhx.Accounts.AvatarSelection
+  alias PlatformPhx.RuntimeConfig
 
   import PlatformPhxWeb.PlatformComponents, only: [preview_link: 1]
 
@@ -182,7 +183,7 @@ defmodule PlatformPhxWeb.AgentPlatformComponents do
             <p class="pp-home-kicker">Owner controls</p>
             <h2 class="pp-route-panel-title">Manage your company from here</h2>
             <p class="pp-panel-copy max-w-[42rem]">
-              Only you can see this section. Pause the company, turn it back on, or jump back to the launch home.
+              Only you can see this section. Review company status or jump back to the launch home.
             </p>
           </div>
 
@@ -198,7 +199,7 @@ defmodule PlatformPhxWeb.AgentPlatformComponents do
             </div>
 
             <div class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--card)] p-4">
-              <p class="pp-home-kicker">Runtime balance</p>
+              <p class="pp-home-kicker">Work balance</p>
               <p class="mt-3 font-display text-[1.15rem] text-[color:var(--foreground)]">
                 {billing_balance(@billing_account)}
               </p>
@@ -220,7 +221,7 @@ defmodule PlatformPhxWeb.AgentPlatformComponents do
 
           <div class="flex flex-wrap gap-3">
             <button
-              :if={owner_company_paused?(@owner_company)}
+              :if={RuntimeConfig.agent_formation_enabled?() and owner_company_paused?(@owner_company)}
               id="agent-owner-resume"
               type="button"
               phx-click="resume_company"
@@ -231,7 +232,9 @@ defmodule PlatformPhxWeb.AgentPlatformComponents do
             </button>
 
             <button
-              :if={!owner_company_paused?(@owner_company)}
+              :if={
+                RuntimeConfig.agent_formation_enabled?() and !owner_company_paused?(@owner_company)
+              }
               id="agent-owner-pause"
               type="button"
               phx-click="pause_company"
@@ -239,6 +242,25 @@ defmodule PlatformPhxWeb.AgentPlatformComponents do
               class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
             >
               Pause company
+            </button>
+
+            <button
+              :if={!RuntimeConfig.agent_formation_enabled?()}
+              type="button"
+              disabled
+              title="Coming soon"
+              aria-label={
+                if owner_company_paused?(@owner_company),
+                  do: "Resume company, coming soon",
+                  else: "Pause company, coming soon"
+              }
+              class="pp-link-button pp-link-button-ghost pp-link-button-slim cursor-not-allowed opacity-65"
+            >
+              <%= if owner_company_paused?(@owner_company) do %>
+                Resume company
+              <% else %>
+                Pause company
+              <% end %>
             </button>
 
             <.link
@@ -259,7 +281,7 @@ defmodule PlatformPhxWeb.AgentPlatformComponents do
 
           <div class="rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--card)] p-4">
             <p class="text-sm leading-7 text-[color:var(--muted-foreground)]">
-              Pausing stops new work from running, keeps your company page online, and keeps your progress saved. Turn it back on whenever you are ready.
+              Pause keeps your company page online and keeps your progress saved. Controls return when company opening is live again.
             </p>
           </div>
         </article>

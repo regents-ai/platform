@@ -20,6 +20,7 @@ config :platform_phx, PlatformPhx.Repo,
 config :platform_phx,
   ethereum_adapter: PlatformPhx.TestEthereumAdapter,
   opensea_client: PlatformPhx.TestOpenSeaClient,
+  agent_formation_enabled: true,
   dragonfly_enabled: false
 
 config :platform_phx, :siwa, receipt_secret: "platform-test-receipt-secret"

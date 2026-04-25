@@ -2,6 +2,7 @@ defmodule PlatformPhxWeb.AppComponents do
   use PlatformPhxWeb, :html
 
   alias PlatformPhx.Accounts.AvatarSelection
+  alias PlatformPhx.RuntimeConfig
   alias PlatformPhxWeb.TokenCardPayload
 
   attr :command, :string, required: true
@@ -1256,11 +1257,23 @@ defmodule PlatformPhxWeb.AppComponents do
           </div>
 
           <.link
+            :if={RuntimeConfig.agent_formation_enabled?()}
             navigate={~p"/app/formation"}
             class="inline-flex items-center justify-center rounded-full bg-[color:var(--brand-ink)] px-4 py-2.5 text-sm text-white transition hover:brightness-110"
           >
             Open another company
           </.link>
+
+          <button
+            :if={!RuntimeConfig.agent_formation_enabled?()}
+            type="button"
+            disabled
+            title="Coming soon"
+            aria-label="Open another company, coming soon"
+            class="inline-flex cursor-not-allowed items-center justify-center rounded-full border border-[color:color-mix(in_oklch,var(--border)_86%,transparent)] bg-[color:color-mix(in_oklch,var(--card)_88%,var(--background)_12%)] px-4 py-2.5 text-sm text-[color:var(--muted-foreground)] opacity-75"
+          >
+            Open another company
+          </button>
         </div>
 
         <div class="mt-5 grid gap-3 md:grid-cols-5">
@@ -1275,9 +1288,9 @@ defmodule PlatformPhxWeb.AppComponents do
             copy="Available company credit."
           />
           <.metric_tile
-            label="Runtime spend"
+            label="Company spend"
             value={format_usd_cents(@usage.runtime_spend_usd_cents)}
-            copy="Recorded company runtime spend."
+            copy="Recorded company work spend."
           />
           <.metric_tile
             label="Model spend"
@@ -1300,7 +1313,7 @@ defmodule PlatformPhxWeb.AppComponents do
                 Companies
               </p>
               <p class="mt-2 text-sm leading-6 text-[color:var(--muted-foreground)]">
-                Review the state of each hosted company and open the live page or change runtime state.
+                Review each hosted company, open the live page, or pause and resume work.
               </p>
             </div>
           </div>
@@ -1362,7 +1375,7 @@ defmodule PlatformPhxWeb.AppComponents do
                     >
                       Open public page
                     </a>
-                    <%= if company.desired_runtime_state == "paused" do %>
+                    <%= if RuntimeConfig.agent_formation_enabled?() and company.desired_runtime_state == "paused" do %>
                       <button
                         type="button"
                         phx-click="resume_company"
@@ -1371,7 +1384,8 @@ defmodule PlatformPhxWeb.AppComponents do
                       >
                         Resume company
                       </button>
-                    <% else %>
+                    <% end %>
+                    <%= if RuntimeConfig.agent_formation_enabled?() and company.desired_runtime_state != "paused" do %>
                       <button
                         type="button"
                         phx-click="pause_company"
@@ -1381,6 +1395,24 @@ defmodule PlatformPhxWeb.AppComponents do
                         Pause company
                       </button>
                     <% end %>
+                    <button
+                      :if={!RuntimeConfig.agent_formation_enabled?()}
+                      type="button"
+                      disabled
+                      title="Coming soon"
+                      aria-label={
+                        if company.desired_runtime_state == "paused",
+                          do: "Resume company, coming soon",
+                          else: "Pause company, coming soon"
+                      }
+                      class="inline-flex cursor-not-allowed items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--card)_86%,var(--background)_14%)] px-4 py-2.5 text-sm text-[color:var(--muted-foreground)] opacity-75"
+                    >
+                      <%= if company.desired_runtime_state == "paused" do %>
+                        Resume company
+                      <% else %>
+                        Pause company
+                      <% end %>
+                    </button>
                   </div>
                 </article>
               <% end %>
@@ -1650,13 +1682,6 @@ defmodule PlatformPhxWeb.AppComponents do
                   Save one of these shader looks as the account-level avatar.
                 </p>
               </div>
-
-              <.link
-                navigate={~p"/shader"}
-                class="inline-flex items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--background)] px-4 py-2 text-sm text-[color:var(--foreground)] transition hover:border-[color:var(--ring)]"
-              >
-                Open shader studio
-              </.link>
             </div>
 
             <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -1963,6 +1988,8 @@ defmodule PlatformPhxWeb.AppComponents do
   attr :action_label, :string, required: true
   attr :action_path, :string, required: true
   attr :action_copy, :string, default: nil
+  attr :action_disabled, :boolean, default: false
+  attr :action_title, :string, default: nil
   attr :notice, :map, default: nil
 
   def setup_blocked_stage(assigns) do
@@ -2003,7 +2030,19 @@ defmodule PlatformPhxWeb.AppComponents do
           title="Keep the setup flow moving"
           copy="Finish the missing step and come right back here. The next action will unlock as soon as the blocker is cleared."
         >
+          <button
+            :if={@action_disabled}
+            type="button"
+            disabled
+            title={@action_title || "Coming soon"}
+            aria-label={"#{@action_label}, coming soon"}
+            class="inline-flex cursor-not-allowed items-center justify-center rounded-full border border-[color:color-mix(in_oklch,var(--border)_86%,transparent)] bg-[color:color-mix(in_oklch,var(--card)_88%,var(--background)_12%)] px-4 py-2.5 text-sm text-[color:var(--muted-foreground)] opacity-75"
+          >
+            {@action_label}
+          </button>
+
           <.link
+            :if={!@action_disabled}
             navigate={@action_path}
             class="inline-flex items-center justify-center rounded-full bg-[color:var(--brand-ink)] px-4 py-2.5 text-sm text-white transition hover:brightness-110"
           >

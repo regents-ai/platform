@@ -35,6 +35,10 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     previous_runtime_topups = Application.get_env(:platform_phx, :runtime_topups, [])
     previous_formation = Application.get_env(:platform_phx, :formation, [])
+
+    previous_agent_formation_enabled =
+      Application.get_env(:platform_phx, :agent_formation_enabled)
+
     previous_runtime_test_pid = Application.get_env(:platform_phx, :sprite_runtime_test_pid)
 
     previous_runtime_start_result =
@@ -56,11 +60,13 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     previous_welcome_credit_limit = System.get_env("WELCOME_CREDIT_LIMIT")
     previous_welcome_credit_amount = System.get_env("WELCOME_CREDIT_AMOUNT_USD_CENTS")
     previous_welcome_credit_expiry = System.get_env("WELCOME_CREDIT_EXPIRY_DAYS")
+    previous_agent_formation_enabled_env = System.get_env("AGENT_FORMATION_ENABLED")
 
     Application.put_env(:platform_phx, :opensea_http_client, PlatformPhx.OpenSeaFakeClient)
     Application.put_env(:platform_phx, :opensea_fake_responses, %{})
     Application.put_env(:platform_phx, :stripe_billing_client, PlatformPhx.StripeLlmFakeClient)
     Application.put_env(:platform_phx, :stripe_fake_credit_grant_result, :ok)
+    Application.put_env(:platform_phx, :agent_formation_enabled, true)
 
     Application.put_env(
       :platform_phx,
@@ -90,6 +96,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     System.put_env("WELCOME_CREDIT_LIMIT", "100")
     System.put_env("WELCOME_CREDIT_AMOUNT_USD_CENTS", "500")
     System.put_env("WELCOME_CREDIT_EXPIRY_DAYS", "60")
+    System.delete_env("AGENT_FORMATION_ENABLED")
     OpenSea.clear_cache()
 
     on_exit(fn ->
@@ -113,6 +120,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
       Application.put_env(:platform_phx, :runtime_topups, previous_runtime_topups)
       Application.put_env(:platform_phx, :formation, previous_formation)
+      restore_app_env(:platform_phx, :agent_formation_enabled, previous_agent_formation_enabled)
       restore_app_env(:platform_phx, :sprite_runtime_test_pid, previous_runtime_test_pid)
       restore_app_env(:platform_phx, :sprite_runtime_start_result, previous_runtime_start_result)
       restore_app_env(:platform_phx, :sprite_runtime_stop_result, previous_runtime_stop_result)
@@ -134,6 +142,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       restore_system_env("WELCOME_CREDIT_LIMIT", previous_welcome_credit_limit)
       restore_system_env("WELCOME_CREDIT_AMOUNT_USD_CENTS", previous_welcome_credit_amount)
       restore_system_env("WELCOME_CREDIT_EXPIRY_DAYS", previous_welcome_credit_expiry)
+      restore_system_env("AGENT_FORMATION_ENABLED", previous_agent_formation_enabled_env)
       OpenSea.clear_cache()
     end)
 
@@ -213,6 +222,34 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
              "fresh" => false,
              "marked" => true
            }
+  end
+
+  test "company opening writes are unavailable when company opening is paused", %{conn: conn} do
+    Application.put_env(:platform_phx, :agent_formation_enabled, false)
+
+    human = insert_human!()
+
+    conn =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
+
+    unavailable_message = "Hosted company opening is not available right now."
+
+    for {path, payload} <- [
+          {"/api/agent-platform/billing/setup/checkout", %{claimedLabel: "quiet"}},
+          {"/api/agent-platform/billing/topups/checkout", %{amountUsdCents: 800}},
+          {"/api/agent-platform/formation/companies", %{claimedLabel: "quiet"}},
+          {"/api/agent-platform/sprites/quiet/pause", %{}},
+          {"/api/agent-platform/sprites/quiet/resume", %{}}
+        ] do
+      response =
+        conn
+        |> post(path, payload)
+        |> json_response(503)
+
+      assert response["statusMessage"] == unavailable_message
+    end
   end
 
   test "billing setup, top-up, webhook sync, and formation queue a company", %{conn: conn} do
@@ -472,6 +509,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     script_path =
       "/Users/sean/Documents/regent/platform/priv/agent_formation/hermes-workspace/seed_company_workspace.mjs"
 
+    File.rm_rf!(tmp_dir)
     File.mkdir_p!(tmp_dir)
 
     File.write!(
@@ -1024,6 +1062,9 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert billing_account["runtime_credit_balance_usd_cents"] == 500
     assert billing_account["welcome_credit"]["amount_usd_cents"] == 500
     assert Repo.aggregate(WelcomeCreditGrant, :count, :id) == 1
+
+    assert length(all_enqueued(worker: PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker)) ==
+             1
   end
 
   defp insert_human! do

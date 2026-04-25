@@ -3,6 +3,7 @@ defmodule PlatformPhxWeb.App.FormationLive do
 
   alias PlatformPhx.Dashboard
   alias PlatformPhx.AgentPlatform.Formation
+  alias PlatformPhx.RuntimeConfig
   import PlatformPhxWeb.AppComponents
 
   @impl true
@@ -37,19 +38,23 @@ defmodule PlatformPhxWeb.App.FormationLive do
 
   @impl true
   def handle_event("start_company", _params, socket) do
-    case Formation.create_company(socket.assigns.current_human, %{
-           "claimedLabel" => socket.assigns.selected_claimed_label
-         }) do
-      {:accepted, payload} ->
-        formation_id = get_in(payload, [:formation, :id])
+    if RuntimeConfig.agent_formation_enabled?() do
+      case Formation.create_company(socket.assigns.current_human, %{
+             "claimedLabel" => socket.assigns.selected_claimed_label
+           }) do
+        {:accepted, payload} ->
+          formation_id = get_in(payload, [:formation, :id])
 
-        {:noreply,
-         socket
-         |> put_flash(:info, "Your company is opening now.")
-         |> push_navigate(to: ~p"/app/provisioning/#{formation_id}")}
+          {:noreply,
+           socket
+           |> put_flash(:info, "Your company is opening now.")
+           |> push_navigate(to: ~p"/app/provisioning/#{formation_id}")}
 
-      {:error, {_status, message}} ->
-        {:noreply, put_flash(socket, :error, message)}
+        {:error, {_status, message}} ->
+          {:noreply, put_flash(socket, :error, message)}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "Hosted company opening is not available right now.")}
     end
   end
 
@@ -106,6 +111,44 @@ defmodule PlatformPhxWeb.App.FormationLive do
               action_label="Back to billing"
               action_path={~p"/app/billing"}
               action_copy="Return to the previous step, then come back here when company opening is available again."
+            />
+          <% !RuntimeConfig.agent_formation_enabled?() -> %>
+            <.setup_blocked_stage
+              step={4}
+              title="Company opening is not available yet"
+              summary="The token and staking routes are live first. Hosted company opening will return after the launch service is ready."
+              snapshot={setup_snapshot_from_formation(@formation_data)}
+              facts={[
+                %{
+                  icon: "hero-currency-dollar",
+                  title: "$REGENT staking",
+                  copy: "Stake, claim, and review the current rail from the token page."
+                },
+                %{
+                  icon: "hero-identification",
+                  title: "Identity stays saved",
+                  copy: "Your sign-in, wallet, avatar, and claimed names remain available."
+                },
+                %{
+                  icon: "hero-building-office-2",
+                  title: "Company opening next",
+                  copy: "Hosted companies will open when the launch service is ready."
+                }
+              ]}
+              next_steps={[
+                %{
+                  number: 4,
+                  title: "Use staking now",
+                  copy: "Open the token page to use the live staking route."
+                }
+              ]}
+              blocker_copy="Hosted company opening is not available right now."
+              action_label="Open company"
+              action_path={~p"/app/formation"}
+              action_copy="Company opening is coming soon. $REGENT staking is live on the token page."
+              action_disabled={true}
+              action_title="Coming soon"
+              readiness={Map.get(@formation_data || %{}, :readiness)}
             />
           <% formation_stage_ready?(@formation_data) -> %>
             <.formation_stage

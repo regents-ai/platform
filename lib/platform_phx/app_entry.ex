@@ -3,12 +3,14 @@ defmodule PlatformPhx.AppEntry do
 
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.Dashboard
+  alias PlatformPhx.RuntimeConfig
 
   @type next_step ::
           :access
           | :identity
           | :billing
           | :formation
+          | :token_info
           | :dashboard
           | {:provisioning, integer()}
 
@@ -25,6 +27,7 @@ defmodule PlatformPhx.AppEntry do
       :identity -> "/app/identity"
       :billing -> "/app/billing"
       :formation -> "/app/formation"
+      :token_info -> "/token-info"
       :dashboard -> "/app/dashboard"
       {:provisioning, formation_id} -> "/app/provisioning/#{formation_id}"
     end
@@ -50,8 +53,11 @@ defmodule PlatformPhx.AppEntry do
       formation.billing_account.connected != true ->
         :billing
 
-      true ->
+      RuntimeConfig.agent_formation_enabled?() ->
         :formation
+
+      true ->
+        :token_info
     end
   end
 

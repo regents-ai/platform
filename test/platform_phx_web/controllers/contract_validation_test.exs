@@ -3,6 +3,7 @@ defmodule PlatformPhxWeb.ContractValidationTest do
 
   @api_contract_path Path.expand("../../../api-contract.openapiv3.yaml", __DIR__)
   @detach_path "/api/agent-platform/agents/{slug}/ens/detach"
+  @readyz_path "/readyz"
 
   test "api contract is served from the app", %{conn: conn} do
     api_contract_conn =
@@ -71,6 +72,59 @@ defmodule PlatformPhxWeb.ContractValidationTest do
              MapSet.new(["attached", "claim_id", "name", "claim_status"])
   end
 
+  test "api contract publishes the readiness route" do
+    contract = api_contract()
+
+    assert get_in(contract, ["paths", @readyz_path, "get", "operationId"]) == "readyz"
+
+    assert get_in(contract, [
+             "paths",
+             @readyz_path,
+             "get",
+             "responses",
+             "200",
+             "content",
+             "application/json",
+             "schema",
+             "$ref"
+           ]) == "#/components/schemas/ReadyzSnapshot"
+
+    assert get_in(contract, [
+             "paths",
+             @readyz_path,
+             "get",
+             "responses",
+             "503",
+             "content",
+             "application/json",
+             "schema",
+             "$ref"
+           ]) == "#/components/schemas/ReadyzSnapshot"
+  end
+
+  test "api contract matches the product HTTP route surface" do
+    contract_routes =
+      api_contract()
+      |> Map.fetch!("paths")
+      |> Enum.flat_map(fn {path, operations} ->
+        operations
+        |> Map.keys()
+        |> Enum.map(&{String.upcase(&1), path})
+      end)
+      |> MapSet.new()
+
+    router_routes =
+      PlatformPhxWeb.Router.__routes__()
+      |> Enum.filter(&contract_backed_route?/1)
+      |> Enum.map(
+        &{&1.verb |> Atom.to_string() |> String.upcase(), normalize_route_path(&1.path)}
+      )
+      |> MapSet.new()
+
+    assert MapSet.difference(router_routes, contract_routes) == MapSet.new()
+    assert MapSet.difference(contract_routes, router_routes) == MapSet.new()
+  end
+
   defp api_contract do
     @api_contract_path
     |> File.read!()
@@ -129,4 +183,29 @@ defmodule PlatformPhxWeb.ContractValidationTest do
   defp normalize_string_scalar("true"), do: true
   defp normalize_string_scalar("false"), do: false
   defp normalize_string_scalar(value), do: value
+
+  defp contract_backed_route?(route) do
+    path = route.path
+
+    String.starts_with?(path, "/api") or
+      String.starts_with?(path, "/v1") or
+      path in [
+        "/healthz",
+        "/readyz",
+        "/robots.txt",
+        "/sitemap.xml",
+        "/.well-known/api-catalog",
+        "/.well-known/agent-card.json",
+        "/.well-known/agent-skills/index.json",
+        "/.well-known/mcp/server-card.json",
+        "/api-contract.openapiv3.yaml",
+        "/cli-contract.yaml",
+        "/agent-skills/regents-cli.md",
+        "/metadata/:token_id"
+      ]
+  end
+
+  defp normalize_route_path(path) do
+    Regex.replace(~r/:([A-Za-z0-9_]+)/, path, "{\\1}")
+  end
 end

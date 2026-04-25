@@ -42,7 +42,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
       :ok
     else
       nil ->
-        {:discard, "agent not found"}
+        {:cancel, "agent not found"}
 
       {:error, {:runtime_not_ready, state}} ->
         handle_runtime_not_ready(job, agent, formation, state)

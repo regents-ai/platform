@@ -1,6 +1,33 @@
 defmodule PlatformPhxWeb.Router do
   use PlatformPhxWeb, :router
 
+  @public_rate_limit_rules [
+    [
+      name: :public_writes,
+      method: "POST",
+      paths: [
+        "/api/bug-report",
+        "/api/security-report",
+        "/api/basenames/credit",
+        "/api/basenames/mint",
+        "/api/basenames/use"
+      ],
+      limit: 12,
+      window_ms: :timer.minutes(1)
+    ],
+    [
+      name: :expensive_public_reads,
+      method: "GET",
+      paths: [
+        "/api/basenames/availability",
+        "/api/opensea",
+        "/api/opensea/redeem-stats"
+      ],
+      limit: 60,
+      window_ms: :timer.minutes(1)
+    ]
+  ]
+
   pipeline :browser do
     plug PlatformPhxWeb.PublicEntryPlug
     plug :accepts, ["html"]
@@ -16,6 +43,7 @@ defmodule PlatformPhxWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+    plug PlatformPhxWeb.Plugs.RateLimit, rules: @public_rate_limit_rules
   end
 
   pipeline :session_api do
@@ -61,8 +89,6 @@ defmodule PlatformPhxWeb.Router do
         {PlatformPhxWeb.LiveCurrentHuman, :default},
         {PlatformPhxWeb.LivePageMetadata, :default}
       ] do
-      live "/demo", DemoLive
-      live "/heerich-demo", HeerichDemoLive
       live "/", HomeLive
       live "/app", AppEntryLive
       live "/app/access", App.AccessLive
@@ -75,8 +101,6 @@ defmodule PlatformPhxWeb.Router do
       live "/cli", RegentCliLive
       live "/docs", DocsLive
       live "/agents/:slug", AgentSiteLive
-      live "/logos", LogosLive
-      live "/shader", ShaderLive
       live "/bug-report", BugReportLive
       live "/techtree", TechtreeLive
       live "/autolaunch", AutolaunchLive

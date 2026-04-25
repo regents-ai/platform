@@ -19,6 +19,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   alias PlatformPhx.Basenames.Mint
   alias PlatformPhx.PublicErrors
   alias PlatformPhx.Repo
+  alias PlatformPhx.RuntimeConfig
   alias PlatformPhxWeb.Endpoint
   alias Oban
 
@@ -99,7 +100,8 @@ defmodule PlatformPhx.AgentPlatform.Formation do
     do: {:error, {:unauthorized, "Sign in before setting up billing"}}
 
   def start_billing_setup_checkout(%HumanUser{} = human, attrs) when is_map(attrs) do
-    with :ok <- ensure_wallet_connected(human),
+    with :ok <- require_agent_formation_enabled(),
+         :ok <- ensure_wallet_connected(human),
          {:ok, billing_account} <- AgentPlatform.ensure_billing_account(human),
          {:ok, checkout_urls} <- build_billing_setup_checkout_urls(attrs),
          {:ok, checkout} <-
@@ -131,7 +133,8 @@ defmodule PlatformPhx.AgentPlatform.Formation do
     do: {:error, {:unauthorized, "Sign in before starting Agent Formation"}}
 
   def create_company(%HumanUser{} = human, attrs) when is_map(attrs) do
-    with :ok <- ensure_wallet_connected(human),
+    with :ok <- require_agent_formation_enabled(),
+         :ok <- ensure_wallet_connected(human),
          {:ok, holdings} <- AgentPlatform.holdings_for_human(human),
          :ok <- ensure_eligible_holdings(holdings),
          {:ok, billing_account} <- require_active_billing_account(human),
@@ -210,7 +213,8 @@ defmodule PlatformPhx.AgentPlatform.Formation do
     do: {:error, {:unauthorized, "Sign in before adding runtime credit"}}
 
   def start_billing_topup_checkout(%HumanUser{} = human, attrs) when is_map(attrs) do
-    with amount when is_integer(amount) and amount > 0 <-
+    with :ok <- require_agent_formation_enabled(),
+         amount when is_integer(amount) and amount > 0 <-
            normalize_positive_integer(Map.get(attrs, "amountUsdCents")),
          {:ok, billing_account} <- AgentPlatform.ensure_billing_account(human),
          {:ok, checkout} <- StripeBilling.create_topup_checkout_session(billing_account, amount),
@@ -235,7 +239,8 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   def pause_sprite(nil, _slug), do: {:error, {:unauthorized, "Sign in before pausing a sprite"}}
 
   def pause_sprite(%HumanUser{} = human, slug) when is_binary(slug) do
-    with %Agent{} = agent <- AgentPlatform.get_owned_agent(human, slug),
+    with :ok <- require_agent_formation_enabled(),
+         %Agent{} = agent <- AgentPlatform.get_owned_agent(human, slug),
          {:ok, updated} <-
            RuntimeControl.pause(agent,
              runtime_status: "paused",
@@ -246,6 +251,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
       {:ok, %{ok: true, sprite: sprite_runtime_control_payload(updated)}}
     else
       nil -> {:error, {:not_found, "Company not found"}}
+      {:error, {:unavailable, _message}} = error -> error
       {:error, reason} -> runtime_control_error(reason, "pause")
     end
   end
@@ -253,7 +259,8 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   def resume_sprite(nil, _slug), do: {:error, {:unauthorized, "Sign in before resuming a sprite"}}
 
   def resume_sprite(%HumanUser{} = human, slug) when is_binary(slug) do
-    with %Agent{} = agent <- AgentPlatform.get_owned_agent(human, slug),
+    with :ok <- require_agent_formation_enabled(),
+         %Agent{} = agent <- AgentPlatform.get_owned_agent(human, slug),
          {:ok, billing_account} <- require_active_or_funded_billing_account(human, agent),
          {:ok, updated} <-
            RuntimeControl.resume(agent,
@@ -270,6 +277,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
     else
       nil -> {:error, {:not_found, "Company not found"}}
       {:error, {:payment_required, _message}} = error -> error
+      {:error, {:unavailable, _message}} = error -> error
       {:error, reason} -> runtime_control_error(reason, "resume")
     end
   end
@@ -380,6 +388,14 @@ defmodule PlatformPhx.AgentPlatform.Formation do
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  defp require_agent_formation_enabled do
+    if RuntimeConfig.agent_formation_enabled?() do
+      :ok
+    else
+      {:error, {:unavailable, "Hosted company opening is not available right now."}}
     end
   end
 

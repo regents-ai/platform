@@ -1,4 +1,6 @@
 defmodule PlatformPhxWeb.LayoutHelpers do
+  alias PlatformPhx.RuntimeConfig
+
   @nav_items [
     %{
       kind: :internal,
@@ -7,6 +9,14 @@ defmodule PlatformPhxWeb.LayoutHelpers do
       label: "Regents",
       note: "Setup",
       icon: "hero-sparkles"
+    },
+    %{
+      kind: :internal,
+      key: "token-info",
+      href: "/token-info",
+      label: "$REGENT",
+      note: "Staking",
+      icon: "hero-currency-dollar"
     },
     %{
       kind: :internal,
@@ -55,7 +65,7 @@ defmodule PlatformPhxWeb.LayoutHelpers do
     %{label: "Autolaunch", href: "/autolaunch"},
     %{label: "Regents CLI", href: "/cli"},
     %{label: "Docs", href: "/docs"},
-    %{label: "Token info", href: "/token-info"},
+    %{label: "$REGENT staking", href: "/token-info"},
     %{label: "Bug report", href: "/bug-report"}
   ]
 
@@ -83,6 +93,14 @@ defmodule PlatformPhxWeb.LayoutHelpers do
   def shell_title(value, _active_nav), do: value
 
   def continue_label(current_human) do
-    if current_human, do: "Continue setup", else: "App setup"
+    cond do
+      !RuntimeConfig.agent_formation_enabled?() -> "Open $REGENT staking"
+      current_human -> "Continue setup"
+      true -> "App setup"
+    end
+  end
+
+  def continue_path do
+    if RuntimeConfig.agent_formation_enabled?(), do: "/app", else: "/token-info"
   end
 end

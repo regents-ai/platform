@@ -11,6 +11,7 @@ defmodule PlatformPhx.Application do
       [
         PlatformPhxWeb.Telemetry,
         PlatformPhx.Repo,
+        PlatformPhx.RateLimiter,
         {Oban, Application.fetch_env!(:platform_phx, Oban)},
         {DNSCluster, query: Application.get_env(:platform_phx, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: PlatformPhx.PubSub},

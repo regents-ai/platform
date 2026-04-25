@@ -100,6 +100,33 @@ defmodule PlatformPhxWeb.Api.OpenseaControllerTest do
     assert response == %{"animata" => 248, "regent-animata-ii" => 319}
   end
 
+  test "redeem stats endpoint is rate limited", %{conn: conn} do
+    System.put_env("OPENSEA_API_KEY", "test-key")
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      collection_url("animata") => {:ok, %{"total_supply" => 248}},
+      collection_url("regent-animata-ii") => {:ok, %{"total_supply" => 319}}
+    })
+
+    Enum.each(1..60, fn _index ->
+      response =
+        conn
+        |> recycle()
+        |> get("/api/opensea/redeem-stats")
+        |> json_response(200)
+
+      assert response == %{"animata" => 248, "regent-animata-ii" => 319}
+    end)
+
+    response =
+      conn
+      |> recycle()
+      |> get("/api/opensea/redeem-stats")
+      |> json_response(429)
+
+    assert response["statusMessage"] == "Too many requests. Try again shortly."
+  end
+
   test "returns 502 when redeem stats fail upstream", %{conn: conn} do
     System.put_env("OPENSEA_API_KEY", "test-key")
 

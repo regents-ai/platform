@@ -428,11 +428,13 @@ defmodule PlatformPhxWeb.Layouts do
 
   defp app_resume_link(assigns) do
     assigns =
-      assign(assigns, :label, LayoutHelpers.continue_label(assigns.current_human))
+      assigns
+      |> assign(:label, LayoutHelpers.continue_label(assigns.current_human))
+      |> assign(:path, LayoutHelpers.continue_path())
 
     ~H"""
     <.link
-      navigate={~p"/app"}
+      navigate={@path}
       class={[
         "inline-flex items-center gap-3 rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_90%,var(--card)_10%)] px-4 py-3 text-sm text-[color:var(--foreground)] shadow-[0_16px_30px_-28px_color-mix(in_oklch,var(--foreground)_16%,transparent)] transition duration-200 hover:-translate-y-0.5 hover:border-[color:var(--ring)]",
         @class
@@ -754,7 +756,9 @@ defmodule PlatformPhxWeb.Layouts do
 
   defp notification_menu(assigns) do
     assigns =
-      assign(assigns, :next_label, LayoutHelpers.continue_label(assigns.current_human))
+      assigns
+      |> assign(:next_label, LayoutHelpers.continue_label(assigns.current_human))
+      |> assign(:next_path, LayoutHelpers.continue_path())
 
     ~H"""
     <details class="relative">
@@ -779,7 +783,7 @@ defmodule PlatformPhxWeb.Layouts do
         </p>
         <div class="mt-3 space-y-2">
           <.link
-            navigate={~p"/app"}
+            navigate={@next_path}
             class="flex items-center justify-between rounded-[0.95rem] border border-[color:color-mix(in_oklch,var(--border)_88%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_88%,var(--card)_12%)] px-3 py-3 text-sm text-[color:var(--foreground)] transition duration-200 hover:border-[color:var(--ring)]"
           >
             {@next_label}

@@ -3,6 +3,7 @@ defmodule PlatformPhxWeb.App.BillingLive do
 
   alias PlatformPhx.Dashboard
   alias PlatformPhx.AgentPlatform.Formation
+  alias PlatformPhx.RuntimeConfig
   import PlatformPhxWeb.AppComponents
 
   @refresh_ms 2_500
@@ -113,6 +114,45 @@ defmodule PlatformPhxWeb.App.BillingLive do
               action_path={~p"/app/identity"}
               action_copy="Return to the previous step, then come back here once billing is available again."
               notice={@billing_notice}
+            />
+          <% !RuntimeConfig.agent_formation_enabled?() -> %>
+            <.setup_blocked_stage
+              step={3}
+              title="Billing is not available yet"
+              summary="$REGENT staking is live first. Hosted company billing will return after the launch service is ready."
+              snapshot={setup_snapshot_from_formation(@formation_data)}
+              facts={[
+                %{
+                  icon: "hero-currency-dollar",
+                  title: "$REGENT staking",
+                  copy: "Use the live token page to stake and claim."
+                },
+                %{
+                  icon: "hero-identification",
+                  title: "Identity stays saved",
+                  copy: "Your sign-in, wallet, avatar, and claimed names remain available."
+                },
+                %{
+                  icon: "hero-credit-card",
+                  title: "Billing returns next",
+                  copy: "Hosted company billing will open with company setup."
+                }
+              ]}
+              next_steps={[
+                %{
+                  number: 3,
+                  title: "Use staking now",
+                  copy: "Open the token page to use the live staking route."
+                }
+              ]}
+              blocker_copy="Hosted company billing is not available right now."
+              action_label="Set up billing"
+              action_path={~p"/app/billing"}
+              action_copy="Billing is coming soon. $REGENT staking is live on the token page."
+              action_disabled={true}
+              action_title="Coming soon"
+              notice={@billing_notice}
+              readiness={Map.get(@formation_data || %{}, :readiness)}
             />
           <% billing_stage_ready?(@formation_data) -> %>
             <.billing_stage

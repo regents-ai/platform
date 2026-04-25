@@ -33,6 +33,7 @@ defmodule PlatformPhxWeb.ConnCase do
 
   setup tags do
     sandbox_owner = PlatformPhx.DataCase.setup_sandbox(tags)
+    PlatformPhx.RateLimiter.reset()
     {:ok, conn: Phoenix.ConnTest.build_conn(), sandbox_owner: sandbox_owner}
   end
 end

@@ -107,7 +107,7 @@ defmodule PlatformPhxWeb.DiscoveryControllerTest do
     assert ready["status"] == "ready"
     assert ready["checks"]["database"] == "ready"
     assert ready["checks"]["cache"] in ["ready", "disabled"]
-    assert ready["launch"]["queued"] == 0
+    refute Map.has_key?(ready, "launch")
 
     api_contract_conn =
       conn

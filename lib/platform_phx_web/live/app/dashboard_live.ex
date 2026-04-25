@@ -6,6 +6,7 @@ defmodule PlatformPhxWeb.App.DashboardLive do
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Formation
   alias PlatformPhx.Dashboard
+  alias PlatformPhx.RuntimeConfig
   import PlatformPhxWeb.AppComponents
 
   @impl true
@@ -127,9 +128,9 @@ defmodule PlatformPhxWeb.App.DashboardLive do
               }
             ]}
             blocker_copy={dashboard_not_ready_copy(@formation_data)}
-            action_label="Open Agent Formation"
-            action_path={~p"/app/formation"}
-            action_copy="Finish company setup first, then come back here to manage the live company."
+            action_label={dashboard_action_label()}
+            action_path={dashboard_action_path()}
+            action_copy={dashboard_action_copy()}
             notice={@formation_notice}
             readiness={Map.get(@formation_data || %{}, :readiness)}
           />
@@ -157,7 +158,11 @@ defmodule PlatformPhxWeb.App.DashboardLive do
   defp dashboard_ready?(_formation), do: false
 
   defp dashboard_not_ready_copy(%{readiness: %{ready: true}}) do
-    "Everything is ready. Open the company, then come back here to manage it."
+    if RuntimeConfig.agent_formation_enabled?() do
+      "Everything is ready. Open the company, then come back here to manage it."
+    else
+      "Company opening is paused right now. $REGENT staking is live on the token page."
+    end
   end
 
   defp dashboard_not_ready_copy(%{readiness: %{blocked_step: %{message: message}}})
@@ -170,11 +175,37 @@ defmodule PlatformPhxWeb.App.DashboardLive do
   end
 
   defp dashboard_not_ready_copy(%{authenticated: false}) do
-    "Sign in, claim a name, add billing, and launch a company in Agent Formation. This page will become your company home after launch."
+    if RuntimeConfig.agent_formation_enabled?() do
+      "Sign in, claim a name, add billing, and open a company. This page becomes your company home after launch."
+    else
+      "$REGENT staking is live now. Company opening will return when the launch service is ready."
+    end
   end
 
   defp dashboard_not_ready_copy(_formation) do
-    "We could not load your company details right now. Open Agent Formation to keep going."
+    if RuntimeConfig.agent_formation_enabled?() do
+      "We could not load your company details right now. Open company setup to keep going."
+    else
+      "$REGENT staking is live now. Company opening will return when the launch service is ready."
+    end
+  end
+
+  defp dashboard_action_label do
+    if RuntimeConfig.agent_formation_enabled?(),
+      do: "Open company setup",
+      else: "Open $REGENT staking"
+  end
+
+  defp dashboard_action_path do
+    if RuntimeConfig.agent_formation_enabled?(), do: ~p"/app/formation", else: ~p"/token-info"
+  end
+
+  defp dashboard_action_copy do
+    if RuntimeConfig.agent_formation_enabled?() do
+      "Finish company setup first, then come back here to manage the live company."
+    else
+      "Use the live token and staking page while company opening is prepared."
+    end
   end
 
   defp empty_holdings do

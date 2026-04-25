@@ -116,6 +116,32 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
     assert response["statusMessage"] =~ "can't be blank"
   end
 
+  test "public report endpoint is rate limited", %{conn: conn} do
+    Enum.each(1..12, fn index ->
+      response =
+        conn
+        |> recycle()
+        |> post("/api/bug-report", %{
+          "summary" => "report #{index}",
+          "details" => "details"
+        })
+        |> json_response(200)
+
+      assert response["ok"] == true
+    end)
+
+    response =
+      conn
+      |> recycle()
+      |> post("/api/bug-report", %{
+        "summary" => "report 13",
+        "details" => "details"
+      })
+      |> json_response(429)
+
+    assert response["statusMessage"] == "Too many requests. Try again shortly."
+  end
+
   test "signed agent bug route stores the verified agent identity", %{conn: conn} do
     body =
       Jason.encode!(%{"summary" => "signed route", "details" => "keeps verified identity only"})

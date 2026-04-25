@@ -1,6 +1,9 @@
 defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
   @moduledoc false
-  use Oban.Worker, queue: :billing, max_attempts: 10
+  use Oban.Worker,
+    queue: :billing,
+    max_attempts: 10,
+    unique: [period: {7, :days}, fields: [:worker, :args], keys: [:event_id]]
 
   import Ecto.Query, warn: false
 
@@ -143,7 +146,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
           error
       end
     else
-      false -> {:discard, "top-up amount missing"}
+      false -> {:cancel, "top-up amount missing"}
       {:error, _reason} = error -> error
     end
   end
@@ -213,11 +216,11 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
       human_id when is_integer(human_id) ->
         case Repo.get(HumanUser, human_id) do
           %HumanUser{} = human -> AgentPlatform.ensure_billing_account(human)
-          nil -> {:discard, "billing owner not found"}
+          nil -> {:cancel, "billing owner not found"}
         end
 
       nil ->
-        {:discard, "billing account not found"}
+        {:cancel, "billing account not found"}
     end
   end
 
