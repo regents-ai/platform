@@ -185,7 +185,44 @@ Run the Platform validation suite:
 mix precommit
 ```
 
-Before including Platform in a cross-repo release, use the shared Regent release spine in [`../docs/release-spine.md`](../docs/release-spine.md) and the Platform operator status checks in [`docs/operator-status.md`](docs/operator-status.md).
+Before including Platform in a cross-repo release, use the shared Regent release spine in [`../docs/release-spine.md`](../docs/release-spine.md), the public beta run sheet in [`../docs/public-beta-run-sheet.md`](../docs/public-beta-run-sheet.md), and the Platform operator status checks in [`docs/operator-status.md`](docs/operator-status.md).
+
+## Fly Public Beta Deploy Gate
+
+Run these before deploying or promoting the Fly app:
+
+```bash
+mix precommit
+MIX_ENV=prod mix compile --warnings-as-errors
+MIX_ENV=prod mix phx.routes | rg '(/demo|/heerich-demo|/logos|/shader|/metrics|/live/longpoll|/dev/dashboard|/dev/mailbox)' && exit 1 || true
+```
+
+Stop if any command fails.
+
+Before public beta, confirm the Fly app has these values set through Fly secrets:
+
+- `SECRET_KEY_BASE`
+- `DATABASE_URL`
+- `REGENT_STAKING_OPERATOR_WALLETS`
+- `REGENT_STAKING_RPC_URL`
+- `REGENT_STAKING_CHAIN_ID`
+- `REGENT_STAKING_CHAIN_LABEL`
+- `REGENT_REVENUE_STAKING_ADDRESS`
+- `STRIPE_WEBHOOK_SECRET` when billing webhooks are enabled
+- Privy, SIWA, Stripe, Dragonfly, Sprite, OpenSea, and RPC values for the enabled surfaces
+
+Keep company opening disabled unless the hosted-company checklist in [`docs/release-phase-tracker.md`](docs/release-phase-tracker.md) is green.
+
+After deploy:
+
+```bash
+fly status --app platform-phx
+fly logs --app platform-phx
+curl -s https://<platform-host>/healthz
+curl -s https://<platform-host>/readyz
+```
+
+Also check the public pages, staking read path, report submission path, and operator-only staking prepare routes from the same Fly app users will reach.
 
 ## Live Metrics Locally
 

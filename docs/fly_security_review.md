@@ -114,6 +114,9 @@ Recommendation: after disabling routes, update the OpenAPI and CLI contracts fir
 
 ## Go / No-Go Checklist For Fly Promotion
 
+- Shared public beta run sheet checked: `/Users/sean/Documents/regent/docs/public-beta-run-sheet.md`.
+- `mix precommit` passes.
+- `MIX_ENV=prod mix compile --warnings-as-errors` passes.
 - Demo/design routes disabled in production.
 - `dev_routes` false in production.
 - Regent treasury prepare routes require signed-in operator access.
