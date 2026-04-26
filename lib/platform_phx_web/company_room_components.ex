@@ -4,27 +4,48 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
 
   attr :room, :map, required: true
   attr :form, :map, required: true
+  attr :id, :string, default: "company-room"
+  attr :form_id, :string, default: "company-room-form"
+  attr :layout, :string, default: "wide"
+  attr :class, :string, default: nil
+  attr :eyebrow, :string, default: "Company room"
+  attr :title, :string, default: "Talk with this company in one shared room"
+
+  attr :description, :string,
+    default:
+      "Join the room to ask questions, follow updates, and keep the company conversation in one place."
+
+  attr :empty_title, :string, default: "No one has posted here yet."
+
+  attr :empty_copy, :string,
+    default: "Join the room, then post the first update or question to start the thread."
+
+  attr :message_placeholder, :string, default: "Ask a question or share an update."
+  attr :moderator_label, :string, default: "Owner admin"
 
   def company_room(assigns) do
     ~H"""
     <section
-      id="company-room"
+      id={@id}
       phx-hook="DashboardXmtpRoom"
       data-pending-request-id={@room.pending_signature_request_id || ""}
-      class="overflow-hidden rounded-[1.8rem] border border-[color:var(--border)] bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_96%,var(--background)_4%),color-mix(in_oklch,var(--background)_90%,transparent))] shadow-[0_28px_90px_-56px_color-mix(in_oklch,var(--brand-ink)_35%,transparent)]"
+      class={[
+        "overflow-hidden rounded-[1.8rem] border border-[color:var(--border)] bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_96%,var(--background)_4%),color-mix(in_oklch,var(--background)_90%,transparent))] shadow-[0_28px_90px_-56px_color-mix(in_oklch,var(--brand-ink)_35%,transparent)]",
+        @class
+      ]}
     >
       <div class="border-b border-[color:var(--border)] px-5 py-5 sm:px-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div class="space-y-3">
             <p class="text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted-foreground)]">
-              Company room
+              {@eyebrow}
             </p>
             <div class="space-y-2">
               <h3 class="font-display text-2xl text-[color:var(--foreground)]">
-                Talk with this company in one shared room
+                {@title}
               </h3>
               <p class="max-w-[44rem] text-sm leading-6 text-[color:var(--muted-foreground)]">
-                Join the room to ask questions, follow updates, and keep the company conversation in one place.
+                {@description}
               </p>
             </div>
           </div>
@@ -49,14 +70,20 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
               :if={@room.moderator?}
               class="rounded-full border border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--brand-1)_18%,transparent)] px-3 py-1 text-[color:var(--foreground)]"
             >
-              Owner admin
+              {@moderator_label}
             </span>
           </div>
         </div>
       </div>
 
-      <div class="grid gap-0 xl:grid-cols-[minmax(0,1.12fr)_minmax(21rem,0.88fr)]">
-        <div class="border-b border-[color:var(--border)] px-5 py-5 sm:px-6 xl:border-b-0 xl:border-r">
+      <div class={[
+        "grid gap-0",
+        @layout == "wide" && "xl:grid-cols-[minmax(0,1.12fr)_minmax(21rem,0.88fr)]"
+      ]}>
+        <div class={[
+          "border-b border-[color:var(--border)] px-5 py-5 sm:px-6",
+          @layout == "wide" && "xl:border-b-0 xl:border-r"
+        ]}>
           <div class="flex items-center justify-between gap-3">
             <div>
               <p class="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
@@ -76,17 +103,17 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
               <div class="flex min-h-[13rem] items-center justify-center rounded-[1.4rem] border border-dashed border-[color:var(--border)] bg-[color:color-mix(in_oklch,var(--background)_85%,transparent)] px-5 py-6 text-center text-sm leading-6 text-[color:var(--muted-foreground)]">
                 <div class="max-w-[24rem] space-y-2">
                   <p class="font-display text-[1.1rem] leading-none text-[color:var(--foreground)]">
-                    No one has posted here yet.
+                    {@empty_title}
                   </p>
                   <p>
-                    Join the room, then post the first update or question to start the thread.
+                    {@empty_copy}
                   </p>
                 </div>
               </div>
             <% else %>
               <%= for message <- @room.messages do %>
                 <article
-                  id={"company-room-message-#{message.key}"}
+                  id={"#{@id}-message-#{message.key}"}
                   data-xmtp-entry
                   data-message-key={message.key}
                   class={[
@@ -159,7 +186,7 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
             </button>
           </div>
 
-          <.form for={@form} id="company-room-form" phx-submit="xmtp_send" class="mt-5 space-y-4">
+          <.form for={@form} id={@form_id} phx-submit="xmtp_send" class="mt-5 space-y-4">
             <label class="space-y-2">
               <span class="text-xs uppercase tracking-[0.16em] text-[color:var(--muted-foreground)]">
                 Post a message
@@ -168,7 +195,7 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
                 field={@form[:body]}
                 type="textarea"
                 rows="4"
-                placeholder="Ask a question or share an update."
+                placeholder={@message_placeholder}
                 disabled={!@room.can_send?}
                 class="min-h-32 w-full rounded-[1.2rem] border border-[color:var(--border)] bg-[color:var(--background)] px-4 py-3 text-sm leading-6 text-[color:var(--foreground)]"
               />

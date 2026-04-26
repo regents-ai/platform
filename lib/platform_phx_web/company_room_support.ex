@@ -9,13 +9,19 @@ defmodule PlatformPhxWeb.CompanyRoomSupport do
   def load_room_panel(nil, _human), do: nil
 
   def load_room_panel(%Agent{} = agent, current_human) do
-    _ = safe_bootstrap(agent)
+    load_public_room_panel(Xmtp.company_room_key(agent), current_human)
+  end
 
-    case Xmtp.company_room_panel(current_human, agent, %{}) do
+  def load_public_room_panel(room_key, current_human) when is_binary(room_key) do
+    _ = safe_bootstrap(room_key)
+
+    case Xmtp.room_panel(current_human, room_key, %{}) do
       {:ok, panel} -> Map.put(panel, :status_override, nil)
       {:error, _reason} -> nil
     end
   end
+
+  def load_public_room_panel(_room_key, _current_human), do: nil
 
   def assign_message_form(socket, body \\ "") do
     assign(
@@ -64,7 +70,13 @@ defmodule PlatformPhxWeb.CompanyRoomSupport do
     do: "This room is unavailable right now."
 
   def safe_bootstrap(%Agent{} = agent) do
-    case Xmtp.bootstrap_company_room!(agent, reuse: true) do
+    agent
+    |> Xmtp.company_room_key()
+    |> safe_bootstrap()
+  end
+
+  def safe_bootstrap(room_key) when is_binary(room_key) do
+    case Xmtp.bootstrap_room!(room_key: room_key, reuse: true) do
       {:ok, _room} -> :ok
       {:error, _reason} -> :error
     end

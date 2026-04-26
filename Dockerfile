@@ -10,7 +10,7 @@ RUN apt-get update -y && \
     apt-get install -y --no-install-recommends build-essential git curl ca-certificates nodejs npm && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /workspace
 
 ENV MIX_ENV=prod
 
@@ -19,12 +19,16 @@ RUN curl -L https://foundry.paradigm.xyz | bash && \
     "${FOUNDRY_DIR}/bin/foundryup" && \
     cp "${FOUNDRY_DIR}/bin/cast" /usr/local/bin/cast
 
-COPY mix.exs mix.lock ./
-COPY config config
-COPY lib lib
-COPY priv priv
-COPY rel rel
-COPY assets assets
+COPY platform/mix.exs platform/mix.lock platform/
+COPY elixir-utils elixir-utils
+
+WORKDIR /workspace/platform
+
+COPY platform/config config
+COPY platform/lib lib
+COPY platform/priv priv
+COPY platform/rel rel
+COPY platform/assets assets
 
 RUN mix deps.get --only prod
 RUN mix deps.compile
@@ -51,8 +55,8 @@ ENV HOME=/app
 WORKDIR /app
 
 COPY --from=build /usr/local/bin/cast /usr/local/bin/cast
-COPY --from=build /app/priv/metadata /app/priv/metadata
-COPY --from=build /app/_build/prod/rel/platform_phx ./
+COPY --from=build /workspace/platform/priv/metadata /app/priv/metadata
+COPY --from=build /workspace/platform/_build/prod/rel/platform_phx ./
 
 EXPOSE 4000
 

@@ -51,12 +51,16 @@ defmodule PlatformPhxWeb.Plugs.RateLimit do
 
   defp client_key(conn) do
     ip =
-      conn
-      |> get_req_header("fly-client-ip")
-      |> List.first()
-      |> normalize_header_ip()
-      |> Kernel.||(forwarded_for_ip(conn))
-      |> Kernel.||(format_ip(conn.remote_ip))
+      if trusted_proxy_ip?(conn.remote_ip) do
+        conn
+        |> get_req_header("fly-client-ip")
+        |> List.first()
+        |> normalize_header_ip()
+        |> Kernel.||(forwarded_for_ip(conn))
+        |> Kernel.||(format_ip(conn.remote_ip))
+      else
+        format_ip(conn.remote_ip)
+      end
 
     "#{ip}:#{conn.method}:#{conn.request_path}"
   end
@@ -87,6 +91,16 @@ defmodule PlatformPhxWeb.Plugs.RateLimit do
       ip -> ip
     end
   end
+
+  defp trusted_proxy_ip?({127, _, _, _}), do: true
+  defp trusted_proxy_ip?({10, _, _, _}), do: true
+  defp trusted_proxy_ip?({172, second, _, _}) when second in 16..31, do: true
+  defp trusted_proxy_ip?({192, 168, _, _}), do: true
+  defp trusted_proxy_ip?({169, 254, _, _}), do: true
+  defp trusted_proxy_ip?({100, second, _, _}) when second in 64..127, do: true
+  defp trusted_proxy_ip?({0, 0, 0, 0, 0, 0, 0, 1}), do: true
+  defp trusted_proxy_ip?({first, _, _, _, _, _, _, _}) when first in 0xFC00..0xFDFF, do: true
+  defp trusted_proxy_ip?(_ip), do: false
 
   defp format_ip({a, b, c, d}), do: Enum.join([a, b, c, d], ".")
   defp format_ip(tuple) when is_tuple(tuple), do: tuple |> Tuple.to_list() |> Enum.join(":")

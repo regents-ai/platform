@@ -1,6 +1,6 @@
 # Platform Release Phase Tracker
 
-Last updated: April 24, 2026
+Last updated: April 25, 2026
 
 Use this as the working handoff note for Platform release work. `AGENTS.md` should stay focused on durable rules; this file tracks the current phase, next phase, and release checks.
 
@@ -48,13 +48,58 @@ Latest verification:
 - `REGENT_STAKING_RPC_URL`
 - `REGENT_STAKING_CHAIN_ID`
 - `REGENT_STAKING_CHAIN_LABEL`
-- `REGENT_REVENUE_STAKING_ADDRESS`
+- `REGENT_STAKING_CONTRACT_ADDRESS`
 - `STRIPE_WEBHOOK_SECRET`
 - Stripe billing secrets and price ids, if billing is enabled
 - Privy auth secrets
-- SIWA receipt secrets
+- `SIWA_SERVER_BASE_URL`
 - Dragonfly connection values
 - Sprite control secrets, if hosted company control is enabled
+
+Platform env source map:
+
+| Platform env var | Source |
+| --- | --- |
+| `DATABASE_URL` | Fly Postgres attach or local Postgres URL |
+| `SECRET_KEY_BASE` | `mix phx.gen.secret` |
+| `PHX_HOST` | final Platform host |
+| `PHX_SERVER` | `true` on Fly |
+| `PORT` | `4000` locally, Fly app port from `fly.toml` |
+| `BASE_RPC_URL` | Base mainnet RPC URL |
+| `VITE_PRIVY_APP_ID` | Privy dashboard |
+| `VITE_PRIVY_APP_CLIENT_ID` | Privy dashboard |
+| `PRIVY_VERIFICATION_KEY` | Privy dashboard |
+| `SIWA_SERVER_BASE_URL` | shared SIWA server URL |
+| `DRAGONFLY_ENABLED` | `true` when Dragonfly is available |
+| `DRAGONFLY_HOST` | Dragonfly private host |
+| `DRAGONFLY_PORT` | usually `6379` |
+| `OPENSEA_API_KEY` | OpenSea dashboard, if token pages need live OpenSea data |
+
+Staking env source map:
+
+| Platform env var | Source |
+| --- | --- |
+| `REGENT_STAKING_CONTRACT_ADDRESS` | `contractAddress` from the Base mainnet Regent staking deploy |
+| `REGENT_STAKING_RPC_URL` | Base mainnet RPC URL |
+| `REGENT_STAKING_CHAIN_ID` | `8453` |
+| `REGENT_STAKING_CHAIN_LABEL` | `Base` |
+| `REGENT_STAKING_OPERATOR_WALLETS` | comma-separated operator wallets allowed to prepare treasury actions |
+
+Autolaunch uses the same staking contract address as `REGENT_REVENUE_STAKING_ADDRESS`; Platform does not read that env name.
+
+Hosted-company env source map, only when company opening is enabled:
+
+| Platform env var | Source |
+| --- | --- |
+| `AGENT_FORMATION_ENABLED` | `true` only after hosted-company checks pass |
+| `STRIPE_SECRET_KEY` | Stripe dashboard |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook endpoint |
+| `STRIPE_BILLING_PRICING_PLAN_ID` | Stripe billing setup |
+| `STRIPE_BILLING_TOPUP_SUCCESS_URL` | Platform top-up return URL |
+| `STRIPE_BILLING_TOPUP_CANCEL_URL` | Platform top-up cancel URL |
+| `STRIPE_RUNTIME_METER_EVENT_NAME` | Stripe meter event name |
+| `SPRITES_API_TOKEN_FILE` | path to Sprite API token file on the machine |
+| `SPRITE_CLI_PATH` | Sprite CLI path, defaults to `sprite` |
 
 ## Next Phase: Staking Release Verification
 

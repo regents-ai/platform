@@ -251,6 +251,66 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     assert has_element?(view, "button[disabled][title='Coming soon']", "Open company")
   end
 
+  test "formation page shows a shared setup room and lets a signed-in person post", %{conn: conn} do
+    room_key = PlatformPhx.Xmtp.formation_room_key()
+    PlatformPhx.Xmtp.reset_for_test!(room_key)
+
+    on_exit(fn ->
+      PlatformPhx.Xmtp.reset_for_test!(room_key)
+    end)
+
+    human = insert_human!("active")
+    insert_billing_account!(human, 900)
+    insert_claimed_name!(human, "room-launch")
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "7"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    {:ok, view, html} =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> live("/app/formation?claimedLabel=room-launch")
+
+    assert html =~ "Setup room"
+    assert html =~ "Talk through company setup"
+    assert html =~ "0/200 seats filled"
+    assert has_element?(view, "#formation-room [phx-click=\"xmtp_join\"]", "Join room")
+
+    html =
+      view
+      |> element("#formation-room [phx-click=\"xmtp_join\"]")
+      |> render_click()
+
+    [_, request_id] =
+      Regex.run(~r/data-pending-request-id="([^"]+)"/, html) ||
+        flunk("expected a pending join request in the setup room")
+
+    html =
+      view
+      |> element("#formation-room")
+      |> render_hook("xmtp_join_signature_signed", %{
+        "request_id" => request_id,
+        "signature" => "0xsigned"
+      })
+
+    assert html =~ "You are in the room."
+    assert html =~ "1 active now"
+
+    html =
+      view
+      |> form("#formation-room-form", %{
+        "xmtp_room" => %{"body" => "Getting my launch checklist ready."}
+      })
+      |> render_submit()
+
+    assert html =~ "Getting my launch checklist ready."
+    refute html =~ "XMTP message"
+  end
+
   test "billing page blocks billing setup when company opening is paused", %{conn: conn} do
     Application.put_env(:platform_phx, :agent_formation_enabled, false)
 

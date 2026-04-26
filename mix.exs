@@ -61,7 +61,7 @@ defmodule PlatformPhx.MixProject do
        depth: 1},
       {:swoosh, "~> 1.16"},
       {:req, "~> 0.5"},
-      {:xmtp_elixir_sdk, "~> 0.1.0"},
+      {:xmtp_elixir_sdk, path: "../elixir-utils/xmtp"},
       {:keccak_ex, "~> 0.4.2"},
       {:ex_secp256k1, "~> 0.8.0"},
       {:telemetry_metrics, "~> 1.0"},

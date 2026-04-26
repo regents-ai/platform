@@ -24,9 +24,9 @@ defmodule PlatformPhx.RegentStaking do
     end
   end
 
-  def stake(attrs, current_human) do
+  def stake(attrs, principal) do
     with {:ok, cfg} <- config(),
-         {:ok, wallet_address} <- required_wallet(current_human),
+         {:ok, wallet_address} <- required_wallet(principal),
          {:ok, amount} <- parse_amount(Map.get(attrs, "amount"), @token_decimals) do
       {:ok,
        %{
@@ -42,9 +42,9 @@ defmodule PlatformPhx.RegentStaking do
     end
   end
 
-  def unstake(attrs, current_human) do
+  def unstake(attrs, principal) do
     with {:ok, cfg} <- config(),
-         {:ok, wallet_address} <- required_wallet(current_human),
+         {:ok, wallet_address} <- required_wallet(principal),
          {:ok, amount} <- parse_amount(Map.get(attrs, "amount"), @token_decimals) do
       {:ok,
        %{
@@ -60,9 +60,9 @@ defmodule PlatformPhx.RegentStaking do
     end
   end
 
-  def claim_usdc(_attrs, current_human) do
+  def claim_usdc(_attrs, principal) do
     with {:ok, cfg} <- config(),
-         {:ok, wallet_address} <- required_wallet(current_human) do
+         {:ok, wallet_address} <- required_wallet(principal) do
       {:ok,
        %{
          staking: compact_state(cfg, wallet_address),
@@ -77,9 +77,9 @@ defmodule PlatformPhx.RegentStaking do
     end
   end
 
-  def claim_regent(_attrs, current_human) do
+  def claim_regent(_attrs, principal) do
     with {:ok, cfg} <- config(),
-         {:ok, wallet_address} <- required_wallet(current_human) do
+         {:ok, wallet_address} <- required_wallet(principal) do
       {:ok,
        %{
          staking: compact_state(cfg, wallet_address),
@@ -94,9 +94,9 @@ defmodule PlatformPhx.RegentStaking do
     end
   end
 
-  def claim_and_restake_regent(_attrs, current_human) do
+  def claim_and_restake_regent(_attrs, principal) do
     with {:ok, cfg} <- config(),
-         {:ok, wallet_address} <- required_wallet(current_human) do
+         {:ok, wallet_address} <- required_wallet(principal) do
       {:ok,
        %{
          staking: compact_state(cfg, wallet_address),
@@ -343,7 +343,14 @@ defmodule PlatformPhx.RegentStaking do
     end
   end
 
-  defp required_wallet(_human), do: {:error, :unauthorized}
+  defp required_wallet(%{"wallet_address" => wallet_address}) do
+    case normalize_address(wallet_address) do
+      nil -> {:error, :unauthorized}
+      address -> {:ok, address}
+    end
+  end
+
+  defp required_wallet(_principal), do: {:error, :unauthorized}
 
   defp primary_wallet_address(%HumanUser{} = human) do
     [human.wallet_address | List.wrap(human.wallet_addresses)]
@@ -351,7 +358,10 @@ defmodule PlatformPhx.RegentStaking do
     |> normalize_address()
   end
 
-  defp primary_wallet_address(_human), do: nil
+  defp primary_wallet_address(%{"wallet_address" => wallet_address}),
+    do: normalize_address(wallet_address)
+
+  defp primary_wallet_address(_principal), do: nil
 
   defp serialize_tx_request(%{chain_id: chain_id, to: to, value_hex: value_hex, data: data}) do
     %{chain_id: chain_id, to: to, value: value_hex, data: data}

@@ -4,17 +4,25 @@ defmodule PlatformPhxWeb.App.FormationLive do
   alias PlatformPhx.Dashboard
   alias PlatformPhx.AgentPlatform.Formation
   alias PlatformPhx.RuntimeConfig
+  alias PlatformPhx.Xmtp
+  alias PlatformPhxWeb.CompanyRoomComponents
+  alias PlatformPhxWeb.PublicRoomLive
   import PlatformPhxWeb.AppComponents
 
   @impl true
   def mount(_params, _session, socket) do
+    room_key = Xmtp.formation_room_key()
+    :ok = PublicRoomLive.subscribe(socket, room_key)
+
     {:ok,
      socket
      |> assign(:page_title, "Open company")
      |> assign(:formation_data, nil)
      |> assign(:selected_claimed_label, nil)
      |> assign(:requested_claimed_label, nil)
-     |> load_formation_payload()}
+     |> load_formation_payload()
+     |> PublicRoomLive.assign_room(room_key)
+     |> PublicRoomLive.assign_message_form()}
   end
 
   @impl true
@@ -59,6 +67,55 @@ defmodule PlatformPhxWeb.App.FormationLive do
   end
 
   @impl true
+  def handle_event("xmtp_join", _params, socket) do
+    PublicRoomLive.handle_join(socket, Xmtp.formation_room_key())
+  end
+
+  @impl true
+  def handle_event(
+        "xmtp_join_signature_signed",
+        %{"request_id" => request_id, "signature" => signature},
+        socket
+      ) do
+    PublicRoomLive.handle_join_signature_signed(
+      socket,
+      Xmtp.formation_room_key(),
+      request_id,
+      signature
+    )
+  end
+
+  @impl true
+  def handle_event("xmtp_join_signature_failed", %{"message" => message}, socket) do
+    {:noreply, PublicRoomLive.put_status(socket, message)}
+  end
+
+  @impl true
+  def handle_event("xmtp_send", %{"xmtp_room" => %{"body" => body}}, socket) do
+    PublicRoomLive.handle_send(socket, Xmtp.formation_room_key(), body)
+  end
+
+  @impl true
+  def handle_event("xmtp_delete_message", %{"message_id" => message_id}, socket) do
+    PublicRoomLive.handle_delete_message(socket, Xmtp.formation_room_key(), message_id)
+  end
+
+  @impl true
+  def handle_event("xmtp_kick_user", %{"target" => target}, socket) do
+    PublicRoomLive.handle_kick_user(socket, Xmtp.formation_room_key(), target)
+  end
+
+  @impl true
+  def handle_event("xmtp_heartbeat", _params, socket) do
+    PublicRoomLive.handle_heartbeat(socket, Xmtp.formation_room_key())
+  end
+
+  @impl true
+  def handle_info({:xmtp_public_room, :refresh}, socket) do
+    {:noreply, PublicRoomLive.assign_room(socket, Xmtp.formation_room_key())}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app
@@ -76,123 +133,145 @@ defmodule PlatformPhxWeb.App.FormationLive do
         class="pp-route-shell rg-regent-theme-platform"
         phx-hook="DashboardReveal"
       >
-        <%= cond do %>
-          <% @formation_data == nil -> %>
-            <.setup_blocked_stage
-              step={4}
-              title="Open company"
-              summary="Company opening could not be loaded right now, so launch cannot continue yet."
-              snapshot={setup_snapshot_from_formation(nil)}
-              facts={[
-                %{
-                  icon: "hero-identification",
-                  title: "Chosen identity",
-                  copy: "A ready name becomes the company identity."
-                },
-                %{
-                  icon: "hero-credit-card",
-                  title: "Payments active",
-                  copy: "Billing must already be on."
-                },
-                %{
-                  icon: "hero-building-office-2",
-                  title: "Hosted launch",
-                  copy: "Regents opens the company for you."
-                }
-              ]}
-              next_steps={[
-                %{
-                  number: 4,
-                  title: "Launch progress",
-                  copy: "You move to live progress after opening."
-                }
-              ]}
-              blocker_copy="Company opening is unavailable right now."
-              action_label="Back to billing"
-              action_path={~p"/app/billing"}
-              action_copy="Return to the previous step, then come back here when company opening is available again."
+        <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(21rem,24rem)] xl:items-start">
+          <div class="min-w-0">
+            <%= cond do %>
+              <% @formation_data == nil -> %>
+                <.setup_blocked_stage
+                  step={4}
+                  title="Open company"
+                  summary="Company opening could not be loaded right now, so launch cannot continue yet."
+                  snapshot={setup_snapshot_from_formation(nil)}
+                  facts={[
+                    %{
+                      icon: "hero-identification",
+                      title: "Chosen identity",
+                      copy: "A ready name becomes the company identity."
+                    },
+                    %{
+                      icon: "hero-credit-card",
+                      title: "Payments active",
+                      copy: "Billing must already be on."
+                    },
+                    %{
+                      icon: "hero-building-office-2",
+                      title: "Hosted launch",
+                      copy: "Regents opens the company for you."
+                    }
+                  ]}
+                  next_steps={[
+                    %{
+                      number: 4,
+                      title: "Launch progress",
+                      copy: "You move to live progress after opening."
+                    }
+                  ]}
+                  blocker_copy="Company opening is unavailable right now."
+                  action_label="Back to billing"
+                  action_path={~p"/app/billing"}
+                  action_copy="Return to the previous step, then come back here when company opening is available again."
+                />
+              <% !RuntimeConfig.agent_formation_enabled?() -> %>
+                <.setup_blocked_stage
+                  step={4}
+                  title="Company opening is not available yet"
+                  summary="The token and staking routes are live first. Hosted company opening will return after the launch service is ready."
+                  snapshot={setup_snapshot_from_formation(@formation_data)}
+                  facts={[
+                    %{
+                      icon: "hero-currency-dollar",
+                      title: "$REGENT staking",
+                      copy: "Stake, claim, and review the current rail from the token page."
+                    },
+                    %{
+                      icon: "hero-identification",
+                      title: "Identity stays saved",
+                      copy: "Your sign-in, wallet, avatar, and claimed names remain available."
+                    },
+                    %{
+                      icon: "hero-building-office-2",
+                      title: "Company opening next",
+                      copy: "Hosted companies will open when the launch service is ready."
+                    }
+                  ]}
+                  next_steps={[
+                    %{
+                      number: 4,
+                      title: "Use staking now",
+                      copy: "Open the token page to use the live staking route."
+                    }
+                  ]}
+                  blocker_copy="Hosted company opening is not available right now."
+                  action_label="Open company"
+                  action_path={~p"/app/formation"}
+                  action_copy="Company opening is coming soon. $REGENT staking is live on the token page."
+                  action_disabled={true}
+                  action_title="Coming soon"
+                  readiness={Map.get(@formation_data || %{}, :readiness)}
+                />
+              <% formation_stage_ready?(@formation_data) -> %>
+                <.formation_stage
+                  formation={@formation_data}
+                  selected_claimed_label={@selected_claimed_label}
+                  setup_form={setup_form(@selected_claimed_label)}
+                />
+              <% true -> %>
+                <.setup_blocked_stage
+                  step={4}
+                  title="Open company"
+                  summary="Company opening becomes available once access, identity, and billing are all ready."
+                  snapshot={setup_snapshot_from_formation(@formation_data)}
+                  facts={[
+                    %{
+                      icon: "hero-identification",
+                      title: "Chosen identity",
+                      copy: "A ready name becomes the company identity."
+                    },
+                    %{
+                      icon: "hero-credit-card",
+                      title: "Payments active",
+                      copy: "Billing must already be on."
+                    },
+                    %{
+                      icon: "hero-building-office-2",
+                      title: "Hosted launch",
+                      copy: "Regents opens the company for you."
+                    }
+                  ]}
+                  next_steps={[
+                    %{
+                      number: 4,
+                      title: "Launch progress",
+                      copy: "You move to live progress after opening."
+                    }
+                  ]}
+                  blocker_copy={formation_blocker_copy(@formation_data)}
+                  action_label={formation_next_step_label(@formation_data)}
+                  action_path={formation_next_step_path(@formation_data)}
+                  action_copy="Finish the missing setup step, then come back here to launch the company."
+                  readiness={Map.get(@formation_data, :readiness)}
+                />
+            <% end %>
+          </div>
+
+          <aside :if={@xmtp_room} class="min-w-0 xl:sticky xl:top-24">
+            <CompanyRoomComponents.company_room
+              id="formation-room"
+              form_id="formation-room-form"
+              layout="compact"
+              class="h-full"
+              room={@xmtp_room}
+              form={@xmtp_message_form}
+              eyebrow="Setup room"
+              title="Talk through company setup"
+              description="Join a shared room for setup questions, launch notes, and help from other people preparing companies."
+              empty_title="No one has posted here yet."
+              empty_copy="Join the room, then ask a setup question or share what you are preparing."
+              message_placeholder="Ask a setup question or share an update."
+              moderator_label="Team admin"
             />
-          <% !RuntimeConfig.agent_formation_enabled?() -> %>
-            <.setup_blocked_stage
-              step={4}
-              title="Company opening is not available yet"
-              summary="The token and staking routes are live first. Hosted company opening will return after the launch service is ready."
-              snapshot={setup_snapshot_from_formation(@formation_data)}
-              facts={[
-                %{
-                  icon: "hero-currency-dollar",
-                  title: "$REGENT staking",
-                  copy: "Stake, claim, and review the current rail from the token page."
-                },
-                %{
-                  icon: "hero-identification",
-                  title: "Identity stays saved",
-                  copy: "Your sign-in, wallet, avatar, and claimed names remain available."
-                },
-                %{
-                  icon: "hero-building-office-2",
-                  title: "Company opening next",
-                  copy: "Hosted companies will open when the launch service is ready."
-                }
-              ]}
-              next_steps={[
-                %{
-                  number: 4,
-                  title: "Use staking now",
-                  copy: "Open the token page to use the live staking route."
-                }
-              ]}
-              blocker_copy="Hosted company opening is not available right now."
-              action_label="Open company"
-              action_path={~p"/app/formation"}
-              action_copy="Company opening is coming soon. $REGENT staking is live on the token page."
-              action_disabled={true}
-              action_title="Coming soon"
-              readiness={Map.get(@formation_data || %{}, :readiness)}
-            />
-          <% formation_stage_ready?(@formation_data) -> %>
-            <.formation_stage
-              formation={@formation_data}
-              selected_claimed_label={@selected_claimed_label}
-              setup_form={setup_form(@selected_claimed_label)}
-            />
-          <% true -> %>
-            <.setup_blocked_stage
-              step={4}
-              title="Open company"
-              summary="Company opening becomes available once access, identity, and billing are all ready."
-              snapshot={setup_snapshot_from_formation(@formation_data)}
-              facts={[
-                %{
-                  icon: "hero-identification",
-                  title: "Chosen identity",
-                  copy: "A ready name becomes the company identity."
-                },
-                %{
-                  icon: "hero-credit-card",
-                  title: "Payments active",
-                  copy: "Billing must already be on."
-                },
-                %{
-                  icon: "hero-building-office-2",
-                  title: "Hosted launch",
-                  copy: "Regents opens the company for you."
-                }
-              ]}
-              next_steps={[
-                %{
-                  number: 4,
-                  title: "Launch progress",
-                  copy: "You move to live progress after opening."
-                }
-              ]}
-              blocker_copy={formation_blocker_copy(@formation_data)}
-              action_label={formation_next_step_label(@formation_data)}
-              action_path={formation_next_step_path(@formation_data)}
-              action_copy="Finish the missing setup step, then come back here to launch the company."
-              readiness={Map.get(@formation_data, :readiness)}
-            />
-        <% end %>
+          </aside>
+        </div>
       </div>
     </Layouts.app>
     """

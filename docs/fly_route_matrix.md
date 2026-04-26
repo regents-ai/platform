@@ -74,8 +74,6 @@ This matrix is for the Platform Phoenix Fly app (`platform-phx`). It is based on
 | `GET /api/agent-platform/templates` | Keep | Lists company templates. | Needed by formation UI. | Public read. |
 | `GET /api/agent-platform/resolve` | Keep | Resolves platform identity/company inputs. | Needed by public app flows. | Validate inputs and cache where safe. |
 | `GET /api/agent-platform/agents/:slug/feed` | Keep | Public company feed. | Needed by company pages. | Must expose public events only. |
-| `GET /api/regent/staking` | Keep | Regent staking overview. | Needed by token/staking pages. | Public read; cache short-lived data. |
-| `GET /api/regent/staking/account/:address` | Keep | Wallet staking view. | Needed when a user inspects a wallet. | Public chain data only; validate address. |
 | `POST /api/agent-platform/stripe/webhooks` | Keep | Receives Stripe billing events. | Required for billing status and credits. | Stripe signature verification required; keep unauthenticated otherwise. |
 
 ## Human Session APIs
@@ -106,14 +104,6 @@ This matrix is for the Platform Phoenix Fly app (`platform-phx`). It is based on
 | `POST /api/agent-platform/agents/:slug/ens/link/prepare-bidirectional` | Keep, gated | Prepares bidirectional ENS action. | Required for identity setup. | Must enforce ownership. |
 | `POST /api/agent-platform/sprites/:slug/pause` | Keep, gated | Pauses hosted runtime. | Required owner control. | Must enforce ownership and log action. |
 | `POST /api/agent-platform/sprites/:slug/resume` | Keep, gated | Resumes hosted runtime. | Required owner control. | Must enforce ownership and log action. |
-| `POST /api/regent/staking/stake` | Keep, gated | Prepares stake transaction. | Required for Regent staking. | Requires human session and CSRF. |
-| `POST /api/regent/staking/unstake` | Keep, gated | Prepares unstake transaction. | Required for Regent staking. | Requires human session and CSRF. |
-| `POST /api/regent/staking/claim-usdc` | Keep, gated | Prepares USDC claim. | Required for Regent staking. | Requires human session and CSRF. |
-| `POST /api/regent/staking/claim-regent` | Keep, gated | Prepares Regent emissions claim. | Required for Regent staking. | Requires human session and CSRF. |
-| `POST /api/regent/staking/claim-and-restake-regent` | Keep, gated | Prepares claim-and-restake. | Required for Regent staking. | Requires human session and CSRF. |
-| `POST /api/regent/staking/deposit-usdc/prepare` | Keep, operator-gated | Prepares treasury USDC deposit. | Needed for operator funding. | Requires a signed-in wallet listed in `REGENT_STAKING_OPERATOR_WALLETS`. |
-| `POST /api/regent/staking/withdraw-treasury/prepare` | Keep, operator-gated | Prepares treasury withdrawal. | Needed for treasury operations. | Requires a signed-in wallet listed in `REGENT_STAKING_OPERATOR_WALLETS`. |
-
 ## Signed-Agent APIs
 
 | Route | Decision | What it does | Why it is necessary | Security notes |
@@ -121,6 +111,13 @@ This matrix is for the Platform Phoenix Fly app (`platform-phx`). It is based on
 | `POST /api/agentbook/sessions` | Keep, gated | Agent creates human trust session. | Required for AgentBook. | Requires shared SIWA. |
 | `GET /api/agentbook/sessions/:id` | Keep, gated | Agent reads trust session status. | Required for AgentBook. | Requires shared SIWA and session ownership. |
 | `GET /api/agentbook/lookup` | Keep, gated | Agent reads completed trust status. | Required for AgentBook. | Requires shared SIWA. |
+| `GET /v1/agent/regent/staking` | Keep, gated | Reads Regent staking totals for the signed Agent account. | Required for CLI staking. | Requires shared SIWA. |
+| `GET /v1/agent/regent/staking/account/:address` | Keep, gated | Reads Regent staking state for one wallet. | Required for CLI account inspection. | Requires shared SIWA and address validation. |
+| `POST /v1/agent/regent/staking/stake` | Keep, gated | Prepares a stake transaction. | Required for CLI staking. | Requires shared SIWA. |
+| `POST /v1/agent/regent/staking/unstake` | Keep, gated | Prepares an unstake transaction. | Required for CLI staking. | Requires shared SIWA. |
+| `POST /v1/agent/regent/staking/claim-usdc` | Keep, gated | Prepares a USDC claim transaction. | Required for CLI staking. | Requires shared SIWA. |
+| `POST /v1/agent/regent/staking/claim-regent` | Keep, gated | Prepares a REGENT claim transaction. | Required for CLI staking. | Requires shared SIWA. |
+| `POST /v1/agent/regent/staking/claim-and-restake-regent` | Keep, gated | Prepares a claim-and-restake transaction. | Required for CLI staking. | Requires shared SIWA. |
 | `POST /v1/agent/bug-report` | Keep, gated | Agent-authenticated bug report. | Required for CLI/agent reports. | Requires shared SIWA. |
 | `POST /v1/agent/security-report` | Keep, gated | Agent-authenticated security report. | Required for vuln intake from agents. | Requires shared SIWA. |
 | `POST /api/agent-platform/ens/prepare-primary` | Keep, gated | Agent prepares primary ENS action. | Needed for agent-side ENS work. | Requires shared SIWA. |

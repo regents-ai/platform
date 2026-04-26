@@ -207,9 +207,12 @@ Before public beta, confirm the Fly app has these values set through Fly secrets
 - `REGENT_STAKING_RPC_URL`
 - `REGENT_STAKING_CHAIN_ID`
 - `REGENT_STAKING_CHAIN_LABEL`
-- `REGENT_REVENUE_STAKING_ADDRESS`
+- `REGENT_STAKING_CONTRACT_ADDRESS`
+- `SIWA_SERVER_BASE_URL`
 - `STRIPE_WEBHOOK_SECRET` when billing webhooks are enabled
 - Privy, SIWA, Stripe, Dragonfly, Sprite, OpenSea, and RPC values for the enabled surfaces
+
+For the current release path, `REGENT_STAKING_CONTRACT_ADDRESS` is the `contractAddress` printed by the Base mainnet Regent staking deploy. Autolaunch uses that same address under its own env name, `REGENT_REVENUE_STAKING_ADDRESS`.
 
 Keep company opening disabled unless the hosted-company checklist in [`docs/release-phase-tracker.md`](docs/release-phase-tracker.md) is green.
 

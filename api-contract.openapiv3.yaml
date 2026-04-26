@@ -768,21 +768,25 @@ paths:
           $ref: '#/components/responses/StatusMessage400'
         '401':
           $ref: '#/components/responses/StatusMessage401'
-  /api/regent/staking:
+  /v1/agent/regent/staking:
     get:
-      operationId: regentStakingOverview
+      operationId: getAgentRegentStakingOverview
+      security: [{ AgentSiwaHeaders: [] }]
       responses:
         '200':
-          description: Shared Regent staking overview for the public token page
+          description: Regent staking overview for the signed Agent account
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/RegentStakingOverviewResponse'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
         '503':
           $ref: '#/components/responses/StatusMessage503'
-  /api/regent/staking/account/{address}:
+  /v1/agent/regent/staking/account/{address}:
     get:
-      operationId: regentStakingAccount
+      operationId: getAgentRegentStakingAccount
+      security: [{ AgentSiwaHeaders: [] }]
       parameters:
         - name: address
           in: path
@@ -791,19 +795,21 @@ paths:
             type: string
       responses:
         '200':
-          description: Shared Regent staking overview scoped to one wallet
+          description: Regent staking overview scoped to one wallet
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/RegentStakingAccountResponse'
         '400':
           $ref: '#/components/responses/StatusMessage400'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
         '503':
           $ref: '#/components/responses/StatusMessage503'
-  /api/regent/staking/stake:
+  /v1/agent/regent/staking/stake:
     post:
-      operationId: regentStakingStake
-      security: [{ PrivySessionCookie: [] }]
+      operationId: stakeAgentRegent
+      security: [{ AgentSiwaHeaders: [] }]
       requestBody:
         required: true
         content:
@@ -823,10 +829,10 @@ paths:
           $ref: '#/components/responses/StatusMessage401'
         '503':
           $ref: '#/components/responses/StatusMessage503'
-  /api/regent/staking/unstake:
+  /v1/agent/regent/staking/unstake:
     post:
-      operationId: regentStakingUnstake
-      security: [{ PrivySessionCookie: [] }]
+      operationId: unstakeAgentRegent
+      security: [{ AgentSiwaHeaders: [] }]
       requestBody:
         required: true
         content:
@@ -846,10 +852,10 @@ paths:
           $ref: '#/components/responses/StatusMessage401'
         '503':
           $ref: '#/components/responses/StatusMessage503'
-  /api/regent/staking/claim-usdc:
+  /v1/agent/regent/staking/claim-usdc:
     post:
-      operationId: regentStakingClaimUsdc
-      security: [{ PrivySessionCookie: [] }]
+      operationId: claimAgentRegentStakingUsdc
+      security: [{ AgentSiwaHeaders: [] }]
       responses:
         '200':
           description: Prepared wallet action for claiming USDC rewards
@@ -863,10 +869,10 @@ paths:
           $ref: '#/components/responses/StatusMessage401'
         '503':
           $ref: '#/components/responses/StatusMessage503'
-  /api/regent/staking/claim-regent:
+  /v1/agent/regent/staking/claim-regent:
     post:
-      operationId: regentStakingClaimRegent
-      security: [{ PrivySessionCookie: [] }]
+      operationId: claimAgentRegentStakingRegent
+      security: [{ AgentSiwaHeaders: [] }]
       responses:
         '200':
           description: Prepared wallet action for claiming REGENT rewards
@@ -880,10 +886,10 @@ paths:
           $ref: '#/components/responses/StatusMessage401'
         '503':
           $ref: '#/components/responses/StatusMessage503'
-  /api/regent/staking/claim-and-restake-regent:
+  /v1/agent/regent/staking/claim-and-restake-regent:
     post:
-      operationId: regentStakingClaimAndRestakeRegent
-      security: [{ PrivySessionCookie: [] }]
+      operationId: claimAndRestakeAgentRegentStakingRegent
+      security: [{ AgentSiwaHeaders: [] }]
       responses:
         '200':
           description: Prepared wallet action for claiming and restaking REGENT rewards
@@ -895,56 +901,6 @@ paths:
           $ref: '#/components/responses/StatusMessage400'
         '401':
           $ref: '#/components/responses/StatusMessage401'
-        '503':
-          $ref: '#/components/responses/StatusMessage503'
-  /api/regent/staking/deposit-usdc/prepare:
-    post:
-      operationId: regentStakingPrepareDepositUsdc
-      security: [{ PrivySessionCookie: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RegentStakingDepositRequest'
-      responses:
-        '200':
-          description: Prepared multisig payload for treasury USDC deposit
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RegentStakingPrepareResponse'
-        '400':
-          $ref: '#/components/responses/StatusMessage400'
-        '401':
-          $ref: '#/components/responses/StatusMessage401'
-        '403':
-          $ref: '#/components/responses/StatusMessage403'
-        '503':
-          $ref: '#/components/responses/StatusMessage503'
-  /api/regent/staking/withdraw-treasury/prepare:
-    post:
-      operationId: regentStakingPrepareWithdrawTreasury
-      security: [{ PrivySessionCookie: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RegentStakingWithdrawRequest'
-      responses:
-        '200':
-          description: Prepared multisig payload for treasury withdrawal
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RegentStakingPrepareResponse'
-        '400':
-          $ref: '#/components/responses/StatusMessage400'
-        '401':
-          $ref: '#/components/responses/StatusMessage401'
-        '403':
-          $ref: '#/components/responses/StatusMessage403'
         '503':
           $ref: '#/components/responses/StatusMessage503'
   /api/agent-platform/formation:
@@ -2343,20 +2299,6 @@ components:
       required: [amount]
       properties:
         amount: {type: string}
-    RegentStakingDepositRequest:
-      allOf:
-        - $ref: '#/components/schemas/RegentStakingAmountRequest'
-        - type: object
-          required: [source_tag, source_ref]
-          properties:
-            source_tag: {type: string}
-            source_ref: {type: string}
-    RegentStakingWithdrawRequest:
-      allOf:
-        - $ref: '#/components/schemas/RegentStakingAmountRequest'
-        - type: object
-          properties:
-            recipient: {type: string}
     RegentStakingTxRequest:
       type: object
       required: [chain_id, to, value, data]
@@ -2430,27 +2372,6 @@ components:
             wallet_address: {type: string}
         tx_request:
           $ref: '#/components/schemas/RegentStakingTxRequest'
-    RegentStakingPreparedAction:
-      type: object
-      required: [resource, action, chain_id, target, calldata, params, tx_request]
-      properties:
-        resource: {type: string}
-        action: {type: string}
-        chain_id: {type: integer}
-        target: {type: string}
-        calldata: {type: string}
-        params:
-          type: object
-          additionalProperties: {type: string}
-        tx_request:
-          $ref: '#/components/schemas/RegentStakingTxRequest'
-    RegentStakingPrepareResponse:
-      type: object
-      required: [ok, prepared]
-      properties:
-        ok: {type: boolean}
-        prepared:
-          $ref: '#/components/schemas/RegentStakingPreparedAction'
     WelcomeCredit:
       type: object
       required: [status, amount_usd_cents, credit_scope, granted_at, expires_at, stripe_sync_status]

@@ -25,14 +25,9 @@ Routes:
 
 These are useful internal design surfaces, but they are not needed for the production app. They are no longer mounted by the release router.
 
-### Resolved: Regent treasury prepare routes require an operator wallet
+### Resolved: Public Regent staking uses signed Agent account routes
 
-Routes:
-
-- `POST /api/regent/staking/deposit-usdc/prepare`
-- `POST /api/regent/staking/withdraw-treasury/prepare`
-
-These routes are under the browser session API, so write methods require CSRF. They now also require the signed-in wallet to appear in `REGENT_STAKING_OPERATOR_WALLETS`.
+Regent staking is exposed to the CLI and agent clients through `/v1/agent/regent/staking...` with signed Agent account authentication. The old browser-session staking routes are no longer part of the public route surface.
 
 ### Resolved: Public write and expensive read routes are rate-limited
 

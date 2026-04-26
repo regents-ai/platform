@@ -142,6 +142,62 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
     assert response["statusMessage"] == "Too many requests. Try again shortly."
   end
 
+  test "public report rate limit ignores spoofed fly client ip headers on direct requests" do
+    Enum.each(1..12, fn index ->
+      response =
+        build_conn()
+        |> put_remote_ip({203, 0, 113, 10})
+        |> put_req_header("fly-client-ip", "198.51.100.#{index}")
+        |> post("/api/bug-report", %{
+          "summary" => "report #{index}",
+          "details" => "details"
+        })
+        |> json_response(200)
+
+      assert response["ok"] == true
+    end)
+
+    response =
+      build_conn()
+      |> put_remote_ip({203, 0, 113, 10})
+      |> put_req_header("fly-client-ip", "198.51.100.250")
+      |> post("/api/bug-report", %{
+        "summary" => "report 13",
+        "details" => "details"
+      })
+      |> json_response(429)
+
+    assert response["statusMessage"] == "Too many requests. Try again shortly."
+  end
+
+  test "public report rate limit ignores spoofed forwarded for headers on direct requests" do
+    Enum.each(1..12, fn index ->
+      response =
+        build_conn()
+        |> put_remote_ip({203, 0, 113, 11})
+        |> put_req_header("x-forwarded-for", "198.51.100.#{index}")
+        |> post("/api/bug-report", %{
+          "summary" => "report #{index}",
+          "details" => "details"
+        })
+        |> json_response(200)
+
+      assert response["ok"] == true
+    end)
+
+    response =
+      build_conn()
+      |> put_remote_ip({203, 0, 113, 11})
+      |> put_req_header("x-forwarded-for", "198.51.100.250")
+      |> post("/api/bug-report", %{
+        "summary" => "report 13",
+        "details" => "details"
+      })
+      |> json_response(429)
+
+    assert response["statusMessage"] == "Too many requests. Try again shortly."
+  end
+
   test "signed agent bug route stores the verified agent identity", %{conn: conn} do
     body =
       Jason.encode!(%{"summary" => "signed route", "details" => "keeps verified identity only"})
@@ -253,4 +309,6 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
 
     "sha-256=:#{digest}:"
   end
+
+  defp put_remote_ip(conn, remote_ip), do: %{conn | remote_ip: remote_ip}
 end

@@ -169,6 +169,7 @@ commands:
                   type: string
   - name: regents platform auth login
     summary: Sign in to the Regent website from the terminal and save the session for later platform commands.
+    availability: current
     auth:
       mode: privy-identity-token
     transport:
@@ -211,6 +212,7 @@ commands:
             $ref: '#/components/schemas/CurrentHumanProfile'
   - name: regents platform auth status
     summary: Show who is signed in through the saved platform session.
+    availability: current
     auth:
       mode: session-file
     transport:
@@ -241,6 +243,7 @@ commands:
             $ref: '#/components/schemas/CurrentHumanProfile'
   - name: regents platform auth logout
     summary: Delete the saved platform session and sign out from platform commands.
+    availability: current
     auth:
       mode: session-file
     transport:
@@ -269,6 +272,7 @@ commands:
           sessionFile: {type: string}
   - name: regents agentbook register
     summary: Start a hosted human-backed trust flow for the saved Regent agent identity.
+    availability: current
     auth:
       mode: agent-siwa
     transport:
@@ -291,6 +295,7 @@ commands:
           session: {type: object, additionalProperties: true}
   - name: regents agentbook sessions watch
     summary: Poll one hosted human-backed trust session for the saved Regent agent identity.
+    availability: current
     auth:
       mode: agent-siwa
     transport:
@@ -317,6 +322,7 @@ commands:
           session: {type: object, additionalProperties: true}
   - name: regents agentbook lookup
     summary: Show the saved human-backed trust summary for the current Regent agent identity.
+    availability: current
     auth:
       mode: agent-siwa
     transport:
@@ -334,6 +340,7 @@ commands:
           result: {type: object, additionalProperties: true}
   - name: regents platform formation status
     summary: Show launch readiness from the saved session, including claimed names, billing, and owned companies.
+    availability: current
     auth:
       mode: session-file
     transport:
@@ -363,6 +370,7 @@ commands:
             $ref: '#/components/schemas/AgentFormationResponse'
   - name: regents platform billing account
     summary: Show the billing account tied to the saved platform session.
+    availability: current
     auth:
       mode: session-file
     transport:
@@ -397,6 +405,7 @@ commands:
                 $ref: '#/components/schemas/BillingAccount'
   - name: regents platform billing usage
     summary: Show shared runtime credit and company usage from the saved platform session.
+    availability: current
     auth:
       mode: session-file
     transport:
@@ -431,11 +440,11 @@ commands:
                 $ref: '#/components/schemas/BillingUsageSummary'
   - name: regents platform billing setup
     summary: Open billing setup for the saved platform account.
+    availability: beta_disabled
     auth:
       mode: session-file
     transport:
-      kind: http-cookie-session
-      operationIds: [agentPlatformBillingSetupCheckout]
+      kind: beta-disabled
     args: []
     flags:
       - name: --claimed-label
@@ -454,27 +463,14 @@ commands:
     output:
       format: json
       schema:
-        type: object
-        required: [ok, command, origin, checkout]
-        properties:
-          ok: {type: boolean}
-          command: {type: string}
-          origin: {type: string}
-          checkout:
-            type: object
-            required: [ok, checkout_url, billing_account]
-            properties:
-              ok: {type: boolean}
-              checkout_url: {type: string}
-              billing_account:
-                $ref: '#/components/schemas/BillingAccount'
+        $ref: '#/components/schemas/BetaUnavailableCommandResponse'
   - name: regents platform billing topup
     summary: Open runtime credit checkout for the saved platform account.
+    availability: beta_disabled
     auth:
       mode: session-file
     transport:
-      kind: http-cookie-session
-      operationIds: [agentPlatformBillingTopupCheckout]
+      kind: beta-disabled
     args: []
     flags:
       - name: --amount-usd-cents
@@ -493,27 +489,14 @@ commands:
     output:
       format: json
       schema:
-        type: object
-        required: [ok, command, origin, checkout]
-        properties:
-          ok: {type: boolean}
-          command: {type: string}
-          origin: {type: string}
-          checkout:
-            type: object
-            required: [ok, checkout_url, billing_account]
-            properties:
-              ok: {type: boolean}
-              checkout_url: {type: string}
-              billing_account:
-                $ref: '#/components/schemas/BillingAccount'
+        $ref: '#/components/schemas/BetaUnavailableCommandResponse'
   - name: regents platform company create
     summary: Launch a company for one claimed name from the saved platform account.
+    availability: beta_disabled
     auth:
       mode: session-file
     transport:
-      kind: http-cookie-session
-      operationIds: [agentPlatformFormationCreateCompany]
+      kind: beta-disabled
     args: []
     flags:
       - name: --claimed-label
@@ -532,23 +515,10 @@ commands:
     output:
       format: json
       schema:
-        type: object
-        required: [ok, command, origin, company]
-        properties:
-          ok: {type: boolean}
-          command: {type: string}
-          origin: {type: string}
-          company:
-            type: object
-            required: [ok, agent, formation]
-            properties:
-              ok: {type: boolean}
-              agent:
-                $ref: '#/components/schemas/AgentRecord'
-              formation:
-                $ref: '#/components/schemas/AgentFormation'
+        $ref: '#/components/schemas/BetaUnavailableCommandResponse'
   - name: regents platform company runtime
     summary: Show runtime state for one owned company from the saved platform session.
+    availability: current
     auth:
       mode: session-file
     transport:
@@ -582,11 +552,11 @@ commands:
             $ref: '#/components/schemas/AgentRuntimeResponse'
   - name: regents platform sprite pause
     summary: Pause one owned company runtime from the saved platform session.
+    availability: beta_disabled
     auth:
       mode: session-file
     transport:
-      kind: http-cookie-session
-      operationIds: [agentPlatformPauseSprite]
+      kind: beta-disabled
     args: []
     flags:
       - name: --slug
@@ -605,26 +575,14 @@ commands:
     output:
       format: json
       schema:
-        type: object
-        required: [ok, command, origin, sprite]
-        properties:
-          ok: {type: boolean}
-          command: {type: string}
-          origin: {type: string}
-          sprite:
-            type: object
-            required: [ok, sprite]
-            properties:
-              ok: {type: boolean}
-              sprite:
-                $ref: '#/components/schemas/SpriteRuntimeControl'
+        $ref: '#/components/schemas/BetaUnavailableCommandResponse'
   - name: regents platform sprite resume
     summary: Resume one owned company runtime from the saved platform session.
+    availability: beta_disabled
     auth:
       mode: session-file
     transport:
-      kind: http-cookie-session
-      operationIds: [agentPlatformResumeSprite]
+      kind: beta-disabled
     args: []
     flags:
       - name: --slug
@@ -643,24 +601,22 @@ commands:
     output:
       format: json
       schema:
-        type: object
-        required: [ok, command, origin, sprite]
-        properties:
-          ok: {type: boolean}
-          command: {type: string}
-          origin: {type: string}
-          sprite:
-            type: object
-            required: [ok, sprite]
-            properties:
-              ok: {type: boolean}
-              sprite:
-                $ref: '#/components/schemas/SpriteRuntimeControl'
-              billing_account:
-                $ref: '#/components/schemas/BillingAccount'
+        $ref: '#/components/schemas/BetaUnavailableCommandResponse'
 
 components:
   schemas:
+    BetaUnavailableCommandResponse:
+      type: object
+      required: [ok, command, status, statusMessage]
+      properties:
+        ok:
+          type: boolean
+          const: false
+        command: {type: string}
+        status:
+          type: string
+          const: unavailable
+        statusMessage: {type: string}
     PrivySessionCsrf:
       type: object
       required: [ok, csrf_token]
@@ -670,7 +626,7 @@ components:
     PrivySessionRequest:
       type: object
       properties:
-        displayName: {type: [string, 'null']}
+        display_name: {type: [string, 'null']}
     ClaimedName:
       type: object
       required: [label, fqdn, claimed_at, in_use]

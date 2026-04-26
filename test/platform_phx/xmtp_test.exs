@@ -26,6 +26,27 @@ defmodule PlatformPhx.XmtpTest do
     assert owner_panel.connected_wallet == String.downcase(human.wallet_address)
   end
 
+  test "formation room is a 200 seat human room" do
+    human = insert_human!("0xabc0000000000000000000000000000000000002")
+    room_key = Xmtp.formation_room_key()
+    Xmtp.reset_for_test!(room_key)
+
+    on_exit(fn ->
+      Xmtp.reset_for_test!(room_key)
+    end)
+
+    assert {:ok, room_info} = Xmtp.bootstrap_formation_room!(reuse: true)
+    assert room_info.room_key == room_key
+
+    assert {:ok, panel} = Xmtp.formation_room_panel(human)
+    assert panel.room_key == room_key
+    assert panel.room_name == "Formation Room"
+    assert panel.seat_count == 200
+    assert panel.seats_remaining == 200
+    assert panel.can_join? == true
+    assert panel.can_send? == false
+  end
+
   defp insert_human!(wallet_address) do
     %HumanUser{}
     |> HumanUser.changeset(%{

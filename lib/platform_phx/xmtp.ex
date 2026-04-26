@@ -7,10 +7,12 @@ defmodule PlatformPhx.Xmtp do
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.Repo
+  alias PlatformPhx.RuntimeConfig
   alias Xmtp.Principal
 
   @manager __MODULE__.Manager
   @shared_agent_room_key "platform_agents"
+  @formation_room_key "formation:company-opening"
 
   def child_spec(opts \\ []) do
     Xmtp.child_spec(
@@ -24,12 +26,14 @@ defmodule PlatformPhx.Xmtp do
   end
 
   def rooms do
-    shared_room_definitions() ++ company_room_definitions()
+    shared_room_definitions() ++ formation_room_definitions() ++ company_room_definitions()
   end
 
   def default_room_key do
     @shared_agent_room_key
   end
+
+  def formation_room_key, do: @formation_room_key
 
   def topic(room_key \\ default_room_key()), do: Xmtp.topic(@manager, room_key)
 
@@ -98,6 +102,14 @@ defmodule PlatformPhx.Xmtp do
     Xmtp.bootstrap_room!(@manager, room_key, opts)
   end
 
+  def formation_room_panel(principal, claims \\ %{}) do
+    room_panel(principal, @formation_room_key, claims)
+  end
+
+  def bootstrap_formation_room!(opts \\ []) do
+    bootstrap_room!(Keyword.merge([reuse: true, room_key: @formation_room_key], opts))
+  end
+
   def company_room_key(%Agent{slug: slug}), do: company_room_key(slug)
 
   def company_room_key(slug) when is_binary(slug) do
@@ -163,6 +175,26 @@ defmodule PlatformPhx.Xmtp do
     |> Application.get_env(__MODULE__, [])
     |> Keyword.get(:rooms, [])
     |> Enum.filter(&(&1[:key] == @shared_agent_room_key))
+  end
+
+  defp formation_room_definitions do
+    [
+      %{
+        key: @formation_room_key,
+        name: "Formation Room",
+        description: "Shared room for people preparing company launches.",
+        app_data: "platform-formation-room",
+        agent_private_key: agent_room_private_key(),
+        moderator_wallets: RuntimeConfig.regent_staking_operator_wallets(),
+        capacity: 200,
+        presence_timeout_ms: :timer.minutes(2),
+        presence_check_interval_ms: :timer.seconds(30),
+        policy_options: %{
+          allowed_kinds: [:human],
+          required_claims: %{}
+        }
+      }
+    ]
   end
 
   defp company_room_definitions do
