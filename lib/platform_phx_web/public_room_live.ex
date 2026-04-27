@@ -35,20 +35,13 @@ defmodule PlatformPhxWeb.PublicRoomLive do
   def handle_join(socket, room_key) when is_binary(room_key) do
     case Xmtp.request_join(socket.assigns[:current_human], room_key, %{}) do
       {:ok, panel} ->
-        {:noreply, assign(socket, :xmtp_room, Map.put(panel, :status_override, nil))}
+        reply_with_panel(socket, panel)
 
       {:needs_signature, %{request_id: request_id, signature_text: signature_text, panel: panel}} ->
-        {:noreply,
-         socket
-         |> assign(:xmtp_room, Map.put(panel, :status_override, nil))
-         |> Phoenix.LiveView.push_event("xmtp:sign-request", %{
-           request_id: request_id,
-           signature_text: signature_text,
-           wallet_address: panel.connected_wallet
-         })}
+        reply_with_signature_request(socket, panel, request_id, signature_text)
 
       {:error, reason} ->
-        {:noreply, put_status(socket, CompanyRoomSupport.reason_message(reason))}
+        reply_with_error(socket, reason)
     end
   end
 
@@ -63,11 +56,8 @@ defmodule PlatformPhxWeb.PublicRoomLive do
            room_key,
            %{}
          ) do
-      {:ok, panel} ->
-        {:noreply, assign(socket, :xmtp_room, Map.put(panel, :status_override, nil))}
-
-      {:error, reason} ->
-        {:noreply, put_status(socket, CompanyRoomSupport.reason_message(reason))}
+      {:ok, panel} -> reply_with_panel(socket, panel)
+      {:error, reason} -> reply_with_error(socket, reason)
     end
   end
 
@@ -76,17 +66,8 @@ defmodule PlatformPhxWeb.PublicRoomLive do
 
   def handle_send(socket, room_key, body) when is_binary(room_key) do
     case Xmtp.send_message(socket.assigns[:current_human], body, room_key) do
-      {:ok, panel} ->
-        {:noreply,
-         socket
-         |> assign(:xmtp_room, Map.put(panel, :status_override, nil))
-         |> assign_message_form()}
-
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> assign_message_form(body)
-         |> put_status(CompanyRoomSupport.reason_message(reason))}
+      {:ok, panel} -> reply_with_panel(socket, panel, reset_form?: true)
+      {:error, reason} -> reply_with_error(socket, reason, message_body: body)
     end
   end
 
@@ -94,11 +75,8 @@ defmodule PlatformPhxWeb.PublicRoomLive do
 
   def handle_delete_message(socket, room_key, message_id) when is_binary(room_key) do
     case Xmtp.moderator_delete_message(socket.assigns[:current_human], message_id, room_key) do
-      {:ok, panel} ->
-        {:noreply, assign(socket, :xmtp_room, Map.put(panel, :status_override, nil))}
-
-      {:error, reason} ->
-        {:noreply, put_status(socket, CompanyRoomSupport.reason_message(reason))}
+      {:ok, panel} -> reply_with_panel(socket, panel)
+      {:error, reason} -> reply_with_error(socket, reason)
     end
   end
 
@@ -106,11 +84,8 @@ defmodule PlatformPhxWeb.PublicRoomLive do
 
   def handle_kick_user(socket, room_key, target) when is_binary(room_key) do
     case Xmtp.kick_user(socket.assigns[:current_human], target, room_key) do
-      {:ok, panel} ->
-        {:noreply, assign(socket, :xmtp_room, Map.put(panel, :status_override, nil))}
-
-      {:error, reason} ->
-        {:noreply, put_status(socket, CompanyRoomSupport.reason_message(reason))}
+      {:ok, panel} -> reply_with_panel(socket, panel)
+      {:error, reason} -> reply_with_error(socket, reason)
     end
   end
 
@@ -122,4 +97,41 @@ defmodule PlatformPhxWeb.PublicRoomLive do
   end
 
   def handle_heartbeat(socket, _room_key), do: {:noreply, socket}
+
+  defp reply_with_panel(socket, panel, opts \\ []) do
+    socket =
+      socket
+      |> assign_room_panel(panel)
+      |> maybe_reset_message_form(Keyword.get(opts, :reset_form?, false))
+
+    {:noreply, socket}
+  end
+
+  defp reply_with_signature_request(socket, panel, request_id, signature_text) do
+    {:noreply,
+     socket
+     |> assign_room_panel(panel)
+     |> Phoenix.LiveView.push_event("xmtp:sign-request", %{
+       request_id: request_id,
+       signature_text: signature_text,
+       wallet_address: panel.connected_wallet
+     })}
+  end
+
+  defp reply_with_error(socket, reason, opts \\ []) do
+    socket =
+      case Keyword.fetch(opts, :message_body) do
+        {:ok, body} -> assign_message_form(socket, body)
+        :error -> socket
+      end
+
+    {:noreply, put_status(socket, CompanyRoomSupport.reason_message(reason))}
+  end
+
+  defp assign_room_panel(socket, panel) do
+    assign(socket, :xmtp_room, Map.put(panel, :status_override, nil))
+  end
+
+  defp maybe_reset_message_form(socket, true), do: assign_message_form(socket)
+  defp maybe_reset_message_form(socket, false), do: socket
 end

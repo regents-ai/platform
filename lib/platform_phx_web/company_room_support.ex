@@ -13,8 +13,6 @@ defmodule PlatformPhxWeb.CompanyRoomSupport do
   end
 
   def load_public_room_panel(room_key, current_human) when is_binary(room_key) do
-    _ = safe_bootstrap(room_key)
-
     case Xmtp.room_panel(current_human, room_key, %{}) do
       {:ok, panel} -> Map.put(panel, :status_override, nil)
       {:error, _reason} -> nil
@@ -68,19 +66,4 @@ defmodule PlatformPhxWeb.CompanyRoomSupport do
 
   def reason_message(_reason),
     do: "This room is unavailable right now."
-
-  def safe_bootstrap(%Agent{} = agent) do
-    agent
-    |> Xmtp.company_room_key()
-    |> safe_bootstrap()
-  end
-
-  def safe_bootstrap(room_key) when is_binary(room_key) do
-    case Xmtp.bootstrap_room!(room_key: room_key, reuse: true) do
-      {:ok, _room} -> :ok
-      {:error, _reason} -> :error
-    end
-  rescue
-    _error -> :error
-  end
 end

@@ -5,6 +5,7 @@ defmodule PlatformPhx.XmtpTest do
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.Repo
   alias PlatformPhx.Xmtp
+  alias PlatformPhxWeb.CompanyRoomSupport
   alias Elixir.Xmtp.Room, as: XmtpRoom
 
   test "company rooms keep the Regent room agent as owner while the company owner is moderator" do
@@ -45,6 +46,47 @@ defmodule PlatformPhx.XmtpTest do
     assert panel.seats_remaining == 200
     assert panel.can_join? == true
     assert panel.can_send? == false
+  end
+
+  test "room reads do not bootstrap company rooms" do
+    human = insert_human!("0xabc0000000000000000000000000000000000003")
+    agent = insert_agent!(human, "read-only-room")
+    room_key = Xmtp.company_room_key(agent)
+
+    refute Repo.get_by(XmtpRoom, room_key: room_key)
+
+    assert %{room_key: ^room_key, room_id: nil, ready?: false} =
+             CompanyRoomSupport.load_public_room_panel(room_key, human)
+
+    refute Repo.get_by(XmtpRoom, room_key: room_key)
+  end
+
+  test "room sync bootstraps current company room definitions" do
+    human = insert_human!("0xabc0000000000000000000000000000000000004")
+    agent = insert_agent!(human, "synced-room")
+    room_key = Xmtp.company_room_key(agent)
+
+    on_exit(fn ->
+      Xmtp.reset_for_test!(room_key)
+    end)
+
+    room_definition =
+      Enum.find(Xmtp.rooms(), fn
+        %{key: ^room_key} -> true
+        _room -> false
+      end)
+
+    results = Xmtp.bootstrap_current_rooms(rooms: [room_definition])
+
+    assert Enum.any?(results, fn
+             %{room_key: result_room_key, result: {:ok, %{room_key: info_room_key}}} ->
+               result_room_key == room_key and info_room_key == room_key
+
+             _result ->
+               false
+           end)
+
+    assert Repo.get_by(XmtpRoom, room_key: room_key)
   end
 
   defp insert_human!(wallet_address) do

@@ -355,6 +355,8 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     agent = insert_public_agent!(human, "owner-room")
     room_key = PlatformPhx.Xmtp.company_room_key(agent)
 
+    assert {:ok, _room_info} = PlatformPhx.Xmtp.bootstrap_company_room!(agent, reuse: true)
+
     on_exit(fn ->
       PlatformPhx.Xmtp.reset_for_test!(room_key)
     end)

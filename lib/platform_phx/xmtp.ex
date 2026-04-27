@@ -9,12 +9,75 @@ defmodule PlatformPhx.Xmtp do
   alias PlatformPhx.Repo
   alias PlatformPhx.RuntimeConfig
   alias Xmtp.Principal
+  alias Xmtp.Room, as: XmtpRoom
 
   @manager __MODULE__.Manager
+  @supervisor __MODULE__.Supervisor
   @shared_agent_room_key "platform_agents"
   @formation_room_key "formation:company-opening"
+  @room_bootstrap_interval_ms :timer.minutes(1)
 
   def child_spec(opts \\ []) do
+    children = [
+      xmtp_manager_child_spec(opts),
+      {__MODULE__.RoomBootstrapper, room_bootstrapper_opts(opts)}
+    ]
+
+    %{
+      id: @supervisor,
+      start: {Supervisor, :start_link, [children, [strategy: :one_for_one, name: @supervisor]]}
+    }
+  end
+
+  defp xmtp_manager_child_spec(opts) do
+    opts
+    |> Keyword.drop([:room_bootstrap_interval_ms, :room_bootstrap_auto_sync?])
+    |> manager_child_spec()
+  end
+
+  defp room_bootstrapper_opts(opts) do
+    [
+      interval_ms: Keyword.get(opts, :room_bootstrap_interval_ms, @room_bootstrap_interval_ms),
+      auto_sync?: Keyword.get(opts, :room_bootstrap_auto_sync?, room_bootstrap_auto_sync?())
+    ]
+  end
+
+  defp room_bootstrap_auto_sync? do
+    PlatformPhx.Repo.config()[:pool] != Ecto.Adapters.SQL.Sandbox
+  end
+
+  def bootstrap_current_rooms(opts \\ []) do
+    opts
+    |> Keyword.get(:rooms, rooms())
+    |> Enum.reject(&room_bootstrapped?/1)
+    |> Enum.map(&bootstrap_room_definition/1)
+  end
+
+  def sync_room_bootstrapper(timeout \\ :timer.seconds(30)) do
+    __MODULE__.RoomBootstrapper.sync_now(timeout)
+  end
+
+  defp bootstrap_room_definition(room_definition) do
+    room_key = room_definition_key(room_definition)
+
+    %{
+      room_key: room_key,
+      result: bootstrap_room!(room_key: room_key, reuse: true)
+    }
+  end
+
+  defp room_bootstrapped?(room_definition) do
+    room_key = room_definition_key(room_definition)
+
+    XmtpRoom
+    |> where([room], room.room_key == ^room_key)
+    |> Repo.exists?()
+  end
+
+  defp room_definition_key(%{key: room_key}), do: room_key
+  defp room_definition_key(room_definition), do: Keyword.fetch!(room_definition, :key)
+
+  defp manager_child_spec(opts) do
     Xmtp.child_spec(
       Keyword.merge(opts,
         name: @manager,
@@ -150,6 +213,8 @@ defmodule PlatformPhx.Xmtp do
   defp normalize_target(target) when is_binary(target), do: target
   defp normalize_target(target), do: normalize_principal(target)
 
+  defp normalize_principal(%Principal{} = principal), do: Principal.from(principal)
+
   defp normalize_principal(%HumanUser{} = human) do
     Principal.human(%{
       id: human.id,
@@ -167,7 +232,6 @@ defmodule PlatformPhx.Xmtp do
     })
   end
 
-  defp normalize_principal(%{} = attrs), do: Principal.from(attrs)
   defp normalize_principal(nil), do: nil
 
   defp shared_room_definitions do
