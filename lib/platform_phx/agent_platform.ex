@@ -3,7 +3,6 @@ defmodule PlatformPhx.AgentPlatform do
 
   import Ecto.Query, warn: false
 
-  alias PlatformPhx.Accounts
   alias PlatformPhx.Accounts.AvatarSelection
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.Agentbook
@@ -14,6 +13,7 @@ defmodule PlatformPhx.AgentPlatform do
   alias PlatformPhx.AgentPlatform.Connection
   alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.AgentPlatform.LlmUsageEvent
+  alias PlatformPhx.AgentPlatform.Profiles
   alias PlatformPhx.AgentPlatform.WorkspaceBootstrap
   alias PlatformPhx.AgentPlatform.Service
   alias PlatformPhx.AgentPlatform.SpriteUsageRecord
@@ -26,6 +26,7 @@ defmodule PlatformPhx.AgentPlatform do
 
   @default_sprite_owner "regents"
   @default_hermes_model "glm-5.1"
+  @public_cache_ttl_seconds 60
 
   @type error_reason ::
           {:bad_request, String.t()}
@@ -131,6 +132,16 @@ defmodule PlatformPhx.AgentPlatform do
   def get_agent_by_host(_host), do: nil
 
   def resolve_host_payload(host) when is_binary(host) do
+    cache_key = public_cache_key(:resolve_host, normalize_host(host))
+
+    RegentCache.fetch(:platform_phx, cache_key, @public_cache_ttl_seconds, fn ->
+      resolve_host_payload_uncached(host)
+    end)
+  end
+
+  def resolve_host_payload(_host), do: {:error, {:bad_request, "Invalid host"}}
+
+  defp resolve_host_payload_uncached(host) do
     case CompanyProfiles.by_host(host) do
       %{agent: %Agent{} = agent, host: resolved_host} ->
         {:ok, %{ok: true, host: resolved_host, agent: serialize_agent(agent, :public)}}
@@ -140,9 +151,20 @@ defmodule PlatformPhx.AgentPlatform do
     end
   end
 
-  def resolve_host_payload(_host), do: {:error, {:bad_request, "Invalid host"}}
-
   def feed_payload(slug) when is_binary(slug) do
+    normalized_slug = normalize_slug(slug)
+    cache_key = public_cache_key(:feed, normalized_slug)
+
+    RegentCache.fetch(:platform_phx, cache_key, @public_cache_ttl_seconds, fn ->
+      feed_payload_uncached(normalized_slug)
+    end)
+  end
+
+  def feed_payload(_slug), do: {:error, {:bad_request, "Invalid agent slug"}}
+
+  defp feed_payload_uncached(nil), do: {:error, {:bad_request, "Invalid agent slug"}}
+
+  defp feed_payload_uncached(slug) do
     case CompanyProfiles.by_slug(slug) do
       %{agent: %Agent{} = agent} ->
         {:ok,
@@ -160,7 +182,30 @@ defmodule PlatformPhx.AgentPlatform do
     end
   end
 
-  def feed_payload(_slug), do: {:error, {:bad_request, "Invalid agent slug"}}
+  def clear_public_agent_cache(%Agent{} = agent) do
+    hostname =
+      case agent.subdomain do
+        %Subdomain{hostname: hostname} when is_binary(hostname) -> hostname
+        _ -> nil
+      end
+
+    keys =
+      [
+        public_cache_key(:feed, agent.slug),
+        hostname && public_cache_key(:resolve_host, hostname)
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    _ = RegentCache.delete(:platform_phx, keys)
+    :ok
+  end
+
+  def clear_public_agent_cache(slug) when is_binary(slug) do
+    _ = RegentCache.delete(:platform_phx, public_cache_key(:feed, normalize_slug(slug)))
+    :ok
+  end
+
+  def clear_public_agent_cache(_agent), do: :ok
 
   def claimed_names_for_human(%HumanUser{} = human) do
     wallets = linked_wallet_addresses(human)
@@ -219,34 +264,7 @@ defmodule PlatformPhx.AgentPlatform do
 
   def holdings_for_human(_human), do: {:ok, empty_holdings()}
 
-  def save_human_avatar(nil, _attrs),
-    do: {:error, {:unauthorized, "Sign in before saving an avatar"}}
-
-  def save_human_avatar(%HumanUser{} = human, attrs) when is_map(attrs) do
-    with {:ok, holdings} <- avatar_holdings(human, attrs),
-         {:ok, avatar} <- AvatarSelection.normalize(attrs, holdings),
-         {:ok, updated_human} <- Accounts.update_human(human, %{avatar: avatar}) do
-      {:ok, updated_human}
-    else
-      {:error, :unconfigured} ->
-        {:error, {:unavailable, "Avatar saving is unavailable right now"}}
-
-      {:error, {:bad_request, _message}} = error ->
-        error
-
-      {:error, {:external, _service, _message}} ->
-        {:error, {:unavailable, "Could not confirm wallet holdings right now"}}
-
-      {:error, message} when is_binary(message) ->
-        {:error, {:bad_request, message}}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:error, {:bad_request, format_changeset(changeset)}}
-
-      {:error, _reason} ->
-        {:error, {:bad_request, "Could not save that avatar"}}
-    end
-  end
+  defdelegate save_human_avatar(human, attrs), to: Profiles
 
   def eligible_holdings?(holdings) when is_map(holdings) do
     Enum.any?(["animata1", "animata2", "animataPass"], fn key ->
@@ -560,6 +578,14 @@ defmodule PlatformPhx.AgentPlatform do
 
   def normalize_slug(_value), do: nil
 
+  def normalize_host(value) when is_binary(value) do
+    value
+    |> String.downcase()
+    |> String.trim()
+  end
+
+  def normalize_host(_value), do: nil
+
   def iso(nil), do: nil
   def iso(%DateTime{} = value), do: DateTime.to_iso8601(value)
 
@@ -627,6 +653,14 @@ defmodule PlatformPhx.AgentPlatform do
     |> List.wrap()
     |> Enum.filter(&(&1.visibility == "public"))
     |> Enum.map(&serialize_artifact(agent, &1))
+  end
+
+  defp public_cache_key(kind, value) when is_binary(value) do
+    "platform:agent-platform:public:#{kind}:#{value}:v1"
+  end
+
+  defp public_cache_key(kind, _value) do
+    "platform:agent-platform:public:#{kind}:invalid:v1"
   end
 
   defp public_artifact_url(%Agent{slug: slug}, url) when is_binary(url) do
@@ -737,7 +771,7 @@ defmodule PlatformPhx.AgentPlatform do
     %{status: agent.checkpoint_status}
   end
 
-  defp empty_holdings do
+  def empty_holdings do
     %{
       "animata1" => [],
       "animata2" => [],
@@ -773,14 +807,6 @@ defmodule PlatformPhx.AgentPlatform do
   defp agent_avatar(_agent), do: nil
 
   defp serialize_avatar(avatar), do: AvatarSelection.serialize(avatar)
-
-  defp avatar_holdings(%HumanUser{} = human, attrs) do
-    if AvatarSelection.collection_token_selection?(attrs) do
-      holdings_for_human(human)
-    else
-      {:ok, empty_holdings()}
-    end
-  end
 
   defp formation_from_agent(%Agent{formation_run: %FormationRun{} = formation}), do: formation
   defp formation_from_agent(_agent), do: nil

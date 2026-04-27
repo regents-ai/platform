@@ -8,6 +8,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.BillingAccount
+  alias PlatformPhx.AgentPlatform.BillingLedgerEntry
   alias PlatformPhx.AgentPlatform.FormationProgress
   alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.Basenames.Mint
@@ -162,6 +163,28 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     assert html =~ "Next: open the company."
   end
 
+  test "billing page shows failed credit status in plain English", %{conn: conn} do
+    human = insert_human!("active")
+    account = insert_billing_account!(human, 900)
+    insert_failed_billing_entry!(account)
+    insert_claimed_name!(human, "billing-issue")
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "7"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    {:ok, _billing, html} =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> live("/app/billing?claimedLabel=billing-issue")
+
+    assert html =~ "Billing credit needs attention"
+    assert html =~ "Check billing before relying on that balance."
+  end
+
   test "dashboard route renders a safe no-company state for anonymous visitors", %{conn: conn} do
     {:ok, _dashboard, html} = live(conn, "/app/dashboard")
 
@@ -258,6 +281,8 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     on_exit(fn ->
       PlatformPhx.Xmtp.reset_for_test!(room_key)
     end)
+
+    assert {:ok, _room_info} = PlatformPhx.Xmtp.bootstrap_formation_room!(reuse: true)
 
     human = insert_human!("active")
     insert_billing_account!(human, 900)
@@ -547,6 +572,20 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       stripe_pricing_plan_subscription_id: "sub_#{unique_suffix}",
       billing_status: "active",
       runtime_credit_balance_usd_cents: balance_cents
+    })
+    |> Repo.insert!()
+  end
+
+  defp insert_failed_billing_entry!(account) do
+    %BillingLedgerEntry{}
+    |> BillingLedgerEntry.changeset(%{
+      billing_account_id: account.id,
+      entry_type: "topup",
+      amount_usd_cents: 500,
+      source_ref: "failed-topup-#{System.unique_integer([:positive])}",
+      effective_at: DateTime.utc_now() |> DateTime.truncate(:second),
+      stripe_sync_status: "failed",
+      stripe_sync_attempt_count: 1
     })
     |> Repo.insert!()
   end

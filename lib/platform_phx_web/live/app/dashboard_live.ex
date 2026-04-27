@@ -8,6 +8,7 @@ defmodule PlatformPhxWeb.App.DashboardLive do
   alias PlatformPhx.Dashboard
   alias PlatformPhx.RuntimeConfig
   import PlatformPhxWeb.AppComponents
+  import PlatformPhxWeb.AppComponents.SetupPresenter, only: [setup_snapshot_from_formation: 1]
 
   @impl true
   def mount(_params, _session, socket) do

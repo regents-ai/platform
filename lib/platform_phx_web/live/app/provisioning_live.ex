@@ -4,6 +4,7 @@ defmodule PlatformPhxWeb.App.ProvisioningLive do
   alias PlatformPhx.AgentPlatform.FormationProgress
   alias PlatformPhx.Dashboard
   import PlatformPhxWeb.AppComponents
+  import PlatformPhxWeb.AppComponents.SetupPresenter, only: [setup_snapshot_from_formation: 1]
 
   @impl true
   def mount(%{"id" => formation_id}, _session, socket) do

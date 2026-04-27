@@ -4,6 +4,7 @@ defmodule PlatformPhx.Dashboard do
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Formation
+  alias PlatformPhx.AgentPlatform.Issues
   alias PlatformPhx.Basenames
   alias PlatformPhx.OpenSea
   alias PlatformPhx.TokenCardManifest
@@ -133,13 +134,19 @@ defmodule PlatformPhx.Dashboard do
   def agent_formation_payload(human) do
     case Formation.formation_payload(human) do
       {:ok, payload} ->
-        {:ok, %{formation: map_formation_payload(payload), notice: nil}}
+        {:ok,
+         %{
+           formation: map_formation_payload(payload),
+           notice: nil,
+           notices: issue_notices(human)
+         }}
 
       {:error, _reason} ->
         {:ok,
          %{
            formation: nil,
-           notice: %{tone: :error, message: "Agent Formation is unavailable right now."}
+           notice: %{tone: :error, message: "Agent Formation is unavailable right now."},
+           notices: issue_notices(human)
          }}
     end
   end
@@ -151,7 +158,7 @@ defmodule PlatformPhx.Dashboard do
     {usage, usage_notice} = dashboard_usage(human)
 
     notices =
-      [formation.notice, holdings_notice, usage_notice]
+      [formation.notice, holdings_notice, usage_notice | issue_notices(human)]
       |> Enum.reject(&is_nil/1)
 
     {:ok,
@@ -334,6 +341,12 @@ defmodule PlatformPhx.Dashboard do
         {empty_dashboard_holdings(),
          %{tone: :error, message: "Wallet holdings are unavailable right now."}}
     end
+  end
+
+  defp issue_notices(human) do
+    human
+    |> Issues.for_human()
+    |> Enum.map(&Issues.to_notice/1)
   end
 
   defp empty_usage do

@@ -4,6 +4,7 @@ defmodule PlatformPhx.AgentPlatform.RuntimeControl do
   import Ecto.Query, warn: false
 
   alias PlatformPhx.AgentPlatform.Agent
+  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.SpriteAudit
   alias PlatformPhx.AgentPlatform.SpriteRuntimeClient
@@ -38,6 +39,7 @@ defmodule PlatformPhx.AgentPlatform.RuntimeControl do
            end),
          :ok <- audit_succeeded(updated, "pause_runtime", opts) do
       {:ok, updated}
+      |> tap(fn _result -> AgentPlatform.clear_public_agent_cache(updated) end)
     else
       {:error, {:external, :sprite, _message} = reason} = error ->
         audit_failed(agent, "pause_runtime", opts, reason)
@@ -67,6 +69,7 @@ defmodule PlatformPhx.AgentPlatform.RuntimeControl do
            end),
          :ok <- audit_succeeded(updated, "resume_runtime", opts) do
       {:ok, updated}
+      |> tap(fn _result -> AgentPlatform.clear_public_agent_cache(updated) end)
     else
       {:error, {:external, :sprite, _message} = reason} = error ->
         audit_failed(agent, "resume_runtime", opts, reason)
@@ -182,9 +185,13 @@ defmodule PlatformPhx.AgentPlatform.RuntimeControl do
   defp mark_runtime_failure(agent_id, {:external, :sprite, _message}) do
     case Repo.get(Agent, agent_id) do
       %Agent{} = agent ->
-        agent
-        |> Agent.changeset(%{runtime_status: "failed", runtime_last_checked_at: now()})
-        |> Repo.update()
+        result =
+          agent
+          |> Agent.changeset(%{runtime_status: "failed", runtime_last_checked_at: now()})
+          |> Repo.update()
+
+        AgentPlatform.clear_public_agent_cache(agent)
+        result
 
       nil ->
         :ok

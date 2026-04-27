@@ -1,5 +1,5 @@
 defmodule PlatformPhx.AgentPlatform.ResolveHostPayloadTest do
-  use PlatformPhx.DataCase, async: true
+  use PlatformPhx.DataCase, async: false
 
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform
@@ -9,6 +9,23 @@ defmodule PlatformPhx.AgentPlatform.ResolveHostPayloadTest do
   alias PlatformPhx.Repo
 
   @address "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+
+  setup do
+    previous_dragonfly_enabled = Application.get_env(:platform_phx, :dragonfly_enabled)
+    previous_dragonfly_name = Application.get_env(:platform_phx, :dragonfly_name)
+
+    previous_dragonfly_command_module =
+      Application.get_env(:platform_phx, :dragonfly_command_module)
+
+    on_exit(fn ->
+      restore_app_env(:platform_phx, :dragonfly_enabled, previous_dragonfly_enabled)
+      restore_app_env(:platform_phx, :dragonfly_name, previous_dragonfly_name)
+      restore_app_env(:platform_phx, :dragonfly_command_module, previous_dragonfly_command_module)
+      Process.delete(:dragonfly_values)
+    end)
+
+    :ok
+  end
 
   test "paused companies still keep their public Regent hostnames" do
     insert_public_agent!("paused-host",
@@ -36,6 +53,28 @@ defmodule PlatformPhx.AgentPlatform.ResolveHostPayloadTest do
     assert slug_agent.id == host_agent.id
     assert slug_agent.slug == "shared-profile"
     assert host_agent.slug == "shared-profile"
+  end
+
+  test "public resolve payload uses Dragonfly and can be cleared after writes" do
+    configure_fake_cache(%{})
+    agent = insert_public_agent!("cached-profile", name: "Cached Profile")
+
+    assert {:ok, %{agent: %{public_summary: "Public profile test"}}} =
+             AgentPlatform.resolve_host_payload("cached-profile.regents.sh")
+
+    agent
+    |> Agent.changeset(%{public_summary: "Updated profile"})
+    |> Repo.update!()
+
+    assert {:ok, %{agent: %{public_summary: "Public profile test"}}} =
+             AgentPlatform.resolve_host_payload("cached-profile.regents.sh")
+
+    agent
+    |> Repo.preload(:subdomain)
+    |> AgentPlatform.clear_public_agent_cache()
+
+    assert {:ok, %{agent: %{public_summary: "Updated profile"}}} =
+             AgentPlatform.resolve_host_payload("cached-profile.regents.sh")
   end
 
   defp insert_public_agent!(slug, attrs) do
@@ -80,5 +119,35 @@ defmodule PlatformPhx.AgentPlatform.ResolveHostPayloadTest do
     |> Repo.insert!()
 
     agent
+  end
+
+  defp configure_fake_cache(values) do
+    Application.put_env(:platform_phx, :dragonfly_enabled, true)
+    Application.put_env(:platform_phx, :dragonfly_name, self())
+    Application.put_env(:platform_phx, :dragonfly_command_module, __MODULE__.FakeRedix)
+    Process.put(:dragonfly_values, values)
+  end
+
+  defp restore_app_env(app, key, nil), do: Application.delete_env(app, key)
+  defp restore_app_env(app, key, value), do: Application.put_env(app, key, value)
+
+  defmodule FakeRedix do
+    def command(_owner, ["GET", key]) do
+      {:ok, Map.get(Process.get(:dragonfly_values, %{}), key)}
+    end
+
+    def command(_owner, ["SET", key, value, "EX", _ttl]) do
+      values = Process.get(:dragonfly_values, %{})
+      Process.put(:dragonfly_values, Map.put(values, key, value))
+      {:ok, "OK"}
+    end
+
+    def command(_owner, ["DEL" | keys]) do
+      values = Process.get(:dragonfly_values, %{})
+      Process.put(:dragonfly_values, Map.drop(values, keys))
+      {:ok, length(keys)}
+    end
+
+    def command(_owner, ["PING"]), do: {:ok, "PONG"}
   end
 end

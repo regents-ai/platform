@@ -8,6 +8,7 @@ defmodule PlatformPhxWeb.App.FormationLive do
   alias PlatformPhxWeb.CompanyRoomComponents
   alias PlatformPhxWeb.PublicRoomLive
   import PlatformPhxWeb.AppComponents
+  import PlatformPhxWeb.AppComponents.SetupPresenter, only: [setup_snapshot_from_formation: 1]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -18,6 +19,7 @@ defmodule PlatformPhxWeb.App.FormationLive do
      socket
      |> assign(:page_title, "Open company")
      |> assign(:formation_data, nil)
+     |> assign(:status_notices, [])
      |> assign(:selected_claimed_label, nil)
      |> assign(:requested_claimed_label, nil)
      |> load_formation_payload()
@@ -133,6 +135,10 @@ defmodule PlatformPhxWeb.App.FormationLive do
         class="pp-route-shell rg-regent-theme-platform"
         phx-hook="DashboardReveal"
       >
+        <div :if={@status_notices != []} class="mb-5 space-y-3">
+          <.inline_notice :for={notice <- @status_notices} notice={notice} />
+        </div>
+
         <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(21rem,24rem)] xl:items-start">
           <div class="min-w-0">
             <%= cond do %>
@@ -282,6 +288,7 @@ defmodule PlatformPhxWeb.App.FormationLive do
 
     socket
     |> assign(:formation_data, result.formation)
+    |> assign(:status_notices, Map.get(result, :notices, []))
     |> sync_selected_claim()
   end
 

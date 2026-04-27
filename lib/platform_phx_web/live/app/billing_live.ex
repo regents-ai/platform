@@ -5,6 +5,7 @@ defmodule PlatformPhxWeb.App.BillingLive do
   alias PlatformPhx.AgentPlatform.Formation
   alias PlatformPhx.RuntimeConfig
   import PlatformPhxWeb.AppComponents
+  import PlatformPhxWeb.AppComponents.SetupPresenter, only: [setup_snapshot_from_formation: 1]
 
   @refresh_ms 2_500
 
@@ -15,6 +16,7 @@ defmodule PlatformPhxWeb.App.BillingLive do
      |> assign(:page_title, "Add billing")
      |> assign(:formation_data, nil)
      |> assign(:billing_notice, nil)
+     |> assign(:status_notices, [])
      |> assign(:selected_claimed_label, nil)
      |> assign(:requested_claimed_label, nil)
      |> assign(:billing_return_state, nil)
@@ -78,6 +80,10 @@ defmodule PlatformPhxWeb.App.BillingLive do
         class="pp-route-shell rg-regent-theme-platform"
         phx-hook="DashboardReveal"
       >
+        <div :if={@status_notices != []} class="mb-5 space-y-3">
+          <.inline_notice :for={notice <- @status_notices} notice={notice} />
+        </div>
+
         <%= cond do %>
           <% @formation_data == nil -> %>
             <.setup_blocked_stage
@@ -210,6 +216,7 @@ defmodule PlatformPhxWeb.App.BillingLive do
     socket =
       socket
       |> assign(:formation_data, result.formation)
+      |> assign(:status_notices, Map.get(result, :notices, []))
       |> sync_selected_claim()
 
     if connected?(socket) and awaiting_billing_ready?(socket) do
