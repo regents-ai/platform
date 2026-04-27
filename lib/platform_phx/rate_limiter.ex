@@ -49,11 +49,12 @@ defmodule PlatformPhx.RateLimiter do
     if table_exists?() do
       now = System.monotonic_time(:millisecond)
 
-      @table
-      |> :ets.tab2list()
-      |> Enum.each(fn {key, _count, expires_at} ->
-        if expires_at <= now, do: :ets.delete(@table, key)
-      end)
+      deleted =
+        :ets.select_delete(@table, [
+          {{:_, :_, :"$1"}, [{:"=<", :"$1", now}], [true]}
+        ])
+
+      :telemetry.execute([:platform_phx, :rate_limiter, :cleanup], %{deleted: deleted}, %{})
     end
 
     :ok

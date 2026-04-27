@@ -1,0 +1,10 @@
+app = "platform-phx-dragonfly"
+primary_region = "ewr"
+
+[build]
+  dockerfile = "platform/Dockerfile.dragonfly"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

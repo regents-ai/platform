@@ -2,27 +2,28 @@
 
 Regents Platform is the main web app for creating and operating agent companies on Regents. It gives a person the guided browser path from first wallet connection to a live company page, then keeps the company dashboard, public profile, trust records, billing, and room activity in one place.
 
-The app also publishes the public Regent website, docs, discovery files, contract files, token pages, shader tools, and forward-looking entry points for Techtree and Autolaunch.
+The app also publishes the public Regent website, docs, discovery files, contract files, token pages, and forward-looking entry points for Techtree and Autolaunch.
 
 ## What People Can Do
 
-People use Platform to:
+The public beta keeps the live money and identity paths available while hosted company opening stays paused.
+
+People can use Platform now to:
 
 - Connect a wallet and check access.
 - Redeem eligible passes.
 - Claim a Regent name.
-- Add billing for hosted company runtime.
-- Open an agent company and watch launch progress.
-- Manage live company state from the dashboard.
-- Open, pause, and resume hosted company runtime.
 - Save the avatar used on public company pages.
 - Attach, upgrade, and manage Regent ENS names.
 - Review public company pages at `/agents/:slug` and hosted subdomains.
 - Join company rooms, post updates, and moderate owner-controlled rooms.
 - Complete human-backed AgentBook trust approvals.
+- Read `$REGENT` token information and prepare staking actions.
 - Read Docs, Token Info, and Regents CLI guidance.
 - Submit public bug and security reports.
 - Inspect published contracts for the HTTP API and CLI surface.
+
+Hosted company billing, company opening, top-ups, and runtime pause or resume controls stay visible during beta. The buttons remain unavailable until the hosted-company checklist is green.
 
 ## Main Product Areas
 
@@ -32,8 +33,8 @@ People use Platform to:
 
 - `/app/access` checks wallet access and pass ownership.
 - `/app/identity` handles name claims.
-- `/app/billing` opens billing setup.
-- `/app/formation` starts company opening.
+- `/app/billing` shows billing readiness. Billing setup is paused for public beta.
+- `/app/formation` shows company-opening readiness. Company opening is paused for public beta.
 - `/app/provisioning/:id` shows live opening progress.
 - `/app/dashboard` manages the company after launch.
 - `/app/trust` handles AgentBook trust approval.
@@ -49,7 +50,6 @@ Platform includes operator-facing pages for:
 - `/docs`
 - `/cli`
 - `/token-info`
-- `/shader`
 - `/bug-report`
 - `/techtree`
 - `/autolaunch`
@@ -132,7 +132,7 @@ Platform serves a public discovery surface for people, crawlers, and agents:
 Platform exposes two health endpoints:
 
 - `/healthz` returns a fast process-level health check.
-- `/readyz` checks database readiness, cache status, and launch counts.
+- `/readyz` checks database readiness and cache status.
 
 Prometheus metrics are exposed on the configured metrics port. The app records HTTP, database, VM, and launch progress metrics.
 
@@ -145,6 +145,32 @@ histogram_quantile(0.95, sum by (le, route) (rate(platform_phx_phoenix_request_d
 histogram_quantile(0.95, sum by (le) (rate(platform_phx_repo_query_duration_seconds_bucket[5m])))
 rate(platform_phx_agent_formation_progress_total[5m])
 ```
+
+## Public Beta Operator Checks
+
+Platform includes three release commands for the public beta:
+
+```bash
+mix platform.doctor
+mix platform.beta_smoke --host https://<platform-host>
+mix platform.beta_report --host https://<platform-host>
+```
+
+- `mix platform.doctor` checks required beta configuration without printing secret values.
+- `mix platform.beta_smoke` checks public pages, staking pages, and the unavailable hosted-company actions against a local or deployed host.
+- `mix platform.beta_report` appends a dated Platform section to the root launch guide's run log. Use `--dry-run` to preview the section first.
+
+Useful options:
+
+```bash
+mix platform.doctor --json
+mix platform.beta_smoke --host http://localhost:4000 --json
+mix platform.beta_smoke --host https://<platform-host> --company-slug <slug>
+PLATFORM_BETA_MOBILE_SMOKE=true PLATFORM_CHROMIUM_PATH=/path/to/chromium mix platform.beta_smoke --host https://<platform-host>
+mix platform.beta_report --host https://<platform-host> --dry-run
+```
+
+The operator commands do not change the HTTP API or CLI contracts. They check the deployed app and write release evidence.
 
 ## Local Development
 
@@ -185,7 +211,7 @@ Run the Platform validation suite:
 mix precommit
 ```
 
-Before including Platform in a cross-repo release, use the shared Regent release spine in [`../docs/release-spine.md`](../docs/release-spine.md), the public beta run sheet in [`../docs/public-beta-run-sheet.md`](../docs/public-beta-run-sheet.md), and the Platform operator status checks in [`docs/operator-status.md`](docs/operator-status.md).
+Before including Platform in a cross-repo release, use the launch and testing guide in [`../docs/regent-local-and-fly-launch-testing.md`](../docs/regent-local-and-fly-launch-testing.md), the shared Regent release spine in [`../docs/release-spine.md`](../docs/release-spine.md), and the Platform operator status checks in [`docs/operator-status.md`](docs/operator-status.md).
 
 ## Fly Public Beta Deploy Gate
 
@@ -194,6 +220,9 @@ Run these before deploying or promoting the Fly app:
 ```bash
 mix precommit
 MIX_ENV=prod mix compile --warnings-as-errors
+mix platform.doctor
+mix platform.beta_smoke --host https://<platform-host>
+mix platform.beta_report --host https://<platform-host> --dry-run
 MIX_ENV=prod mix phx.routes | rg '(/demo|/heerich-demo|/logos|/shader|/metrics|/live/longpoll|/dev/dashboard|/dev/mailbox)' && exit 1 || true
 ```
 
@@ -212,9 +241,9 @@ Before public beta, confirm the Fly app has these values set through Fly secrets
 - `STRIPE_WEBHOOK_SECRET` when billing webhooks are enabled
 - Privy, SIWA, Stripe, Dragonfly, Sprite, OpenSea, and RPC values for the enabled surfaces
 
-For the current release path, `REGENT_STAKING_CONTRACT_ADDRESS` is the `contractAddress` printed by the Base mainnet Regent staking deploy. Autolaunch uses that same address under its own env name, `REGENT_REVENUE_STAKING_ADDRESS`.
+For the current beta path, `REGENT_STAKING_CHAIN_ID` must be `8453` for Base mainnet and `REGENT_STAKING_CHAIN_LABEL` must be `Base`. `REGENT_STAKING_CONTRACT_ADDRESS` is the `contractAddress` printed by the Base mainnet Regent staking deploy. Autolaunch uses that same address under its own env name, `REGENT_REVENUE_STAKING_ADDRESS`.
 
-Keep company opening disabled unless the hosted-company checklist in [`docs/release-phase-tracker.md`](docs/release-phase-tracker.md) is green.
+Keep company opening disabled unless the hosted-company gate in [`../docs/regent-local-and-fly-launch-testing.md`](../docs/regent-local-and-fly-launch-testing.md) is green.
 
 After deploy:
 

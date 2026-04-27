@@ -60,6 +60,7 @@ npm-debug.log
 /assets/node_modules/
 
 # Local environment files for direnv / cutover work.
+.env
 .env.local
 .envrc
 
@@ -71,6 +72,7 @@ shaders/animata/out/
 docs/*_plan.md
 docs/*_notes.md
 docs/*_spec.md
+docs/regent-local-and-fly-launch-testing.md
 /priv/static/images/animata/cards/*-[0-9a-f]*.png
 /layer2.md
 /layer3.md

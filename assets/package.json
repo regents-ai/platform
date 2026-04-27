@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "node --experimental-strip-types --test js/*.test.ts js/dashboard/*.test.ts js/cli/*.test.ts",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "smoke:mobile": "node js/smoke/mobile-smoke.mjs"
   },
   "dependencies": {
     "@privy-io/react-auth": "^3.12.0",

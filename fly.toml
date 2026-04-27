@@ -2,7 +2,7 @@ app = "platform-phx"
 primary_region = "ewr"
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = "platform/Dockerfile"
 
 [deploy]
   release_command = "/app/bin/migrate"

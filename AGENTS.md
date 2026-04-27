@@ -29,9 +29,10 @@ Use this process consistently:
 
 1. Open `/app` and check access.
 2. Redeem passes and claim names when needed.
-3. Add billing, open the company, and follow launch progress.
-4. Use the public company page and company controls after launch.
-5. Use Regents CLI when the work starts on a machine or inside an agent.
+3. During public beta, review billing and company-opening readiness without running the paused actions.
+4. After hosted company opening is enabled, add billing, open the company, and follow launch progress.
+5. Use the public company page and company controls after launch.
+6. Use Regents CLI when the work starts on a machine or inside an agent.
 
 ## Public Discovery Files
 
@@ -43,11 +44,27 @@ Keep the live discovery surface aligned with the docs and contracts:
 - `/agent-skills/regents-cli.md` is the published Regents CLI skill document.
 - `/api-contract.openapiv3.yaml` and `/cli-contract.yaml` are served from the app and must stay in sync with the actual public behavior.
 
-## TODO
+## Public Beta Release Checks
 
-- Break the dashboard browser app into smaller pieces so it stops behaving like a second frontend living inside Phoenix.
-- Move the bug report ledger toward LiveView streams so loading older reports does not keep growing one large in-memory list.
-- Add a clear contract-validation workflow so the OpenAPI file stays the real source of truth and project docs stop looking like stock Phoenix defaults.
+Use these commands before promoting Platform:
+
+```bash
+mix precommit
+MIX_ENV=prod mix compile --warnings-as-errors
+mix platform.doctor
+mix platform.beta_smoke --host https://<platform-host>
+mix platform.beta_report --host https://<platform-host> --dry-run
+```
+
+`mix platform.doctor` checks the beta configuration without printing secret values. `mix platform.beta_smoke` checks signed-out pages, staking pages, and the paused hosted-company actions. `mix platform.beta_report` writes the Platform section for `/Users/sean/Documents/regent/docs/regent-local-and-fly-launch-testing.md`; preview it with `--dry-run` before appending.
+
+Keep `api-contract.openapiv3.yaml` as the source of truth for HTTP behavior and `cli-contract.yaml` as the source of truth for Platform CLI discovery. The operator Mix tasks are release checks, not public API or CLI surface.
+
+## Current Cleanup Targets
+
+- Keep the app and route matrices aligned when a route becomes live, paused, or internal.
+- Keep issue-ledger notices visible on account and operator pages when billing, runtime, room, or formation work needs attention.
+- Keep public company/profile caching explicit: cache expensive reads, and clear the cache after writes that change public company state.
 
 ### Phoenix v1.8 guidelines
 

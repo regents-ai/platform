@@ -4,6 +4,8 @@ This document defines how Platform should explain company and operator state dur
 
 Use it for dashboard text, release review, and future page changes that touch billing, company opening, hosted runtime, reports, public records, or trust approval.
 
+Launch, Fly deploy, and cross-product testing commands live in `/Users/sean/Documents/regent/docs/regent-local-and-fly-launch-testing.md`.
+
 ## Operator Promise
 
 Every Platform operator surface should answer four questions:
@@ -43,6 +45,12 @@ Platform stabilization focuses on:
 
 Each area needs a clear next action or a clear "no action needed" state.
 
+## Internal Issue Ledger
+
+Platform keeps one internal issue ledger for user-visible operational problems. The first version covers billing, runtime usage, top-ups, room setup, launch or provisioning, and formation readiness.
+
+Use the ledger to feed account and operator pages. Do not turn it into a public diagnostics page. Public pages should show the safe next action, not private service details.
+
 ## Release Review
 
 Before Platform is included in a release:
@@ -54,10 +62,12 @@ Before Platform is included in a release:
 - Confirm bug and security reports return a receipt the person can use.
 - Confirm public company pages do not show private setup or billing state.
 - Confirm `/healthz` and `/readyz` match the release expectation.
+- Run `mix platform.doctor`.
+- Run `mix platform.beta_smoke --host https://<platform-host>`.
+- Preview the run sheet entry with `mix platform.beta_report --host https://<platform-host> --dry-run`.
 
 ## Copy Rules
 
 Use customer-facing text that says what the person can do, what happens next, and why it matters.
 
 Avoid explaining how the app is built, how requests move through the system, or how old behavior used to work.
-
