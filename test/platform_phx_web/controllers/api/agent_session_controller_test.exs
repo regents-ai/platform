@@ -112,6 +112,26 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
     assert %{"ok" => true, "session" => nil} = json_response(malformed_conn, 200)
   end
 
+  test "show clears a local agent session minted for another app", %{conn: conn} do
+    wrong_audience_conn =
+      conn
+      |> init_test_session(%{
+        agent_session: %{
+          session_id: "wrong-platform-session",
+          audience: "techtree",
+          wallet_address: @wallet_address,
+          chain_id: @chain_id,
+          registry_address: @registry_address,
+          token_id: @token_id,
+          issued_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+          expires_at: DateTime.utc_now() |> DateTime.add(60, :second) |> DateTime.to_iso8601()
+        }
+      })
+      |> get("/api/auth/agent/session")
+
+    assert %{"ok" => true, "session" => nil} = json_response(wrong_audience_conn, 200)
+  end
+
   test "shared SIWA login can exchange into a local platform session", %{conn: conn} do
     body = "{}"
     csrf_token = Plug.CSRFProtection.get_csrf_token()

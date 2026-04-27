@@ -144,6 +144,64 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
            } = json_response(conn, 200)
   end
 
+  test "unstake returns a wallet tx request", %{conn: conn} do
+    conn =
+      conn
+      |> put_siwa_headers()
+      |> post("/v1/agent/regent/staking/unstake", %{"amount" => "1.5"})
+
+    assert %{
+             "ok" => true,
+             "tx_request" => %{"chain_id" => 8453, "data" => "0x8381e182"}
+           } = json_response(conn, 200)
+  end
+
+  test "claim usdc returns a wallet tx request", %{conn: conn} do
+    conn =
+      conn
+      |> put_siwa_headers()
+      |> post("/v1/agent/regent/staking/claim-usdc", %{})
+
+    assert %{
+             "ok" => true,
+             "tx_request" => %{"chain_id" => 8453, "data" => "0x42852610"}
+           } = json_response(conn, 200)
+  end
+
+  test "claim regent returns a wallet tx request", %{conn: conn} do
+    conn =
+      conn
+      |> put_siwa_headers()
+      |> post("/v1/agent/regent/staking/claim-regent", %{})
+
+    assert %{
+             "ok" => true,
+             "tx_request" => %{"chain_id" => 8453, "data" => "0x739c8d0d"}
+           } = json_response(conn, 200)
+  end
+
+  test "claim and restake regent returns a wallet tx request", %{conn: conn} do
+    conn =
+      conn
+      |> put_siwa_headers()
+      |> post("/v1/agent/regent/staking/claim-and-restake-regent", %{})
+
+    assert %{
+             "ok" => true,
+             "tx_request" => %{"chain_id" => 8453, "data" => "0xe72a8732"}
+           } = json_response(conn, 200)
+  end
+
+  test "stake returns amount validation message", %{conn: conn} do
+    response =
+      conn
+      |> put_siwa_headers()
+      |> post("/v1/agent/regent/staking/stake", %{})
+      |> json_response(400)
+
+    assert response["statusMessage"] == "Enter an amount before continuing"
+  end
+
   test "stake hides unexpected internal errors", %{conn: conn} do
     response =
       conn

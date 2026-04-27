@@ -134,9 +134,9 @@ defmodule PlatformPhxWeb.Api.PrivySessionControllerTest do
       |> init_test_session(%{current_human_id: human.id})
       |> put_csrf_token()
       |> put("/api/auth/privy/profile/avatar", %{
-        kind: "custom_shader",
-        shader_id: "w3dfWN",
-        define_values: %{}
+        "kind" => "custom_shader",
+        "shader_id" => "w3dfWN",
+        "define_values" => %{}
       })
       |> json_response(200)
 

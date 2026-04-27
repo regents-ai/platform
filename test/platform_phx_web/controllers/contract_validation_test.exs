@@ -125,6 +125,29 @@ defmodule PlatformPhxWeb.ContractValidationTest do
     assert MapSet.difference(contract_routes, router_routes) == MapSet.new()
   end
 
+  test "api contract keeps beta response envelopes explicit" do
+    contract = api_contract()
+    schemas = Map.fetch!(contract, "components") |> Map.fetch!("schemas")
+
+    assert_required(schemas, "StatusMessage", ["statusMessage"])
+    assert_required(schemas, "AgentSessionResponse", ["ok", "session"])
+    assert_required(schemas, "AgentbookSessionResponse", ["ok", "session"])
+    assert_required(schemas, "AgentFormationResponse", ["ok", "authenticated", "readiness"])
+    assert_required(schemas, "BillingAccount", ["status", "connected"])
+    assert_required(schemas, "BillingUsageSummary", ["runtime_credit_balance_usd_cents"])
+    assert_required(schemas, "BasenamesAvailability", ["label", "available", "reserved"])
+    assert_required(schemas, "BugReportResponse", ["ok", "message", "report"])
+    assert_required(schemas, "RegentStakingWalletActionResponse", ["ok", "staking", "tx_request"])
+    assert_required(schemas, "RegentStakingTxRequest", ["chain_id", "to", "value", "data"])
+  end
+
+  test "public staking promises only use the canonical signed-agent route" do
+    paths = api_contract() |> Map.fetch!("paths") |> Map.keys() |> MapSet.new()
+
+    assert MapSet.member?(paths, "/v1/agent/regent/staking")
+    refute MapSet.member?(paths, "/api/regent/staking")
+  end
+
   defp api_contract do
     @api_contract_path
     |> File.read!()
@@ -141,7 +164,18 @@ defmodule PlatformPhxWeb.ContractValidationTest do
   defp property_names(_schema), do: MapSet.new()
 
   defp required_fields(%{"required" => required}) when is_list(required), do: MapSet.new(required)
+
+  defp required_fields(%{"required" => required}) when is_binary(required),
+    do: MapSet.new([required])
+
   defp required_fields(_schema), do: MapSet.new()
+
+  defp assert_required(schemas, schema_name, fields) do
+    schema = Map.fetch!(schemas, schema_name)
+
+    assert MapSet.subset?(MapSet.new(fields), required_fields(schema)),
+           "#{schema_name} must require #{Enum.join(fields, ", ")}"
+  end
 
   defp normalize_yaml([document]), do: normalize_yaml(document)
 

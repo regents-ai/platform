@@ -39,10 +39,11 @@ defmodule PlatformPhxWeb.Api.AgentSessionController do
   end
 
   defp build_session(claims) do
-    issued_at = DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+    now = DateTime.utc_now()
+    issued_at = now |> DateTime.truncate(:second) |> DateTime.to_iso8601()
 
     expires_at =
-      DateTime.utc_now()
+      now
       |> DateTime.add(@session_ttl_seconds, :second)
       |> DateTime.truncate(:second)
       |> DateTime.to_iso8601()
@@ -62,38 +63,41 @@ defmodule PlatformPhxWeb.Api.AgentSessionController do
   defp current_session(conn) do
     case get_session(conn, @session_key) do
       %{} = session ->
-        case session_expires_at(session) do
-          {:ok, expires_at} ->
-            if DateTime.compare(DateTime.utc_now(), expires_at) == :lt do
-              {:ok, session}
-            else
-              :expired
-            end
-
-          :missing ->
-            :expired
-
-          :invalid ->
-            :expired
+        with {:ok, audience} <- session_value(session, :audience),
+             true <- audience == @audience,
+             {:ok, expires_at} <- session_expires_at(session),
+             :lt <- DateTime.compare(DateTime.utc_now(), expires_at) do
+          {:ok, session}
+        else
+          _ -> :expired
         end
 
       _ ->
         :missing
     end
-  rescue
-    _ -> :expired
   end
 
   defp session_expires_at(session) when is_map(session) do
-    case Map.get(session, :expires_at) do
-      expires_at when is_binary(expires_at) ->
-        case DateTime.from_iso8601(expires_at) do
-          {:ok, value, _offset} -> {:ok, value}
-          _ -> :invalid
-        end
+    case session_value(session, :expires_at) do
+      {:ok, expires_at} ->
+        parse_session_expiry(expires_at)
 
-      _ ->
-        :missing
+      {:error, :missing} ->
+        {:error, :missing}
+    end
+  end
+
+  defp session_value(session, key) do
+    case Map.get(session, key) do
+      value when is_binary(value) and value != "" -> {:ok, value}
+      _ -> {:error, :missing}
+    end
+  end
+
+  defp parse_session_expiry(expires_at) do
+    case DateTime.from_iso8601(expires_at) do
+      {:ok, value, _offset} -> {:ok, value}
+      _ -> {:error, :invalid}
     end
   end
 end
