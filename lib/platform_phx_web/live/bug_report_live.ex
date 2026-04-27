@@ -2,6 +2,7 @@ defmodule PlatformPhxWeb.BugReportLive do
   use PlatformPhxWeb, :live_view
 
   alias PlatformPhx.OperatorReports
+  alias PlatformPhx.OperatorReports.BugReports
 
   @page_size 50
 
@@ -233,7 +234,7 @@ defmodule PlatformPhxWeb.BugReportLive do
                               "inline-flex items-center rounded-full px-2.5 py-1 text-[0.72rem]",
                               source_badge_classes(report)
                             ]}>
-                              {inferred_source(report)}
+                              {BugReports.source(report)}
                             </span>
                           </div>
                         </div>
@@ -339,7 +340,7 @@ defmodule PlatformPhxWeb.BugReportLive do
                           <div class="grid grid-cols-[7rem_minmax(0,1fr)] gap-2">
                             <dt class="text-[color:var(--muted-foreground)]">Source</dt>
                             <dd class="text-[color:var(--foreground)]">
-                              {inferred_source(@expanded_report)}
+                              {BugReports.source(@expanded_report)}
                             </dd>
                           </div>
                           <div class="grid grid-cols-[7rem_minmax(0,1fr)] gap-2">
@@ -575,7 +576,7 @@ defmodule PlatformPhxWeb.BugReportLive do
   defp report_stats(reports, now) do
     %{
       status_totals: status_totals(reports),
-      source_totals: source_totals(reports),
+      source_totals: BugReports.source_totals(reports),
       reports_today_count: reports_today(reports, now)
     }
   end
@@ -635,24 +636,6 @@ defmodule PlatformPhxWeb.BugReportLive do
     ]
   end
 
-  defp matches_time_window?(_report, "all", _now), do: true
-
-  defp matches_time_window?(report, time_window, now) do
-    seconds =
-      case time_window do
-        "24h" -> 24 * 60 * 60
-        "7d" -> 7 * 24 * 60 * 60
-        "30d" -> 30 * 24 * 60 * 60
-        _ -> nil
-      end
-
-    case {seconds, report.created_at} do
-      {nil, _} -> true
-      {_, nil} -> false
-      {limit, created_at} -> DateTime.diff(now, created_at, :second) <= limit
-    end
-  end
-
   defp reporter_title(report) do
     cond do
       present?(report.reporter_label) ->
@@ -701,39 +684,14 @@ defmodule PlatformPhxWeb.BugReportLive do
     end
   end
 
-  defp inferred_source(report) do
-    text =
-      [
-        report.reporter_label,
-        report.summary,
-        report.details
-      ]
-      |> Enum.filter(&is_binary/1)
-      |> Enum.join(" ")
-      |> String.downcase()
-
-    cond do
-      String.contains?(text, "autolaunch") -> "Autolaunch"
-      String.contains?(text, "cli") -> "CLI"
-      String.contains?(text, "techtree") -> "Techtree"
-      true -> "Website"
-    end
-  end
-
-  defp source_totals(reports) do
-    Enum.reduce(reports, %{}, fn report, totals ->
-      Map.update(totals, inferred_source(report), 1, &(&1 + 1))
-    end)
-  end
-
-  defp source_icon(report) when is_map(report), do: source_icon(inferred_source(report))
+  defp source_icon(report) when is_map(report), do: source_icon(BugReports.source(report))
   defp source_icon("Techtree"), do: "hero-sparkles"
   defp source_icon("Autolaunch"), do: "hero-rocket-launch"
   defp source_icon("CLI"), do: "hero-command-line"
   defp source_icon(_source), do: "hero-globe-alt"
 
   defp source_chip_classes(report) when is_map(report),
-    do: source_chip_classes(inferred_source(report))
+    do: source_chip_classes(BugReports.source(report))
 
   defp source_chip_classes("Techtree"), do: "bg-[linear-gradient(180deg,#1e57d6,#133f9f)]"
   defp source_chip_classes("Autolaunch"), do: "bg-[linear-gradient(180deg,#22b8cf,#16879a)]"
@@ -741,7 +699,7 @@ defmodule PlatformPhxWeb.BugReportLive do
   defp source_chip_classes(_source), do: "bg-[linear-gradient(180deg,#64748b,#475569)]"
 
   defp source_badge_classes(report) do
-    case inferred_source(report) do
+    case BugReports.source(report) do
       "Techtree" -> "bg-[color:rgba(30,87,214,0.1)] text-[color:#1e57d6]"
       "Autolaunch" -> "bg-[color:rgba(34,184,207,0.12)] text-[color:#16879a]"
       "CLI" -> "bg-[color:rgba(15,27,53,0.12)] text-[color:#0f1b35]"
@@ -802,7 +760,7 @@ defmodule PlatformPhxWeb.BugReportLive do
 
   defp reports_today(reports, now) do
     Enum.count(reports, fn report ->
-      match?(true, matches_time_window?(report, "24h", now))
+      BugReports.within_time_window?(report, "24h", now)
     end)
   end
 

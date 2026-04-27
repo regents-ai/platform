@@ -52,8 +52,21 @@ defmodule PlatformPhx.DataCase do
   def errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
       Regex.replace(~r"%{(\w+)}", message, fn _, key ->
-        opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
+        opts |> changeset_error_opt(key) |> to_string()
       end)
+    end)
+  end
+
+  defp changeset_error_opt(opts, key) do
+    Enum.find_value(opts, key, fn
+      {opt_key, value} when is_atom(opt_key) ->
+        if Atom.to_string(opt_key) == key, do: value
+
+      {^key, value} ->
+        value
+
+      _other ->
+        nil
     end)
   end
 end

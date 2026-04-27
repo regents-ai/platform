@@ -200,7 +200,7 @@ defmodule PlatformPhx.Accounts.AvatarSelection do
   end
 
   defp fetch(attrs, key) when is_map(attrs) do
-    Map.get(attrs, key) || Map.get(attrs, existing_atom_key(key))
+    Map.get(attrs, key)
   end
 
   defp normalize_define_values(nil), do: %{}
@@ -241,12 +241,6 @@ defmodule PlatformPhx.Accounts.AvatarSelection do
   end
 
   defp normalize_string(_value), do: nil
-
-  defp existing_atom_key(key) when is_binary(key) do
-    String.to_existing_atom(key)
-  rescue
-    ArgumentError -> nil
-  end
 
   defp tokens_for_collection(holdings, collection) when is_map(holdings) do
     holdings
