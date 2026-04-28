@@ -34,6 +34,8 @@ defmodule PlatformPhx.RuntimeRegistry.SpritesClient do
 
   def create_runtime(attrs), do: client().create_runtime(attrs)
   def get_runtime(runtime_id), do: client().get_runtime(runtime_id)
+  def create_sprite(attrs), do: create_runtime(attrs)
+  def get_sprite(sprite_name), do: get_runtime(sprite_name)
   def exec(runtime_id, attrs), do: client().exec(runtime_id, attrs)
   def create_checkpoint(runtime_id, attrs), do: client().create_checkpoint(runtime_id, attrs)
 
@@ -53,34 +55,34 @@ defmodule PlatformPhx.RuntimeRegistry.SpritesClient do
 
     @impl true
     def list_services(runtime_id) do
-      with {:ok, body} <- request(:get, "/v1/runtimes/#{runtime_id}/services") do
+      with {:ok, body} <- request(:get, "/v1/sprites/#{runtime_id}/services") do
         {:ok, Map.get(body, "services", body) |> List.wrap()}
       end
     end
 
     @impl true
     def get_service(runtime_id, service_name) do
-      request(:get, "/v1/runtimes/#{runtime_id}/services/#{service_name}")
+      request(:get, "/v1/sprites/#{runtime_id}/services/#{service_name}")
     end
 
     @impl true
     def create_service(runtime_id, attrs) do
-      request(:post, "/v1/runtimes/#{runtime_id}/services", json: attrs)
+      request(:post, "/v1/sprites/#{runtime_id}/services", json: attrs)
     end
 
     @impl true
     def start_service(runtime_id, service_name) do
-      request(:post, "/v1/runtimes/#{runtime_id}/services/#{service_name}/start", json: %{})
+      request(:post, "/v1/sprites/#{runtime_id}/services/#{service_name}/start", json: %{})
     end
 
     @impl true
     def stop_service(runtime_id, service_name) do
-      request(:post, "/v1/runtimes/#{runtime_id}/services/#{service_name}/stop", json: %{})
+      request(:post, "/v1/sprites/#{runtime_id}/services/#{service_name}/stop", json: %{})
     end
 
     @impl true
     def service_status(runtime_id, service_name) do
-      request(:get, "/v1/runtimes/#{runtime_id}/services/#{service_name}/status")
+      request(:get, "/v1/sprites/#{runtime_id}/services/#{service_name}")
     end
 
     @impl true
@@ -90,39 +92,43 @@ defmodule PlatformPhx.RuntimeRegistry.SpritesClient do
         |> Map.take(["cursor", :cursor])
         |> Enum.map(fn {key, value} -> {to_string(key), value} end)
 
-      request(:get, "/v1/runtimes/#{runtime_id}/services/#{service_name}/logs", params: query)
+      request(:get, "/v1/sprites/#{runtime_id}/services/#{service_name}/logs", params: query)
     end
 
     @impl true
     def create_runtime(attrs) do
-      request(:post, "/v1/runtimes", json: attrs)
+      sprite_name = Map.get(attrs, "name") || Map.get(attrs, :name)
+
+      if is_binary(sprite_name) and sprite_name != "" do
+        request(:post, "/v1/sprites", json: attrs)
+      else
+        {:error, {:bad_request, "Sprite name is required"}}
+      end
     end
 
     @impl true
     def get_runtime(runtime_id) do
-      request(:get, "/v1/runtimes/#{runtime_id}")
+      request(:get, "/v1/sprites/#{runtime_id}")
     end
 
     @impl true
     def exec(runtime_id, attrs) do
-      request(:post, "/v1/runtimes/#{runtime_id}/exec", json: attrs)
+      request(:post, "/v1/sprites/#{runtime_id}/exec", json: attrs)
     end
 
     @impl true
     def create_checkpoint(runtime_id, attrs) do
-      request(:post, "/v1/runtimes/#{runtime_id}/checkpoints", json: attrs)
+      request(:post, "/v1/sprites/#{runtime_id}/checkpoints", json: attrs)
     end
 
     @impl true
     def restore_checkpoint(runtime_id, checkpoint_ref) do
-      request(:post, "/v1/runtimes/#{runtime_id}/checkpoints/#{checkpoint_ref}/restore",
-        json: %{}
-      )
+      request(:post, "/v1/sprites/#{runtime_id}/checkpoints/#{checkpoint_ref}/restore", json: %{})
     end
 
     @impl true
     def observe_capacity(runtime_id) do
-      request(:get, "/v1/runtimes/#{runtime_id}/capacity")
+      request(:get, "/v1/sprites/#{runtime_id}")
     end
 
     defp request(method, path, opts \\ []) do
