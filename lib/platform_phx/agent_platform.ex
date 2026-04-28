@@ -9,6 +9,7 @@ defmodule PlatformPhx.AgentPlatform do
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.Artifact
   alias PlatformPhx.AgentPlatform.BillingAccount
+  alias PlatformPhx.AgentPlatform.Company
   alias PlatformPhx.AgentPlatform.CompanyProfiles
   alias PlatformPhx.AgentPlatform.Connection
   alias PlatformPhx.AgentPlatform.FormationRun
@@ -78,10 +79,52 @@ defmodule PlatformPhx.AgentPlatform do
       :connections,
       :artifacts,
       :owner_human,
+      :company,
       formation_run: :events
     ])
     |> Repo.all()
   end
+
+  def create_company(%HumanUser{} = human, attrs) when is_map(attrs) do
+    attrs =
+      attrs
+      |> Map.new()
+      |> put_owner_human_id(human.id)
+      |> normalize_company_attrs()
+
+    %Company{}
+    |> Company.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def list_owned_companies(nil), do: []
+
+  def list_owned_companies(%HumanUser{id: id}) do
+    Company
+    |> where([company], company.owner_human_id == ^id)
+    |> order_by([company], desc: company.updated_at, asc: company.slug)
+    |> preload([:owner_human, :agents])
+    |> Repo.all()
+  end
+
+  def get_owned_company(%HumanUser{} = human, id) when is_integer(id) do
+    Company
+    |> where([company], company.owner_human_id == ^human.id and company.id == ^id)
+    |> preload([:owner_human, :agents])
+    |> Repo.one()
+  end
+
+  def get_owned_company(%HumanUser{} = human, slug) when is_binary(slug) do
+    Company
+    |> where(
+      [company],
+      company.owner_human_id == ^human.id and company.slug == ^normalize_slug(slug)
+    )
+    |> preload([:owner_human, :agents])
+    |> Repo.one()
+  end
+
+  def get_owned_company(_human, _id_or_slug), do: nil
 
   def list_public_agents do
     CompanyProfiles.list_agents()
@@ -102,6 +145,7 @@ defmodule PlatformPhx.AgentPlatform do
       :connections,
       :artifacts,
       :owner_human,
+      :company,
       formation_run: :events
     ])
     |> Repo.one()
@@ -118,6 +162,7 @@ defmodule PlatformPhx.AgentPlatform do
       :connections,
       :artifacts,
       :owner_human,
+      :company,
       formation_run: :events
     ])
     |> Repo.one()
@@ -577,6 +622,27 @@ defmodule PlatformPhx.AgentPlatform do
   end
 
   def normalize_slug(_value), do: nil
+
+  defp put_owner_human_id(attrs, human_id) do
+    if Enum.any?(Map.keys(attrs), &is_binary/1) do
+      Map.put(attrs, "owner_human_id", human_id)
+    else
+      Map.put(attrs, :owner_human_id, human_id)
+    end
+  end
+
+  defp normalize_company_attrs(attrs) do
+    attrs
+    |> normalize_attr_slug(:slug)
+    |> normalize_attr_slug("slug")
+  end
+
+  defp normalize_attr_slug(attrs, key) do
+    case Map.fetch(attrs, key) do
+      {:ok, slug} -> Map.put(attrs, key, normalize_slug(slug))
+      :error -> attrs
+    end
+  end
 
   def normalize_host(value) when is_binary(value) do
     value

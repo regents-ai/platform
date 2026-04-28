@@ -2,6 +2,8 @@ defmodule PlatformPhx.PublicBetaDatabaseTest do
   use PlatformPhx.DataCase, async: false
 
   @required_indexes [
+    {"platform_companies", "platform_companies_owner_updated_idx"},
+    {"platform_companies", "platform_companies_status_slug_idx"},
     {"platform_agents", "platform_agents_owner_updated_idx"},
     {"platform_agents", "platform_agents_status_slug_idx"},
     {"basenames_mints", "basenames_mints_created_at_idx"},

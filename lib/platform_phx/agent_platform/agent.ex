@@ -6,6 +6,7 @@ defmodule PlatformPhx.AgentPlatform.Agent do
 
   alias PlatformPhx.AgentPlatform.Artifact
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
+  alias PlatformPhx.AgentPlatform.Company
   alias PlatformPhx.AgentPlatform.Connection
   alias PlatformPhx.AgentPlatform.CreditLedger
   alias PlatformPhx.AgentPlatform.FormationRun
@@ -57,6 +58,7 @@ defmodule PlatformPhx.AgentPlatform.Agent do
     field :observed_runtime_state, :string, default: "unknown"
 
     belongs_to :owner_human, PlatformPhx.Accounts.HumanUser
+    belongs_to :company, Company
     has_one :subdomain, Subdomain
     has_many :services, Service
     has_many :jobs, Job
@@ -75,6 +77,7 @@ defmodule PlatformPhx.AgentPlatform.Agent do
     agent
     |> cast(attrs, [
       :owner_human_id,
+      :company_id,
       :template_key,
       :name,
       :slug,
@@ -142,7 +145,39 @@ defmodule PlatformPhx.AgentPlatform.Agent do
     |> validate_inclusion(:sprite_metering_status, ["trialing", "paid", "paused"])
     |> validate_inclusion(:desired_runtime_state, ["active", "paused"])
     |> validate_inclusion(:observed_runtime_state, ["unknown", "active", "paused"])
+    |> put_company_for_insert()
+    |> foreign_key_constraint(:company_id)
     |> unique_constraint(:slug)
     |> unique_constraint(:claimed_label)
+  end
+
+  defp put_company_for_insert(changeset) do
+    if changeset.valid? and is_nil(changeset.data.id) and
+         is_nil(get_field(changeset, :company_id)) do
+      prepare_changes(changeset, fn changeset ->
+        case changeset.repo.insert(Company.changeset(%Company{}, company_attrs(changeset))) do
+          {:ok, company} ->
+            put_change(changeset, :company_id, company.id)
+
+          {:error, _changeset} ->
+            add_error(changeset, :company_id, "could not be created")
+        end
+      end)
+    else
+      changeset
+    end
+  end
+
+  defp company_attrs(changeset) do
+    %{
+      owner_human_id: get_field(changeset, :owner_human_id),
+      name: get_field(changeset, :name),
+      slug: get_field(changeset, :slug),
+      claimed_label: get_field(changeset, :claimed_label),
+      status: get_field(changeset, :status) || "forming",
+      public_summary: get_field(changeset, :public_summary),
+      hero_statement: get_field(changeset, :hero_statement),
+      metadata: %{}
+    }
   end
 end
