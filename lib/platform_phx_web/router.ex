@@ -59,7 +59,7 @@ defmodule PlatformPhxWeb.Router do
 
   pipeline :shared_agent_api do
     plug :accepts, ["json"]
-    plug PlatformPhxWeb.Plugs.RequireAgentSiwa, audience: "regents.sh"
+    plug PlatformPhxWeb.Plugs.RequireAgentSiwa, audience: "regent-services"
   end
 
   scope "/", PlatformPhxWeb do
@@ -98,6 +98,10 @@ defmodule PlatformPhxWeb.Router do
       live "/app/formation", App.FormationLive
       live "/app/provisioning/:id", App.ProvisioningLive
       live "/app/dashboard", App.DashboardLive
+      live "/app/work", App.WorkLive
+      live "/app/runs/:id", App.RunLive
+      live "/app/runtimes", App.RuntimesLive
+      live "/app/agents", App.AgentsLive
       live "/cli", RegentCliLive
       live "/docs", DocsLive
       live "/agents/:slug", AgentSiteLive
@@ -216,12 +220,114 @@ defmodule PlatformPhxWeb.Router do
 
     post "/sprites/:slug/pause", AgentFormationController, :pause_sprite
     post "/sprites/:slug/resume", AgentFormationController, :resume_sprite
+
+    get "/rwr/account", RegentWorkRuntimeController, :account
+    get "/companies/:company_id/rwr/work-items", RegentWorkRuntimeController, :work_items
+    post "/companies/:company_id/rwr/work-items", RegentWorkRuntimeController, :create_work_item
+
+    get "/companies/:company_id/rwr/work-items/:work_item_id",
+        RegentWorkRuntimeController,
+        :work_item
+
+    post "/companies/:company_id/rwr/work-items/:work_item_id/runs",
+         RegentWorkRuntimeController,
+         :start_run
+
+    get "/companies/:company_id/rwr/runs/:run_id", RegentWorkRuntimeController, :run
+    get "/companies/:company_id/rwr/runs/:run_id/events", RegentWorkRuntimeController, :run_events
+
+    get "/companies/:company_id/rwr/runs/:run_id/artifacts",
+        RegentWorkRuntimeController,
+        :artifacts
+
+    get "/companies/:company_id/rwr/workers", RegentWorkRuntimeController, :workers
+    get "/companies/:company_id/rwr/runtimes", RegentWorkRuntimeController, :runtimes
+    post "/companies/:company_id/rwr/runtimes", RegentWorkRuntimeController, :create_runtime
+    get "/companies/:company_id/rwr/runtimes/:runtime_id", RegentWorkRuntimeController, :runtime
+
+    post "/companies/:company_id/rwr/runtimes/:runtime_id/checkpoint",
+         RegentWorkRuntimeController,
+         :checkpoint_runtime
+
+    post "/companies/:company_id/rwr/runtimes/:runtime_id/restore",
+         RegentWorkRuntimeController,
+         :restore_runtime
+
+    post "/companies/:company_id/rwr/runtimes/:runtime_id/pause",
+         RegentWorkRuntimeController,
+         :pause_runtime
+
+    post "/companies/:company_id/rwr/runtimes/:runtime_id/resume",
+         RegentWorkRuntimeController,
+         :resume_runtime
+
+    get "/companies/:company_id/rwr/runtimes/:runtime_id/services",
+        RegentWorkRuntimeController,
+        :runtime_services
+
+    get "/companies/:company_id/rwr/runtimes/:runtime_id/health",
+        RegentWorkRuntimeController,
+        :runtime_health
+
+    get "/companies/:company_id/rwr/agents/:source_id/relationships",
+        RegentWorkRuntimeController,
+        :relationships
+
+    post "/companies/:company_id/rwr/agents/:source_id/relationships",
+         RegentWorkRuntimeController,
+         :create_relationship
+
+    get "/companies/:company_id/rwr/agents/:manager_id/execution-pool",
+        RegentWorkRuntimeController,
+        :execution_pool
+
+    delete "/companies/:company_id/rwr/agent-relationships/:relationship_id",
+           RegentWorkRuntimeController,
+           :delete_relationship
   end
 
   scope "/api/agent-platform", PlatformPhxWeb.Api do
     pipe_through :shared_agent_api
 
     post "/ens/prepare-primary", AgentEnsController, :prepare_primary
+  end
+
+  scope "/api/agent-platform", PlatformPhxWeb.Api do
+    pipe_through :platform_agent_api
+
+    post "/companies/:company_id/rwr/workers", RegentWorkRuntimeController, :register_worker
+
+    post "/companies/:company_id/rwr/workers/:worker_id/heartbeat",
+         RegentWorkRuntimeController,
+         :heartbeat
+
+    get "/companies/:company_id/rwr/workers/:worker_id/assignments",
+        RegentWorkRuntimeController,
+        :assignments
+
+    post "/companies/:company_id/rwr/assignments/:assignment_id/claim",
+         RegentWorkRuntimeController,
+         :claim_assignment
+
+    post "/companies/:company_id/rwr/assignments/:assignment_id/release",
+         RegentWorkRuntimeController,
+         :release_assignment
+
+    post "/companies/:company_id/rwr/assignments/:assignment_id/complete",
+         RegentWorkRuntimeController,
+         :complete_assignment
+
+    post "/companies/:company_id/rwr/runs/:run_id/events",
+         RegentWorkRuntimeController,
+         :append_event
+
+    post "/companies/:company_id/rwr/runs/:run_id/artifacts",
+         RegentWorkRuntimeController,
+         :create_artifact
+
+    post "/companies/:company_id/rwr/runs/:run_id/delegations",
+         RegentWorkRuntimeController,
+         :request_delegation
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

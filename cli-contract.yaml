@@ -550,6 +550,645 @@ commands:
           origin: {type: string}
           runtime:
             $ref: '#/components/schemas/AgentRuntimeResponse'
+  - name: regents runtime create
+    summary: Create a runtime for one Regent company.
+    availability: current
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [createRwrRuntime]
+    args: []
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --name
+        type: string
+        required: true
+        description: Runtime name.
+      - name: --runner
+        type: string
+        required: true
+        enum: [hermes_local_manager, hermes_hosted_manager, openclaw_local_manager, codex_exec, codex_app_server, openclaw_local_executor, openclaw_code_agent_local, fake, custom_worker]
+        description: Worker path to use.
+      - name: --execution-surface
+        type: string
+        required: true
+        enum: [hosted_sprite, local_bridge, external_webhook]
+        description: Where the runtime runs.
+      - name: --billing-mode
+        type: string
+        required: true
+        enum: [platform_hosted, user_local, external_self_reported]
+        description: How runtime costs are handled.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrRuntimeCommandResponse'
+  - name: regents runtime show
+    summary: Show one runtime for a Regent company.
+    availability: current
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [getRwrRuntime]
+    args:
+      - name: runtime_id
+        type: string
+        required: true
+        description: Runtime id.
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrRuntimeCommandResponse'
+  - name: regents runtime checkpoint
+    summary: Save a checkpoint for one runtime.
+    availability: current
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [checkpointRwrRuntime]
+    args:
+      - name: runtime_id
+        type: string
+        required: true
+        description: Runtime id.
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --checkpoint-ref
+        type: string
+        required: true
+        description: Checkpoint reference.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrRuntimeCheckpointCommandResponse'
+  - name: regents runtime restore
+    summary: Restore one runtime from a checkpoint.
+    availability: current
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [restoreRwrRuntime]
+    args:
+      - name: runtime_id
+        type: string
+        required: true
+        description: Runtime id.
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --checkpoint-id
+        type: string
+        required: true
+        description: Checkpoint id.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrRuntimeRestoreCommandResponse'
+  - name: regents runtime pause
+    summary: Pause one runtime for a Regent company.
+    availability: current
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [pauseRwrRuntime]
+    args:
+      - name: runtime_id
+        type: string
+        required: true
+        description: Runtime id.
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrRuntimeCommandResponse'
+  - name: regents runtime resume
+    summary: Resume one runtime for a Regent company.
+    availability: current
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [resumeRwrRuntime]
+    args:
+      - name: runtime_id
+        type: string
+        required: true
+        description: Runtime id.
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrRuntimeCommandResponse'
+  - name: regents runtime services
+    summary: List services for one runtime.
+    availability: current
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [listRwrRuntimeServices]
+    args:
+      - name: runtime_id
+        type: string
+        required: true
+        description: Runtime id.
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrRuntimeServiceListCommandResponse'
+  - name: regents runtime health
+    summary: Show health for one runtime.
+    availability: current
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [getRwrRuntimeHealth]
+    args:
+      - name: runtime_id
+        type: string
+        required: true
+        description: Runtime id.
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrRuntimeHealthCommandResponse'
+  - name: regents work create
+    summary: Create work for one Regent company.
+    availability: current
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [createRwrWorkItem]
+    args: []
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --title
+        type: string
+        required: true
+        description: Work title.
+      - name: --description
+        type: string
+        required: false
+        description: Work details.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrWorkItemCommandResponse'
+  - name: regents work list
+    summary: List work for one Regent company.
+    availability: current
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [listRwrWorkItems]
+    args: []
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrWorkItemListCommandResponse'
+  - name: regents work show
+    summary: Show one work item for a Regent company.
+    availability: current
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [getRwrWorkItem]
+    args:
+      - name: work_item_id
+        type: string
+        required: true
+        description: Work item id.
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrWorkItemCommandResponse'
+  - name: regents work run
+    summary: Start a run for one work item.
+    availability: current
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [startRwrWorkRun]
+    args:
+      - name: work_item_id
+        type: string
+        required: true
+        description: Work item id.
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --runner
+        type: string
+        required: true
+        enum: [hermes_local_manager, hermes_hosted_manager, openclaw_local_manager, codex_exec, codex_app_server, openclaw_local_executor, openclaw_code_agent_local, fake, custom_worker]
+        description: Worker path to use.
+      - name: --worker-id
+        type: string
+        required: false
+        description: Specific worker id.
+      - name: --instructions
+        type: string
+        required: false
+        description: Extra instructions for this run.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrRunCommandResponse'
+  - name: regents work watch
+    summary: Watch events for one work run.
+    availability: current
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [listRwrRunEvents]
+    args:
+      - name: run_id
+        type: string
+        required: true
+        description: Run id.
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrRunEventListCommandResponse'
+  - name: regents work local-loop
+    summary: Let one local worker check for assigned Regent work.
+    availability: current
+    auth:
+      mode: agent-siwa
+    transport:
+      kind: http
+      operationIds:
+        - heartbeatRwrWorker
+        - listRwrWorkerAssignments
+        - claimRwrWorkerAssignment
+        - appendRwrRunEvent
+        - createRwrRunArtifact
+        - requestRwrDelegation
+        - releaseRwrWorkerAssignment
+        - completeRwrWorkerAssignment
+    args: []
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --worker-id
+        type: string
+        required: true
+        description: Local worker id.
+      - name: --once
+        type: boolean
+        required: false
+        default: false
+        description: Check once and exit.
+      - name: --sleep-ms
+        type: integer
+        required: false
+        default: 5000
+        description: Wait time between checks.
+      - name: --artifact-title
+        type: string
+        required: false
+        description: Approved artifact title to upload for the claimed run.
+      - name: --artifact-body
+        type: string
+        required: false
+        description: Approved artifact text to upload for the claimed run.
+      - name: --delegate-runner
+        type: string
+        required: false
+        enum: [hermes_local_manager, hermes_hosted_manager, openclaw_local_manager, codex_exec, codex_app_server, openclaw_local_executor, openclaw_code_agent_local, fake, custom_worker]
+        description: Worker path to request for delegated work.
+      - name: --delegate-title
+        type: string
+        required: false
+        description: Delegated work title.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrLocalWorkerLoopCommandResponse'
+  - name: regents agent connect hermes
+    summary: Connect a Hermes worker to one Regent company.
+    availability: current
+    auth:
+      mode: agent-siwa
+    transport:
+      kind: http
+      operationIds: [registerRwrWorker]
+    args: []
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --name
+        type: string
+        required: false
+        description: Display name.
+      - name: --role
+        type: string
+        required: true
+        enum: [manager, executor, hybrid]
+        description: Worker role.
+      - name: --write-connector
+        type: boolean
+        required: false
+        default: true
+        description: Write the local Hermes connector files.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrHermesConnectCommandResponse'
+  - name: regents agent connect openclaw
+    summary: Connect a local OpenClaw worker to one Regent company.
+    availability: current
+    auth:
+      mode: agent-siwa
+    transport:
+      kind: http
+      operationIds: [registerRwrWorker]
+    args: []
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --name
+        type: string
+        required: false
+        description: Display name.
+      - name: --role
+        type: string
+        required: true
+        enum: [manager, executor, hybrid]
+        description: Worker role.
+      - name: --write-skill
+        type: boolean
+        required: false
+        default: true
+        description: Write the local OpenClaw Regents skill file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrOpenClawConnectCommandResponse'
+  - name: regents agent link
+    summary: Link one manager to one worker for a Regent company.
+    availability: current
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [createRwrAgentRelationship]
+    args: []
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --manager-agent-id
+        type: string
+        required: false
+        description: Manager agent id.
+      - name: --manager-worker-id
+        type: string
+        required: false
+        description: Manager worker id.
+      - name: --executor-agent-id
+        type: string
+        required: false
+        description: Executor agent id.
+      - name: --executor-worker-id
+        type: string
+        required: false
+        description: Executor worker id.
+      - name: --relationship
+        type: string
+        required: true
+        enum: [manager_of, preferred_executor, can_delegate_to, reports_to]
+        description: Relationship to create.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrAgentRelationshipCommandResponse'
+  - name: regents agent execution-pool
+    summary: List the workers available to one manager.
+    availability: current
+    auth:
+      mode: session-file
+    transport:
+      kind: http-cookie-session
+      operationIds: [listRwrExecutionPool]
+    args: []
+    flags:
+      - name: --company-id
+        type: string
+        required: true
+        description: Regent company id.
+      - name: --manager
+        type: string
+        required: true
+        description: Manager agent or worker id.
+      - name: --origin
+        type: string
+        required: false
+        default: https://regents.sh
+        description: Platform origin to call. Defaults to the saved session origin when present.
+      - name: --session-file
+        type: string
+        required: false
+        description: Local path for the saved platform session file.
+    output:
+      format: json
+      schema:
+        $ref: '#/components/schemas/RwrExecutionPoolCommandResponse'
   - name: regents platform sprite pause
     summary: Pause one owned company runtime from the saved platform session.
     availability: beta_disabled
@@ -617,6 +1256,471 @@ components:
           type: string
           const: unavailable
         statusMessage: {type: string}
+    AgentKind:
+      type: string
+      enum: [hermes, openclaw, codex, custom, human_operator, regent_bridge]
+    WorkerRole:
+      type: string
+      enum: [manager, executor, hybrid]
+    ExecutionSurface:
+      type: string
+      enum: [hosted_sprite, local_bridge, external_webhook]
+    RunnerKind:
+      type: string
+      enum: [hermes_local_manager, hermes_hosted_manager, openclaw_local_manager, codex_exec, codex_app_server, openclaw_local_executor, openclaw_code_agent_local, fake, custom_worker]
+    BillingMode:
+      type: string
+      enum: [platform_hosted, user_local, external_self_reported]
+    TrustScope:
+      type: string
+      enum: [platform_hosted, local_user_controlled, external_user_controlled]
+    ReportedUsagePolicy:
+      type: string
+      enum: [platform_metered, self_reported, external_reported]
+    RelationshipKind:
+      type: string
+      enum: [manager_of, preferred_executor, can_delegate_to, reports_to]
+    RelationshipStatus:
+      type: string
+      enum: [active, paused, revoked]
+    RwrAgentProfile:
+      type: object
+      required: [id, company_id, name, agent_kind, default_runner_kind, status, visibility]
+      properties:
+        id: {type: integer}
+        company_id: {type: integer}
+        name: {type: string}
+        agent_kind:
+          $ref: '#/components/schemas/AgentKind'
+        default_runner_kind:
+          oneOf:
+            - $ref: '#/components/schemas/RunnerKind'
+            - type: 'null'
+        status: {type: string}
+        visibility:
+          type: string
+          enum: [operator, company, public]
+    RwrWorkItem:
+      type: object
+      required: [id, company_id, title, description, status, priority, visibility, desired_runner_kind, assigned_worker_id, assigned_agent_profile_id, created_at, updated_at]
+      properties:
+        id: {type: integer}
+        company_id: {type: integer}
+        title: {type: string}
+        description: {type: [string, 'null']}
+        status: {type: string}
+        priority:
+          type: string
+          enum: [normal, urgent]
+        visibility:
+          type: string
+          enum: [operator, company, public]
+        desired_runner_kind:
+          oneOf:
+            - $ref: '#/components/schemas/RunnerKind'
+            - type: 'null'
+        assigned_worker_id: {type: [integer, 'null']}
+        assigned_agent_profile_id: {type: [integer, 'null']}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    RwrRun:
+      type: object
+      required: [id, company_id, work_item_id, parent_run_id, root_run_id, worker_id, runtime_profile_id, runner_kind, status, visibility, summary, failure_reason, cost_usd, created_at, updated_at]
+      properties:
+        id: {type: integer}
+        company_id: {type: integer}
+        work_item_id: {type: integer}
+        parent_run_id: {type: [integer, 'null']}
+        root_run_id: {type: [integer, 'null']}
+        worker_id: {type: [integer, 'null']}
+        runtime_profile_id: {type: [integer, 'null']}
+        runner_kind:
+          $ref: '#/components/schemas/RunnerKind'
+        status: {type: string}
+        visibility:
+          type: string
+          enum: [operator, company, public]
+        summary: {type: [string, 'null']}
+        failure_reason: {type: [string, 'null']}
+        cost_usd: {type: string}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    RwrRunEvent:
+      type: object
+      required: [id, company_id, run_id, sequence, kind, actor_kind, actor_id, visibility, sensitivity, payload, occurred_at]
+      properties:
+        id: {type: integer}
+        company_id: {type: integer}
+        run_id: {type: integer}
+        sequence: {type: integer}
+        kind: {type: string}
+        actor_kind: {type: [string, 'null']}
+        actor_id: {type: [string, 'null']}
+        visibility:
+          type: string
+          enum: [operator, company, public]
+        sensitivity:
+          type: string
+          enum: [normal, sensitive, secret]
+        payload:
+          type: object
+          additionalProperties: true
+        occurred_at: {type: string, format: date-time}
+    RwrWorker:
+      type: object
+      required: [id, company_id, agent_profile_id, runtime_profile_id, name, agent_kind, worker_role, execution_surface, runner_kind, billing_mode, trust_scope, reported_usage_policy, status, last_heartbeat_at]
+      properties:
+        id: {type: integer}
+        company_id: {type: integer}
+        agent_profile_id: {type: integer}
+        runtime_profile_id: {type: [integer, 'null']}
+        name: {type: string}
+        agent_kind:
+          $ref: '#/components/schemas/AgentKind'
+        worker_role:
+          $ref: '#/components/schemas/WorkerRole'
+        execution_surface:
+          $ref: '#/components/schemas/ExecutionSurface'
+        runner_kind:
+          $ref: '#/components/schemas/RunnerKind'
+        billing_mode:
+          $ref: '#/components/schemas/BillingMode'
+        trust_scope:
+          $ref: '#/components/schemas/TrustScope'
+        reported_usage_policy:
+          $ref: '#/components/schemas/ReportedUsagePolicy'
+        status: {type: string}
+        last_heartbeat_at: {type: [string, 'null'], format: date-time}
+    RwrRuntime:
+      type: object
+      required: [id, company_id, platform_agent_id, name, runner_kind, execution_surface, billing_mode, status, visibility, config, metadata]
+      properties:
+        id: {type: integer}
+        company_id: {type: integer}
+        platform_agent_id: {type: [integer, 'null']}
+        name: {type: string}
+        runner_kind:
+          $ref: '#/components/schemas/RunnerKind'
+        execution_surface:
+          $ref: '#/components/schemas/ExecutionSurface'
+        billing_mode:
+          $ref: '#/components/schemas/BillingMode'
+        status: {type: string}
+        visibility:
+          type: string
+          enum: [operator, company, public]
+        config:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+    RwrRuntimeCheckpoint:
+      type: object
+      required: [id, company_id, runtime_profile_id, work_run_id, checkpoint_ref, status, protected, captured_at, metadata, created_at, updated_at]
+      properties:
+        id: {type: integer}
+        company_id: {type: integer}
+        runtime_profile_id: {type: integer}
+        work_run_id: {type: [integer, 'null']}
+        checkpoint_ref: {type: string}
+        status:
+          type: string
+          enum: [pending, ready, failed]
+        protected: {type: boolean}
+        captured_at: {type: [string, 'null'], format: date-time}
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    RwrRuntimeService:
+      type: object
+      required: [id, company_id, runtime_profile_id, name, service_kind, status, endpoint_url, metadata]
+      properties:
+        id: {type: integer}
+        company_id: {type: integer}
+        runtime_profile_id: {type: integer}
+        name: {type: string}
+        service_kind: {type: string}
+        status: {type: string}
+        endpoint_url: {type: [string, 'null']}
+        metadata:
+          type: object
+          additionalProperties: true
+    RwrAgentRelationship:
+      type: object
+      required: [id, company_id, source_agent_profile_id, target_agent_profile_id, source_worker_id, target_worker_id, relationship_kind, status, max_parallel_runs]
+      properties:
+        id: {type: integer}
+        company_id: {type: integer}
+        source_agent_profile_id: {type: [integer, 'null']}
+        target_agent_profile_id: {type: [integer, 'null']}
+        source_worker_id: {type: [integer, 'null']}
+        target_worker_id: {type: [integer, 'null']}
+        relationship_kind:
+          $ref: '#/components/schemas/RelationshipKind'
+        status:
+          $ref: '#/components/schemas/RelationshipStatus'
+        max_parallel_runs: {type: integer}
+    RwrWorkItemListResponse:
+      type: object
+      required: [ok, company_id, work_items]
+      properties:
+        ok: {type: boolean, const: true}
+        company_id: {type: integer}
+        work_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RwrWorkItem'
+    RwrWorkItemResponse:
+      type: object
+      required: [ok, work_item]
+      properties:
+        ok: {type: boolean, const: true}
+        work_item:
+          $ref: '#/components/schemas/RwrWorkItem'
+    RwrRunResponse:
+      type: object
+      required: [ok, run]
+      properties:
+        ok: {type: boolean, const: true}
+        run:
+          $ref: '#/components/schemas/RwrRun'
+    RwrRunEventListResponse:
+      type: object
+      required: [ok, run_id, events]
+      properties:
+        ok: {type: boolean, const: true}
+        run_id: {type: integer}
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/RwrRunEvent'
+    RwrWorkerRegistrationResponse:
+      type: object
+      required: [ok, agent_profile, worker]
+      properties:
+        ok: {type: boolean, const: true}
+        agent_profile:
+          $ref: '#/components/schemas/RwrAgentProfile'
+        worker:
+          $ref: '#/components/schemas/RwrWorker'
+    RwrRuntimeResponse:
+      type: object
+      required: [ok, runtime]
+      properties:
+        ok: {type: boolean, const: true}
+        runtime:
+          $ref: '#/components/schemas/RwrRuntime'
+    RwrRuntimeCheckpointResponse:
+      type: object
+      required: [ok, checkpoint]
+      properties:
+        ok: {type: boolean, const: true}
+        checkpoint:
+          $ref: '#/components/schemas/RwrRuntimeCheckpoint'
+    RwrRuntimeRestoreResponse:
+      type: object
+      required: [ok, runtime, checkpoint, restore]
+      properties:
+        ok: {type: boolean, const: true}
+        runtime:
+          $ref: '#/components/schemas/RwrRuntime'
+        checkpoint:
+          $ref: '#/components/schemas/RwrRuntimeCheckpoint'
+        restore:
+          type: object
+          required: [status]
+          properties:
+            status:
+              type: string
+              enum: [accepted]
+    RwrRuntimeServiceListResponse:
+      type: object
+      required: [ok, company_id, runtime_id, services]
+      properties:
+        ok: {type: boolean, const: true}
+        company_id: {type: integer}
+        runtime_id: {type: integer}
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/RwrRuntimeService'
+    RwrRuntimeHealthResponse:
+      type: object
+      required: [ok, company_id, runtime_id, health]
+      properties:
+        ok: {type: boolean, const: true}
+        company_id: {type: integer}
+        runtime_id: {type: integer}
+        health:
+          type: object
+          required: [status, available, metering_status]
+          properties:
+            status: {type: string}
+            available: {type: boolean}
+            metering_status: {type: string}
+    RwrAgentRelationshipResponse:
+      type: object
+      required: [ok, relationship]
+      properties:
+        ok: {type: boolean, const: true}
+        relationship:
+          $ref: '#/components/schemas/RwrAgentRelationship'
+    RwrExecutionPoolResponse:
+      type: object
+      required: [ok, company_id, workers]
+      properties:
+        ok: {type: boolean, const: true}
+        company_id: {type: integer}
+        workers:
+          type: array
+          items:
+            $ref: '#/components/schemas/RwrWorker'
+    RwrWorkItemCommandResponse:
+      type: object
+      required: [ok, command, origin, result]
+      properties:
+        ok: {type: boolean, const: true}
+        command: {type: string}
+        origin: {type: string}
+        result:
+          $ref: '#/components/schemas/RwrWorkItemResponse'
+    RwrWorkItemListCommandResponse:
+      type: object
+      required: [ok, command, origin, result]
+      properties:
+        ok: {type: boolean, const: true}
+        command: {type: string}
+        origin: {type: string}
+        result:
+          $ref: '#/components/schemas/RwrWorkItemListResponse'
+    RwrRunCommandResponse:
+      type: object
+      required: [ok, command, origin, result]
+      properties:
+        ok: {type: boolean, const: true}
+        command: {type: string}
+        origin: {type: string}
+        result:
+          $ref: '#/components/schemas/RwrRunResponse'
+    RwrRunEventListCommandResponse:
+      type: object
+      required: [ok, command, origin, result]
+      properties:
+        ok: {type: boolean, const: true}
+        command: {type: string}
+        origin: {type: string}
+        result:
+          $ref: '#/components/schemas/RwrRunEventListResponse'
+    RwrLocalWorkerLoopCommandResponse:
+      type: object
+      required: [ok, command]
+      properties:
+        ok: {type: boolean, const: true}
+        command: {type: string}
+    RwrWorkerRegistrationCommandResponse:
+      type: object
+      required: [ok, command, origin, result]
+      properties:
+        ok: {type: boolean, const: true}
+        command: {type: string}
+        origin: {type: string}
+        result:
+          $ref: '#/components/schemas/RwrWorkerRegistrationResponse'
+    RwrOpenClawConnectCommandResponse:
+      type: object
+      required: [ok, command, origin, result, openclaw]
+      properties:
+        ok: {type: boolean, const: true}
+        command: {type: string}
+        origin: {type: string}
+        result:
+          $ref: '#/components/schemas/RwrWorkerRegistrationResponse'
+        openclaw:
+          type: object
+          required: [skillFile]
+          properties:
+            skillFile: {type: [string, 'null']}
+    RwrHermesConnectCommandResponse:
+      type: object
+      required: [ok, command, origin, result, hermes]
+      properties:
+        ok: {type: boolean, const: true}
+        command: {type: string}
+        origin: {type: string}
+        result:
+          $ref: '#/components/schemas/RwrWorkerRegistrationResponse'
+        hermes:
+          type: object
+          required: [configFile, skillFile]
+          properties:
+            configFile: {type: [string, 'null']}
+            skillFile: {type: [string, 'null']}
+    RwrAgentRelationshipCommandResponse:
+      type: object
+      required: [ok, command, origin, result]
+      properties:
+        ok: {type: boolean, const: true}
+        command: {type: string}
+        origin: {type: string}
+        result:
+          $ref: '#/components/schemas/RwrAgentRelationshipResponse'
+    RwrExecutionPoolCommandResponse:
+      type: object
+      required: [ok, command, origin, result]
+      properties:
+        ok: {type: boolean, const: true}
+        command: {type: string}
+        origin: {type: string}
+        result:
+          $ref: '#/components/schemas/RwrExecutionPoolResponse'
+    RwrRuntimeCommandResponse:
+      type: object
+      required: [ok, command, origin, result]
+      properties:
+        ok: {type: boolean, const: true}
+        command: {type: string}
+        origin: {type: string}
+        result:
+          $ref: '#/components/schemas/RwrRuntimeResponse'
+    RwrRuntimeCheckpointCommandResponse:
+      type: object
+      required: [ok, command, origin, result]
+      properties:
+        ok: {type: boolean, const: true}
+        command: {type: string}
+        origin: {type: string}
+        result:
+          $ref: '#/components/schemas/RwrRuntimeCheckpointResponse'
+    RwrRuntimeRestoreCommandResponse:
+      type: object
+      required: [ok, command, origin, result]
+      properties:
+        ok: {type: boolean, const: true}
+        command: {type: string}
+        origin: {type: string}
+        result:
+          $ref: '#/components/schemas/RwrRuntimeRestoreResponse'
+    RwrRuntimeServiceListCommandResponse:
+      type: object
+      required: [ok, command, origin, result]
+      properties:
+        ok: {type: boolean, const: true}
+        command: {type: string}
+        origin: {type: string}
+        result:
+          $ref: '#/components/schemas/RwrRuntimeServiceListResponse'
+    RwrRuntimeHealthCommandResponse:
+      type: object
+      required: [ok, command, origin, result]
+      properties:
+        ok: {type: boolean, const: true}
+        command: {type: string}
+        origin: {type: string}
+        result:
+          $ref: '#/components/schemas/RwrRuntimeHealthResponse'
     PrivySessionCsrf:
       type: object
       required: [ok, csrf_token]

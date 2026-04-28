@@ -2,6 +2,7 @@ defmodule PlatformPhxWeb.ContractValidationTest do
   use PlatformPhxWeb.ConnCase, async: false
 
   @api_contract_path Path.expand("../../../api-contract.openapiv3.yaml", __DIR__)
+  @cli_contract_path Path.expand("../../../cli-contract.yaml", __DIR__)
   @detach_path "/api/agent-platform/agents/{slug}/ens/detach"
   @readyz_path "/readyz"
 
@@ -148,8 +149,235 @@ defmodule PlatformPhxWeb.ContractValidationTest do
     refute MapSet.member?(paths, "/api/regent/staking")
   end
 
+  test "RWR contract locks public ids, signed writes, and canonical enums" do
+    contract = api_contract()
+    schemas = Map.fetch!(contract, "components") |> Map.fetch!("schemas")
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/workers",
+             "get",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/workers",
+             "post",
+             "security"
+           ]) == MapSet.new(["AgentSiwaHeaders"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runs/{run_id}/events",
+             "post",
+             "security"
+           ]) == MapSet.new(["AgentSiwaHeaders"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runs/{run_id}/delegations",
+             "post",
+             "security"
+           ]) == MapSet.new(["AgentSiwaHeaders"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/agents/{source_id}/relationships",
+             "post",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/workers/{worker_id}/assignments",
+             "get",
+             "security"
+           ]) == MapSet.new(["AgentSiwaHeaders"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runtimes",
+             "get",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runtimes",
+             "post",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runtimes/{runtime_id}",
+             "get",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runtimes/{runtime_id}/checkpoint",
+             "post",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runtimes/{runtime_id}/restore",
+             "post",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runtimes/{runtime_id}/pause",
+             "post",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runtimes/{runtime_id}/resume",
+             "post",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runtimes/{runtime_id}/services",
+             "get",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runtimes/{runtime_id}/health",
+             "get",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert enum_values(schemas, "AgentKind") ==
+             MapSet.new([
+               "hermes",
+               "openclaw",
+               "codex",
+               "custom",
+               "human_operator",
+               "regent_bridge"
+             ])
+
+    assert enum_values(schemas, "WorkerRole") == MapSet.new(["manager", "executor", "hybrid"])
+
+    assert enum_values(schemas, "ExecutionSurface") ==
+             MapSet.new(["hosted_sprite", "local_bridge", "external_webhook"])
+
+    assert enum_values(schemas, "RunnerKind") ==
+             MapSet.new([
+               "hermes_local_manager",
+               "hermes_hosted_manager",
+               "openclaw_local_manager",
+               "codex_exec",
+               "codex_app_server",
+               "openclaw_local_executor",
+               "openclaw_code_agent_local",
+               "fake",
+               "custom_worker"
+             ])
+
+    assert enum_values(schemas, "BillingMode") ==
+             MapSet.new(["platform_hosted", "user_local", "external_self_reported"])
+
+    assert enum_values(schemas, "TrustScope") ==
+             MapSet.new(["platform_hosted", "local_user_controlled", "external_user_controlled"])
+
+    assert enum_values(schemas, "ReportedUsagePolicy") ==
+             MapSet.new(["platform_metered", "self_reported", "external_reported"])
+
+    assert enum_values(schemas, "RelationshipKind") ==
+             MapSet.new(["manager_of", "preferred_executor", "can_delegate_to", "reports_to"])
+
+    assert enum_values(schemas, "RelationshipStatus") ==
+             MapSet.new(["active", "paused", "revoked"])
+
+    request_schema = Map.fetch!(schemas, "RwrWorkerRegistrationRequest")
+    runtime_schema = Map.fetch!(schemas, "RwrRuntimeCreateRequest")
+    checkpoint_schema = Map.fetch!(schemas, "RwrRuntimeCheckpointRequest")
+    restore_schema = Map.fetch!(schemas, "RwrRuntimeRestoreRequest")
+    delegation_schema = Map.fetch!(schemas, "RwrDelegationRequest")
+    event_schema = Map.fetch!(schemas, "RwrRunEventAppendRequest")
+
+    assert MapSet.member?(required_fields(request_schema), "company_id")
+
+    assert required_fields(runtime_schema) ==
+             MapSet.new([
+               "company_id",
+               "name",
+               "runner_kind",
+               "execution_surface",
+               "billing_mode"
+             ])
+
+    assert required_fields(checkpoint_schema) ==
+             MapSet.new(["company_id", "runtime_id", "checkpoint_ref"])
+
+    assert required_fields(restore_schema) ==
+             MapSet.new(["company_id", "runtime_id", "checkpoint_id"])
+
+    assert required_fields(delegation_schema) ==
+             MapSet.new(["company_id", "run_id", "requested_runner_kind", "strategy", "tasks"])
+
+    assert MapSet.member?(property_names(delegation_schema), "requested_runner_kind")
+    refute MapSet.member?(property_names(delegation_schema), "runner_kind")
+
+    assert required_fields(event_schema) == MapSet.new(["company_id", "run_id", "kind"])
+    assert MapSet.member?(property_names(event_schema), "kind")
+    refute MapSet.member?(property_names(event_schema), "event_type")
+  end
+
+  test "CLI contract uses canonical RWR command names" do
+    commands =
+      cli_contract()
+      |> Map.fetch!("commands")
+      |> Enum.map(&Map.fetch!(&1, "name"))
+      |> MapSet.new()
+
+    assert MapSet.subset?(
+             MapSet.new([
+               "regents work create",
+               "regents work list",
+               "regents work show",
+               "regents work run",
+               "regents work watch",
+               "regents runtime create",
+               "regents runtime show",
+               "regents runtime checkpoint",
+               "regents runtime restore",
+               "regents runtime pause",
+               "regents runtime resume",
+               "regents runtime services",
+               "regents runtime health",
+               "regents agent connect hermes",
+               "regents agent connect openclaw",
+               "regents agent link",
+               "regents agent execution-pool"
+             ]),
+             commands
+           )
+
+    refute Enum.any?(commands, &String.starts_with?(&1, "regents rwr "))
+  end
+
   defp api_contract do
     @api_contract_path
+    |> File.read!()
+    |> :yamerl_constr.string()
+    |> normalize_yaml()
+  end
+
+  defp cli_contract do
+    @cli_contract_path
     |> File.read!()
     |> :yamerl_constr.string()
     |> normalize_yaml()
@@ -169,6 +397,21 @@ defmodule PlatformPhxWeb.ContractValidationTest do
     do: MapSet.new([required])
 
   defp required_fields(_schema), do: MapSet.new()
+
+  defp enum_values(schemas, schema_name) do
+    schemas
+    |> Map.fetch!(schema_name)
+    |> Map.fetch!("enum")
+    |> MapSet.new()
+  end
+
+  defp security_names(contract, path) do
+    contract
+    |> get_in(path)
+    |> List.wrap()
+    |> Enum.flat_map(&Map.keys/1)
+    |> MapSet.new()
+  end
 
   defp assert_required(schemas, schema_name, fields) do
     schema = Map.fetch!(schemas, schema_name)

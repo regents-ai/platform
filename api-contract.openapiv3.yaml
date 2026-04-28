@@ -463,7 +463,7 @@ paths:
     post:
       operationId: createAgentBugReport
       security: [{ AgentSiwaHeaders: [] }]
-      description: Bug report stored from a signed agent request using a regents.sh SIWA receipt.
+      description: Bug report stored from a signed agent request using a regent-services SIWA receipt.
       requestBody:
         required: true
         content:
@@ -485,7 +485,7 @@ paths:
     post:
       operationId: createAgentSecurityReport
       security: [{ AgentSiwaHeaders: [] }]
-      description: Security report stored from a signed agent request using a regents.sh SIWA receipt.
+      description: Security report stored from a signed agent request using a regent-services SIWA receipt.
       requestBody:
         required: true
         content:
@@ -1464,10 +1464,609 @@ paths:
           $ref: '#/components/responses/StatusMessage502'
         '503':
           $ref: '#/components/responses/StatusMessage503'
+  /api/agent-platform/rwr/account:
+    get:
+      operationId: rwrAccount
+      security: [{ PrivySessionCookie: [] }]
+      responses:
+        '200':
+          description: Current Regent Work Runtime account and owned companies
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrAccountResponse'
+  /api/agent-platform/companies/{company_id}/rwr/work-items:
+    get:
+      operationId: listRwrWorkItems
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+      responses:
+        '200':
+          description: Regent Work Runtime work items for the company
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrWorkItemListResponse'
+    post:
+      operationId: createRwrWorkItem
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RwrWorkItemCreateRequest'
+      responses:
+        '201':
+          description: Created Regent Work Runtime work item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrWorkItemResponse'
+  /api/agent-platform/companies/{company_id}/rwr/work-items/{work_item_id}:
+    get:
+      operationId: getRwrWorkItem
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: work_item_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Regent Work Runtime work item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrWorkItemResponse'
+  /api/agent-platform/companies/{company_id}/rwr/work-items/{work_item_id}/runs:
+    post:
+      operationId: startRwrWorkRun
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: work_item_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RwrRunStartRequest'
+      responses:
+        '201':
+          description: Started Regent Work Runtime run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrRunResponse'
+  /api/agent-platform/companies/{company_id}/rwr/runs/{run_id}:
+    get:
+      operationId: getRwrRun
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Regent Work Runtime run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrRunResponse'
+  /api/agent-platform/companies/{company_id}/rwr/runs/{run_id}/events:
+    get:
+      operationId: listRwrRunEvents
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Regent Work Runtime run events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrRunEventListResponse'
+    post:
+      operationId: appendRwrRunEvent
+      security: [{ AgentSiwaHeaders: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RwrRunEventAppendRequest'
+      responses:
+        '201':
+          description: Appended Regent Work Runtime run event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrRunEventResponse'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /api/agent-platform/companies/{company_id}/rwr/runs/{run_id}/artifacts:
+    get:
+      operationId: listRwrRunArtifacts
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Regent Work Runtime run artifacts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrArtifactListResponse'
+    post:
+      operationId: createRwrRunArtifact
+      security: [{ AgentSiwaHeaders: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RwrArtifactCreateRequest'
+      responses:
+        '201':
+          description: Created Regent Work Runtime run artifact
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrArtifactResponse'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /api/agent-platform/companies/{company_id}/rwr/workers:
+    get:
+      operationId: listRwrWorkers
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+      responses:
+        '200':
+          description: Regent Work Runtime workers for the company
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrWorkerListResponse'
+    post:
+      operationId: registerRwrWorker
+      security: [{ AgentSiwaHeaders: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RwrWorkerRegistrationRequest'
+      responses:
+        '201':
+          description: Registered Regent Work Runtime worker
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrWorkerRegistrationResponse'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /api/agent-platform/companies/{company_id}/rwr/workers/{worker_id}/heartbeat:
+    post:
+      operationId: heartbeatRwrWorker
+      security: [{ AgentSiwaHeaders: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: worker_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Updated Regent Work Runtime worker heartbeat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrWorkerResponse'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /api/agent-platform/companies/{company_id}/rwr/workers/{worker_id}/assignments:
+    get:
+      operationId: listRwrWorkerAssignments
+      security: [{ AgentSiwaHeaders: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: worker_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Regent Work Runtime worker assignments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrWorkerAssignmentListResponse'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /api/agent-platform/companies/{company_id}/rwr/assignments/{assignment_id}/claim:
+    post:
+      operationId: claimRwrWorkerAssignment
+      security: [{ AgentSiwaHeaders: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: assignment_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Claimed Regent Work Runtime worker assignment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrWorkerAssignmentResponse'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /api/agent-platform/companies/{company_id}/rwr/assignments/{assignment_id}/release:
+    post:
+      operationId: releaseRwrWorkerAssignment
+      security: [{ AgentSiwaHeaders: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: assignment_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Released Regent Work Runtime worker assignment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrWorkerAssignmentResponse'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /api/agent-platform/companies/{company_id}/rwr/assignments/{assignment_id}/complete:
+    post:
+      operationId: completeRwrWorkerAssignment
+      security: [{ AgentSiwaHeaders: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: assignment_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Completed Regent Work Runtime worker assignment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrWorkerAssignmentResponse'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /api/agent-platform/companies/{company_id}/rwr/runtimes:
+    get:
+      operationId: listRwrRuntimes
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+      responses:
+        '200':
+          description: Regent Work Runtime profiles for the company
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrRuntimeListResponse'
+    post:
+      operationId: createRwrRuntime
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RwrRuntimeCreateRequest'
+      responses:
+        '201':
+          description: Created Regent Work Runtime profile for the company
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrRuntimeResponse'
+  /api/agent-platform/companies/{company_id}/rwr/runtimes/{runtime_id}:
+    get:
+      operationId: getRwrRuntime
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: runtime_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Regent Work Runtime profile for the company
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrRuntimeResponse'
+  /api/agent-platform/companies/{company_id}/rwr/runtimes/{runtime_id}/checkpoint:
+    post:
+      operationId: checkpointRwrRuntime
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: runtime_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RwrRuntimeCheckpointRequest'
+      responses:
+        '201':
+          description: Created Regent Work Runtime checkpoint record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrRuntimeCheckpointResponse'
+  /api/agent-platform/companies/{company_id}/rwr/runtimes/{runtime_id}/restore:
+    post:
+      operationId: restoreRwrRuntime
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: runtime_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RwrRuntimeRestoreRequest'
+      responses:
+        '200':
+          description: Accepted Regent Work Runtime restore request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrRuntimeRestoreResponse'
+  /api/agent-platform/companies/{company_id}/rwr/runtimes/{runtime_id}/pause:
+    post:
+      operationId: pauseRwrRuntime
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: runtime_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paused Regent Work Runtime profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrRuntimeResponse'
+  /api/agent-platform/companies/{company_id}/rwr/runtimes/{runtime_id}/resume:
+    post:
+      operationId: resumeRwrRuntime
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: runtime_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Resumed Regent Work Runtime profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrRuntimeResponse'
+  /api/agent-platform/companies/{company_id}/rwr/runtimes/{runtime_id}/services:
+    get:
+      operationId: listRwrRuntimeServices
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: runtime_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Regent Work Runtime services for the runtime
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrRuntimeServiceListResponse'
+  /api/agent-platform/companies/{company_id}/rwr/runtimes/{runtime_id}/health:
+    get:
+      operationId: getRwrRuntimeHealth
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: runtime_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Regent Work Runtime health for the runtime
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrRuntimeHealthResponse'
+  /api/agent-platform/companies/{company_id}/rwr/runs/{run_id}/delegations:
+    post:
+      operationId: requestRwrDelegation
+      security: [{ AgentSiwaHeaders: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RwrDelegationRequest'
+      responses:
+        '201':
+          description: Created delegated Regent Work Runtime child runs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrDelegationResponse'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /api/agent-platform/companies/{company_id}/rwr/agents/{source_id}/relationships:
+    get:
+      operationId: listRwrAgentRelationships
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: source_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Regent Work Runtime agent relationships
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrAgentRelationshipListResponse'
+    post:
+      operationId: createRwrAgentRelationship
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: source_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RwrAgentRelationshipCreateRequest'
+      responses:
+        '201':
+          description: Created Regent Work Runtime agent relationship
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrAgentRelationshipResponse'
+  /api/agent-platform/companies/{company_id}/rwr/agents/{manager_id}/execution-pool:
+    get:
+      operationId: listRwrExecutionPool
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: manager_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Regent Work Runtime execution pool workers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrExecutionPoolResponse'
+  /api/agent-platform/companies/{company_id}/rwr/agent-relationships/{relationship_id}:
+    delete:
+      operationId: deleteRwrAgentRelationship
+      security: [{ PrivySessionCookie: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CompanyId'
+        - name: relationship_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted Regent Work Runtime agent relationship
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RwrAgentRelationshipResponse'
 components:
   parameters:
     SessionId:
       name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    CompanyId:
+      name: company_id
       in: path
       required: true
       schema:
@@ -1544,7 +2143,7 @@ components:
       type: apiKey
       in: header
       name: x-siwa-receipt
-      description: Placeholder for the signed SIWA header bundle used by authenticated agent requests. The required receipt audience depends on the operation description.
+      description: Signed SIWA header bundle used by authenticated agent requests. The required receipt audience depends on the operation description.
   schemas:
     StatusMessage:
       type: object
@@ -1552,6 +2151,898 @@ components:
       properties:
         statusMessage:
           type: string
+    AgentKind:
+      type: string
+      enum: [hermes, openclaw, codex, custom, human_operator, regent_bridge]
+    WorkerRole:
+      type: string
+      enum: [manager, executor, hybrid]
+    ExecutionSurface:
+      type: string
+      enum: [hosted_sprite, local_bridge, external_webhook]
+    RunnerKind:
+      type: string
+      enum:
+        [
+          hermes_local_manager,
+          hermes_hosted_manager,
+          openclaw_local_manager,
+          codex_exec,
+          codex_app_server,
+          openclaw_local_executor,
+          openclaw_code_agent_local,
+          fake,
+          custom_worker
+        ]
+    BillingMode:
+      type: string
+      enum: [platform_hosted, user_local, external_self_reported]
+    TrustScope:
+      type: string
+      enum: [platform_hosted, local_user_controlled, external_user_controlled]
+    ReportedUsagePolicy:
+      type: string
+      enum: [platform_metered, self_reported, external_reported]
+    RelationshipKind:
+      type: string
+      enum: [manager_of, preferred_executor, can_delegate_to, reports_to]
+    RelationshipStatus:
+      type: string
+      enum: [active, paused, revoked]
+    RwrCompanySummary:
+      type: object
+      required: [id, name, slug, status]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+    RwrAgentProfile:
+      type: object
+      required: [id, company_id, name, agent_kind, default_runner_kind, status, visibility]
+      properties:
+        id:
+          type: integer
+        company_id:
+          type: integer
+        name:
+          type: string
+        agent_kind:
+          $ref: '#/components/schemas/AgentKind'
+        default_runner_kind:
+          oneOf:
+            - $ref: '#/components/schemas/RunnerKind'
+            - type: 'null'
+        status:
+          type: string
+        visibility:
+          type: string
+          enum: [operator, company, public]
+    RwrWorkItem:
+      type: object
+      required: [id, company_id, title, description, status, priority, visibility, desired_runner_kind, assigned_worker_id, assigned_agent_profile_id, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        company_id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: [string, 'null']
+        status:
+          type: string
+        priority:
+          type: string
+          enum: [normal, urgent]
+        visibility:
+          type: string
+          enum: [operator, company, public]
+        desired_runner_kind:
+          oneOf:
+            - $ref: '#/components/schemas/RunnerKind'
+            - type: 'null'
+        assigned_worker_id:
+          type: [integer, 'null']
+        assigned_agent_profile_id:
+          type: [integer, 'null']
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    RwrRun:
+      type: object
+      required: [id, company_id, work_item_id, parent_run_id, root_run_id, worker_id, runtime_profile_id, runner_kind, status, visibility, summary, failure_reason, cost_usd, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        company_id:
+          type: integer
+        work_item_id:
+          type: integer
+        parent_run_id:
+          type: [integer, 'null']
+        root_run_id:
+          type: [integer, 'null']
+        worker_id:
+          type: [integer, 'null']
+        runtime_profile_id:
+          type: [integer, 'null']
+        runner_kind:
+          $ref: '#/components/schemas/RunnerKind'
+        status:
+          type: string
+        visibility:
+          type: string
+          enum: [operator, company, public]
+        summary:
+          type: [string, 'null']
+        failure_reason:
+          type: [string, 'null']
+        cost_usd:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    RwrRunEvent:
+      type: object
+      required: [id, company_id, run_id, sequence, kind, actor_kind, actor_id, visibility, sensitivity, payload, occurred_at]
+      properties:
+        id:
+          type: integer
+        company_id:
+          type: integer
+        run_id:
+          type: integer
+        sequence:
+          type: integer
+        kind:
+          type: string
+        actor_kind:
+          type: [string, 'null']
+        actor_id:
+          type: [string, 'null']
+        visibility:
+          type: string
+          enum: [operator, company, public]
+        sensitivity:
+          type: string
+          enum: [normal, sensitive, secret]
+        payload:
+          type: object
+          additionalProperties: true
+        occurred_at:
+          type: string
+          format: date-time
+    RwrArtifact:
+      type: object
+      required: [id, company_id, work_item_id, run_id, artifact_type, title, url, visibility, attestation_level, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        company_id:
+          type: integer
+        work_item_id:
+          type: integer
+        run_id:
+          type: integer
+        artifact_type:
+          type: string
+        title:
+          type: [string, 'null']
+        url:
+          type: [string, 'null']
+        visibility:
+          type: string
+          enum: [operator, company, public]
+        attestation_level:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    RwrWorker:
+      type: object
+      required: [id, company_id, agent_profile_id, runtime_profile_id, name, agent_kind, worker_role, execution_surface, runner_kind, billing_mode, trust_scope, reported_usage_policy, status, last_heartbeat_at]
+      properties:
+        id:
+          type: integer
+        company_id:
+          type: integer
+        agent_profile_id:
+          type: integer
+        runtime_profile_id:
+          type: [integer, 'null']
+        name:
+          type: string
+        agent_kind:
+          $ref: '#/components/schemas/AgentKind'
+        worker_role:
+          $ref: '#/components/schemas/WorkerRole'
+        execution_surface:
+          $ref: '#/components/schemas/ExecutionSurface'
+        runner_kind:
+          $ref: '#/components/schemas/RunnerKind'
+        billing_mode:
+          $ref: '#/components/schemas/BillingMode'
+        trust_scope:
+          $ref: '#/components/schemas/TrustScope'
+        reported_usage_policy:
+          $ref: '#/components/schemas/ReportedUsagePolicy'
+        status:
+          type: string
+        last_heartbeat_at:
+          type: [string, 'null']
+          format: date-time
+    RwrRuntime:
+      type: object
+      required: [id, company_id, platform_agent_id, name, runner_kind, execution_surface, billing_mode, status, visibility, config, metadata]
+      properties:
+        id:
+          type: integer
+        company_id:
+          type: integer
+        platform_agent_id:
+          type: [integer, 'null']
+        name:
+          type: string
+        runner_kind:
+          $ref: '#/components/schemas/RunnerKind'
+        execution_surface:
+          $ref: '#/components/schemas/ExecutionSurface'
+        billing_mode:
+          $ref: '#/components/schemas/BillingMode'
+        status:
+          type: string
+        visibility:
+          type: string
+          enum: [operator, company, public]
+        config:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+    RwrRuntimeService:
+      type: object
+      required: [id, company_id, runtime_profile_id, name, service_kind, status, endpoint_url, metadata]
+      properties:
+        id:
+          type: integer
+        company_id:
+          type: integer
+        runtime_profile_id:
+          type: integer
+        name:
+          type: string
+        service_kind:
+          type: string
+        status:
+          type: string
+        endpoint_url:
+          type: [string, 'null']
+        metadata:
+          type: object
+          additionalProperties: true
+    RwrRuntimeCheckpoint:
+      type: object
+      required: [id, company_id, runtime_profile_id, work_run_id, checkpoint_ref, status, protected, captured_at, metadata, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        company_id:
+          type: integer
+        runtime_profile_id:
+          type: integer
+        work_run_id:
+          type: [integer, 'null']
+        checkpoint_ref:
+          type: string
+        status:
+          type: string
+          enum: [pending, ready, failed]
+        protected:
+          type: boolean
+        captured_at:
+          type: [string, 'null']
+          format: date-time
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    RwrAgentRelationship:
+      type: object
+      required: [id, company_id, source_agent_profile_id, target_agent_profile_id, source_worker_id, target_worker_id, relationship_kind, status, max_parallel_runs]
+      properties:
+        id:
+          type: integer
+        company_id:
+          type: integer
+        source_agent_profile_id:
+          type: [integer, 'null']
+        target_agent_profile_id:
+          type: [integer, 'null']
+        source_worker_id:
+          type: [integer, 'null']
+        target_worker_id:
+          type: [integer, 'null']
+        relationship_kind:
+          $ref: '#/components/schemas/RelationshipKind'
+        status:
+          $ref: '#/components/schemas/RelationshipStatus'
+        max_parallel_runs:
+          type: integer
+    RwrWorkerAssignment:
+      type: object
+      required: [id, company_id, worker_id, work_run_id, status, claimed_at, leased_until, released_at]
+      properties:
+        id:
+          type: integer
+        company_id:
+          type: integer
+        worker_id:
+          type: integer
+        work_run_id:
+          type: integer
+        status:
+          type: string
+        claimed_at:
+          type: [string, 'null']
+          format: date-time
+        leased_until:
+          type: [string, 'null']
+          format: date-time
+        released_at:
+          type: [string, 'null']
+          format: date-time
+    RwrAccountResponse:
+      type: object
+      required: [ok, authenticated, companies]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        authenticated:
+          type: boolean
+        companies:
+          type: array
+          items:
+            $ref: '#/components/schemas/RwrCompanySummary'
+    RwrWorkItemListResponse:
+      type: object
+      required: [ok, company_id, work_items]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        company_id:
+          type: integer
+        work_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RwrWorkItem'
+    RwrWorkItemResponse:
+      type: object
+      required: [ok, work_item]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        work_item:
+          $ref: '#/components/schemas/RwrWorkItem'
+    RwrRunResponse:
+      type: object
+      required: [ok, run]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        run:
+          $ref: '#/components/schemas/RwrRun'
+    RwrRunEventListResponse:
+      type: object
+      required: [ok, run_id, events]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        run_id:
+          type: integer
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/RwrRunEvent'
+    RwrRunEventResponse:
+      type: object
+      required: [ok, event]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        event:
+          $ref: '#/components/schemas/RwrRunEvent'
+    RwrArtifactListResponse:
+      type: object
+      required: [ok, run_id, artifacts]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        run_id:
+          type: integer
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/RwrArtifact'
+    RwrArtifactResponse:
+      type: object
+      required: [ok, artifact]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        artifact:
+          $ref: '#/components/schemas/RwrArtifact'
+    RwrWorkerListResponse:
+      type: object
+      required: [ok, company_id, workers]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        company_id:
+          type: integer
+        workers:
+          type: array
+          items:
+            $ref: '#/components/schemas/RwrWorker'
+    RwrWorkerResponse:
+      type: object
+      required: [ok, worker]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        worker:
+          $ref: '#/components/schemas/RwrWorker'
+    RwrWorkerRegistrationResponse:
+      type: object
+      required: [ok, agent_profile, worker]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        agent_profile:
+          $ref: '#/components/schemas/RwrAgentProfile'
+        worker:
+          $ref: '#/components/schemas/RwrWorker'
+    RwrWorkerAssignmentListResponse:
+      type: object
+      required: [ok, assignments]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/RwrWorkerAssignment'
+    RwrWorkerAssignmentResponse:
+      type: object
+      required: [ok, assignment]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        assignment:
+          $ref: '#/components/schemas/RwrWorkerAssignment'
+    RwrRuntimeListResponse:
+      type: object
+      required: [ok, company_id, runtimes]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        company_id:
+          type: integer
+        runtimes:
+          type: array
+          items:
+            $ref: '#/components/schemas/RwrRuntime'
+    RwrRuntimeResponse:
+      type: object
+      required: [ok, runtime]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        runtime:
+          $ref: '#/components/schemas/RwrRuntime'
+    RwrRuntimeCheckpointResponse:
+      type: object
+      required: [ok, checkpoint]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        checkpoint:
+          $ref: '#/components/schemas/RwrRuntimeCheckpoint'
+    RwrRuntimeRestoreResponse:
+      type: object
+      required: [ok, runtime, checkpoint, restore]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        runtime:
+          $ref: '#/components/schemas/RwrRuntime'
+        checkpoint:
+          $ref: '#/components/schemas/RwrRuntimeCheckpoint'
+        restore:
+          type: object
+          required: [status]
+          properties:
+            status:
+              type: string
+              enum: [accepted]
+    RwrRuntimeServiceListResponse:
+      type: object
+      required: [ok, company_id, runtime_id, services]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        company_id:
+          type: integer
+        runtime_id:
+          type: integer
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/RwrRuntimeService'
+    RwrRuntimeHealthResponse:
+      type: object
+      required: [ok, company_id, runtime_id, health]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        company_id:
+          type: integer
+        runtime_id:
+          type: integer
+        health:
+          type: object
+          required: [status, available, metering_status]
+          properties:
+            status:
+              type: string
+            available:
+              type: boolean
+            metering_status:
+              type: string
+    RwrDelegationResponse:
+      type: object
+      required: [ok, target_worker, child_runs]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        target_worker:
+          $ref: '#/components/schemas/RwrWorker'
+        child_runs:
+          type: array
+          items:
+            $ref: '#/components/schemas/RwrRun'
+    RwrAgentRelationshipListResponse:
+      type: object
+      required: [ok, company_id, relationships]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        company_id:
+          type: integer
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/RwrAgentRelationship'
+    RwrAgentRelationshipResponse:
+      type: object
+      required: [ok, relationship]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        relationship:
+          $ref: '#/components/schemas/RwrAgentRelationship'
+    RwrExecutionPoolResponse:
+      type: object
+      required: [ok, company_id, workers]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        company_id:
+          type: integer
+        workers:
+          type: array
+          items:
+            $ref: '#/components/schemas/RwrWorker'
+    RwrWorkItemCreateRequest:
+      type: object
+      required: [company_id, title]
+      properties:
+        company_id:
+          type: string
+        title:
+          type: string
+        description:
+          type: [string, 'null']
+        priority:
+          type: string
+          enum: [normal, urgent]
+          default: normal
+        visibility:
+          type: string
+          enum: [operator, company, public]
+          default: operator
+        metadata:
+          type: object
+          additionalProperties: true
+    RwrRunStartRequest:
+      type: object
+      required: [company_id, work_item_id, runner_kind]
+      properties:
+        company_id:
+          type: string
+        work_item_id:
+          type: string
+        runner_kind:
+          $ref: '#/components/schemas/RunnerKind'
+        worker_id:
+          type: [string, 'null']
+        instructions:
+          type: [string, 'null']
+        metadata:
+          type: object
+          additionalProperties: true
+    RwrWorkerRegistrationRequest:
+      type: object
+      required: [company_id, agent_kind, worker_role, execution_surface, runner_kind, billing_mode, trust_scope, reported_usage_policy]
+      properties:
+        company_id:
+          type: string
+        agent_kind:
+          $ref: '#/components/schemas/AgentKind'
+        worker_role:
+          $ref: '#/components/schemas/WorkerRole'
+        execution_surface:
+          $ref: '#/components/schemas/ExecutionSurface'
+        runner_kind:
+          $ref: '#/components/schemas/RunnerKind'
+        billing_mode:
+          $ref: '#/components/schemas/BillingMode'
+        trust_scope:
+          $ref: '#/components/schemas/TrustScope'
+        reported_usage_policy:
+          $ref: '#/components/schemas/ReportedUsagePolicy'
+        display_name:
+          type: [string, 'null']
+        endpoint_url:
+          type: [string, 'null']
+    RwrRuntimeCreateRequest:
+      type: object
+      required: [company_id, name, runner_kind, execution_surface, billing_mode]
+      properties:
+        company_id:
+          type: string
+        platform_agent_id:
+          type: [string, 'null']
+        name:
+          type: string
+        runner_kind:
+          $ref: '#/components/schemas/RunnerKind'
+        execution_surface:
+          $ref: '#/components/schemas/ExecutionSurface'
+        billing_mode:
+          $ref: '#/components/schemas/BillingMode'
+        status:
+          type: string
+          enum: [active, paused, retired]
+        visibility:
+          type: string
+          enum: [operator, company, public]
+        config:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+    RwrRuntimeCheckpointRequest:
+      type: object
+      required: [company_id, runtime_id, checkpoint_ref]
+      properties:
+        company_id:
+          type: string
+        runtime_id:
+          type: string
+        checkpoint_ref:
+          type: string
+        status:
+          type: string
+          enum: [pending, ready, failed]
+        captured_at:
+          type: [string, 'null']
+          format: date-time
+        metadata:
+          type: object
+          additionalProperties: true
+    RwrRuntimeRestoreRequest:
+      type: object
+      required: [company_id, runtime_id, checkpoint_id]
+      properties:
+        company_id:
+          type: string
+        runtime_id:
+          type: string
+        checkpoint_id:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    RwrRunEventAppendRequest:
+      type: object
+      required: [company_id, run_id, kind]
+      properties:
+        company_id:
+          type: string
+        run_id:
+          type: string
+        sequence:
+          type: integer
+          minimum: 1
+        kind:
+          type: string
+        actor_kind:
+          type: string
+        actor_id:
+          type: [string, 'null']
+        visibility:
+          type: string
+          enum: [operator, company, public]
+        sensitivity:
+          type: string
+          enum: [normal, sensitive, secret]
+        occurred_at:
+          type: string
+          format: date-time
+        idempotency_key:
+          type: [string, 'null']
+        payload:
+          type: object
+          additionalProperties: true
+    RwrArtifactCreateRequest:
+      type: object
+      required: [company_id, run_id, artifact_type, visibility]
+      properties:
+        company_id:
+          type: string
+        run_id:
+          type: string
+        artifact_type:
+          type: string
+        title:
+          type: [string, 'null']
+        body:
+          type: [string, 'null']
+        url:
+          type: [string, 'null']
+        visibility:
+          type: string
+          enum: [operator, company, public]
+        publish_action:
+          oneOf:
+            - type: string
+              enum: [publish_artifact]
+            - type: 'null'
+        metadata:
+          type: object
+          additionalProperties: true
+    RwrDelegationRequest:
+      type: object
+      required: [company_id, run_id, requested_runner_kind, strategy, tasks]
+      properties:
+        company_id:
+          type: string
+        run_id:
+          type: string
+        work_item_id:
+          type: [string, 'null']
+        relationship_kind:
+          $ref: '#/components/schemas/RelationshipKind'
+        requested_runner_kind:
+          $ref: '#/components/schemas/RunnerKind'
+        preferred_agent_kind:
+          oneOf:
+            - type: string
+              enum: [codex, openclaw, custom]
+            - type: 'null'
+        target_agent_profile_id:
+          type: [string, 'null']
+        target_worker_id:
+          type: [string, 'null']
+        execution_surface:
+          oneOf:
+            - $ref: '#/components/schemas/ExecutionSurface'
+            - type: string
+              enum: [manager_decides]
+            - type: 'null'
+        strategy:
+          type: string
+          enum: [parallel, serial, manager_decides]
+        tasks:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [title]
+            properties:
+              title:
+                type: string
+              instructions:
+                type: [string, 'null']
+              metadata:
+                type: object
+                additionalProperties: true
+        budget_limit_usd_cents:
+          type: [integer, 'null']
+        instructions:
+          type: [string, 'null']
+    RwrAgentRelationshipCreateRequest:
+      type: object
+      required: [company_id, relationship_kind]
+      properties:
+        company_id:
+          type: string
+        source_agent_profile_id:
+          type: [string, 'null']
+        target_agent_profile_id:
+          type: [string, 'null']
+        source_worker_id:
+          type: [string, 'null']
+        target_worker_id:
+          type: [string, 'null']
+        relationship_kind:
+          $ref: '#/components/schemas/RelationshipKind'
+        status:
+          $ref: '#/components/schemas/RelationshipStatus'
+        max_parallel_runs:
+          type: integer
+          minimum: 1
+          default: 1
+        routing_policy:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
     ReadyzChecks:
       type: object
       additionalProperties: false
