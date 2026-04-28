@@ -301,23 +301,34 @@ defmodule PlatformPhx.Runners.CodexExecTest do
     def create_runtime(attrs), do: {:ok, attrs}
     def get_runtime(runtime_id), do: {:ok, %{"id" => runtime_id}}
     def create_checkpoint(_runtime_id, attrs), do: {:ok, attrs}
-    def restore_checkpoint(_runtime_id, checkpoint_ref), do: {:ok, %{"checkpoint_ref" => checkpoint_ref}}
-    def observe_capacity(_runtime_id), do: {:ok, %{}}
 
-    def exec(_runtime_id, %{"command" => "cat " <> _path}) do
-      {:ok, %{"stdout" => workflow_file(review_required: true)}}
-    end
+    def restore_checkpoint(_runtime_id, checkpoint_ref),
+      do: {:ok, %{"checkpoint_ref" => checkpoint_ref}}
+
+    def observe_capacity(_runtime_id), do: {:ok, %{}}
 
     def exec(_runtime_id, %{"command" => command}) do
       cond do
+        String.contains?(command, Workspaces.test_output_file()) ->
+          {:ok, %{"stdout" => "mix test passed\n"}}
+
+        String.starts_with?(command, "cat ") ->
+          {:ok,
+           %{
+             "stdout" => """
+             ---
+             name: sprite-workspace-test
+             review_required: true
+             ---
+             Complete {{ work_item.title }}.
+             """
+           }}
+
         String.contains?(command, "git status") ->
           {:ok, %{"stdout" => " M remote.txt\n?? new.txt\n"}}
 
         String.contains?(command, "git diff") ->
           {:ok, %{"stdout" => "diff --git a/remote.txt b/remote.txt\n"}}
-
-        String.contains?(command, Workspaces.test_output_file()) ->
-          {:ok, %{"stdout" => "mix test passed\n"}}
 
         true ->
           {:ok, %{"stdout" => ""}}

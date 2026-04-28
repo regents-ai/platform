@@ -222,9 +222,15 @@ defmodule PlatformPhx.Workspaces do
 
       def collect_artifacts(%{provider_runtime_id: runtime_id, path: path}) do
         with {:ok, changed_files} <-
-               exec(runtime_id, "cd #{shell_quote(path)} && git status --short 2>/dev/null || true"),
+               exec(
+                 runtime_id,
+                 "cd #{shell_quote(path)} && git status --short 2>/dev/null || true"
+               ),
              {:ok, patch} <-
-               exec(runtime_id, "cd #{shell_quote(path)} && git diff --no-ext-diff -- 2>/dev/null || true"),
+               exec(
+                 runtime_id,
+                 "cd #{shell_quote(path)} && git diff --no-ext-diff -- 2>/dev/null || true"
+               ),
              {:ok, test_output} <-
                exec(
                  runtime_id,
