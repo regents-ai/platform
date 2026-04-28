@@ -39,7 +39,7 @@ defmodule PlatformPhxWeb.AppComponents.SetupPresenter do
 
     %{
       formation_snapshot
-      | company_opened?: formation && formation.status == "succeeded",
+      | company_opened?: not is_nil(company) and not formation_active?(formation),
         company_opening?: formation_active?(formation)
     }
   end
