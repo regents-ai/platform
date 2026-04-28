@@ -34,7 +34,7 @@ config :platform_phx, PlatformPhxWeb.PrometheusExporter,
 
 config :platform_phx, Oban,
   repo: PlatformPhx.Repo,
-  queues: [agent_formation: 1, billing: 5, runtime_metering: 1],
+  queues: [agent_formation: 1, billing: 5, runtime_metering: 1, runtime_registry: 2, work_runs: 1],
   plugins: [
     {Oban.Plugins.Pruner, max_age: 86_400},
     {Oban.Plugins.Cron,

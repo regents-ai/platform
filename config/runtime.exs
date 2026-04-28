@@ -98,7 +98,7 @@ config :agent_world, :networks, %{
 
 if config_env() != :test do
   oban_queues =
-    [billing: 5, runtime_metering: 1]
+    [billing: 5, runtime_metering: 1, runtime_registry: 2, work_runs: 1]
     |> then(fn queues ->
       if agent_formation_enabled do
         Keyword.put(queues, :agent_formation, 1)

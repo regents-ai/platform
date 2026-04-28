@@ -51,6 +51,8 @@ defmodule PlatformPhx.AgentPlatform.SpriteUsageRecord do
       :window_ended_at,
       :status
     ])
+    |> validate_number(:usage_seconds, greater_than_or_equal_to: 0)
+    |> validate_number(:amount_usd_cents, greater_than_or_equal_to: 0)
     |> validate_number(:stripe_sync_attempt_count, greater_than_or_equal_to: 0)
     |> validate_inclusion(:status, ["pending", "reported", "failed"])
     |> unique_constraint([:agent_id, :window_started_at, :window_ended_at])
