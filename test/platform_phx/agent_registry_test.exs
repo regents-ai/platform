@@ -2,7 +2,6 @@ defmodule PlatformPhx.AgentRegistryTest do
   use PlatformPhx.DataCase, async: false
 
   alias PlatformPhx.Accounts.HumanUser
-  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentRegistry
   alias PlatformPhx.AgentRegistry.AgentWorker
   alias PlatformPhx.Work
@@ -107,6 +106,40 @@ defmodule PlatformPhx.AgentRegistryTest do
 
     refute local_codex.valid?
     assert %{execution_surface: [_], billing_mode: [_]} = errors_on(local_codex)
+  end
+
+  test "worker registration accepts request-shaped hosted Codex attrs" do
+    %{company: company} = company_fixture("worker-request-shape")
+
+    {:ok, profile} =
+      AgentRegistry.create_agent_profile(%{
+        company_id: company.id,
+        name: "worker-request-shape codex profile",
+        agent_kind: "codex",
+        default_runner_kind: "codex_exec"
+      })
+
+    assert {:ok, worker} =
+             AgentRegistry.register_worker(
+               company.id,
+               %{
+                 "agent_profile_id" => profile.id,
+                 "name" => "Hosted Codex",
+                 "agent_kind" => "codex",
+                 "worker_role" => "executor",
+                 "execution_surface" => "hosted_sprite",
+                 "runner_kind" => "codex_exec",
+                 "billing_mode" => "platform_hosted",
+                 "trust_scope" => "platform_hosted",
+                 "reported_usage_policy" => "platform_metered"
+               },
+               %{}
+             )
+
+    assert worker.company_id == company.id
+    assert worker.agent_kind == "codex"
+    assert worker.execution_surface == "hosted_sprite"
+    assert worker.reported_usage_policy == "platform_metered"
   end
 
   test "heartbeat updates only a worker owned by the same company" do
@@ -290,7 +323,7 @@ defmodule PlatformPhx.AgentRegistryTest do
     assert Enum.map(pool, & &1.id) == [openclaw_executor.id]
   end
 
-  test "execution pool excludes stale workers and filters by requested capabilities" do
+  test "execution pool excludes stale workers without changing them during reads" do
     %{company: company, profile: hermes} =
       worker_fixture("pool-capabilities-manager",
         profile_attrs: %{agent_kind: "hermes", default_runner_kind: "hermes_local_manager"},
@@ -338,7 +371,7 @@ defmodule PlatformPhx.AgentRegistryTest do
       )
 
     assert Enum.map(pool, & &1.id) == [capable_worker.id]
-    assert AgentRegistry.get_worker(company.id, stale_worker.id).status == "offline"
+    assert AgentRegistry.get_worker(company.id, stale_worker.id).status == "active"
   end
 
   test "execution pool respects relationship capacity" do
@@ -479,7 +512,7 @@ defmodule PlatformPhx.AgentRegistryTest do
     slug = "agent-registry-#{key}-#{System.unique_integer([:positive])}"
 
     {:ok, company} =
-      AgentPlatform.create_company(human, %{
+      PlatformPhx.AgentPlatform.Companies.create_company(human, %{
         name: "#{key} Regent",
         slug: slug,
         claimed_label: slug,

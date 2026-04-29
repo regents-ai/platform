@@ -67,7 +67,7 @@ defmodule PlatformPhx.RuntimeRegistry.SpritesService do
 
   defp persist_service_observation(%RuntimeService{} = service, payload) do
     service
-    |> RuntimeService.changeset(observation_attrs(payload))
+    |> RuntimeService.changeset(observation_attrs(service, payload))
     |> Repo.update()
   end
 
@@ -80,23 +80,23 @@ defmodule PlatformPhx.RuntimeRegistry.SpritesService do
       status: normalize_status(payload),
       endpoint_url: payload["endpoint_url"] || payload["url"],
       provider_service_id: payload["id"],
-      status_observed_at: DateTime.utc_now() |> DateTime.truncate(:second),
+      status_observed_at: PlatformPhx.Clock.now(),
       log_cursor: payload["log_cursor"],
       last_log_excerpt: payload["last_log_excerpt"],
       metadata: Map.get(payload, "metadata", %{})
     }
   end
 
-  defp observation_attrs(payload) do
+  defp observation_attrs(%RuntimeService{} = service, payload) do
     logs = Map.get(payload, "logs", %{})
 
     %{
       status: normalize_status(payload),
       endpoint_url: payload["endpoint_url"] || payload["url"],
-      status_observed_at: DateTime.utc_now() |> DateTime.truncate(:second),
+      status_observed_at: PlatformPhx.Clock.now(),
       log_cursor: logs["next_cursor"] || payload["log_cursor"],
       last_log_excerpt: logs["excerpt"] || payload["last_log_excerpt"],
-      metadata: Map.get(payload, "metadata", %{})
+      metadata: Map.merge(service.metadata || %{}, Map.get(payload, "metadata", %{}))
     }
   end
 

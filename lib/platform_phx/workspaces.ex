@@ -99,9 +99,7 @@ defmodule PlatformPhx.Workspaces do
     @moduledoc false
 
     def prepare(%WorkRun{} = run, %RuntimeProfile{} = profile) do
-      client = client()
-
-      case client.prepare_workspace(run, profile) do
+      case PlatformPhx.Workspaces.SpriteWorkspace.prepare_workspace(run, profile) do
         {:ok, workspace} ->
           workspace = Map.new(workspace)
 
@@ -121,32 +119,22 @@ defmodule PlatformPhx.Workspaces do
     end
 
     def write_prompt(workspace, prompt) do
-      client = client()
-
-      case client.write_prompt(workspace, prompt) do
+      case PlatformPhx.Workspaces.SpriteWorkspace.write_prompt(workspace, prompt) do
         {:ok, attrs} -> {:ok, Map.merge(workspace, Map.new(attrs))}
         {:error, reason} -> {:error, reason}
       end
     end
 
     def load_workflow(workspace) do
-      client().load_workflow(workspace)
+      PlatformPhx.Workspaces.SpriteWorkspace.load_workflow(workspace)
     end
 
     def collect(workspace) do
-      client().collect_artifacts(workspace)
-    end
-
-    defp client do
-      Application.get_env(
-        :platform_phx,
-        :workspace_sprite_client,
-        PlatformPhx.Workspaces.SpritesClient
-      )
+      PlatformPhx.Workspaces.SpriteWorkspace.collect_artifacts(workspace)
     end
   end
 
-  defmodule SpritesClient do
+  defmodule SpriteWorkspace do
     @moduledoc false
 
     alias PlatformPhx.RuntimeRegistry.RuntimeProfile
@@ -154,26 +142,22 @@ defmodule PlatformPhx.Workspaces do
     alias PlatformPhx.Workflows
 
     def prepare_workspace(run, profile) do
-      client().prepare_workspace(run, profile)
+      __MODULE__.Default.prepare_workspace(run, profile)
     end
 
     def write_prompt(workspace, prompt) do
-      client().write_prompt(workspace, prompt)
+      __MODULE__.Default.write_prompt(workspace, prompt)
     end
 
     def load_workflow(workspace) do
-      client().load_workflow(workspace)
+      __MODULE__.Default.load_workflow(workspace)
     end
 
     def collect_artifacts(workspace) do
-      client().collect_artifacts(workspace)
+      __MODULE__.Default.collect_artifacts(workspace)
     end
 
-    defp client do
-      Application.get_env(:platform_phx, :sprites_workspace_client, __MODULE__.DefaultClient)
-    end
-
-    defmodule DefaultClient do
+    defmodule Default do
       @moduledoc false
 
       def prepare_workspace(%WorkRun{} = run, %RuntimeProfile{} = profile) do
@@ -210,14 +194,9 @@ defmodule PlatformPhx.Workspaces do
       end
 
       def load_workflow(%{provider_runtime_id: runtime_id, path: path}) do
-        workflow_path = Path.join(path, Workflows.workflow_file())
-
-        with {:ok, payload} <- exec(runtime_id, "cat #{shell_quote(workflow_path)}"),
-             {:ok, workflow} <- Workflows.parse(stdout(payload)) do
-          {:ok, Map.put(workflow, :path, workflow_path)}
-        else
-          {:error, reason} -> {:error, reason}
-        end
+        Workflows.Discovery.load_from_reader(path, fn workflow_path ->
+          read_workflow(runtime_id, workflow_path)
+        end)
       end
 
       def collect_artifacts(%{provider_runtime_id: runtime_id, path: path}) do
@@ -256,6 +235,18 @@ defmodule PlatformPhx.Workspaces do
         PlatformPhx.RuntimeRegistry.SpritesClient.exec(runtime_id, %{"command" => command})
       end
 
+      defp read_workflow(runtime_id, workflow_path) do
+        with {:ok, payload} <- exec(runtime_id, "cat #{shell_quote(workflow_path)} 2>/dev/null") do
+          case payload do
+            %{"exit_code" => 0} -> {:ok, stdout(payload)}
+            %{exit_code: 0} -> {:ok, stdout(payload)}
+            %{"exit_code" => _status} -> {:error, :missing_workflow}
+            %{exit_code: _status} -> {:error, :missing_workflow}
+            _payload -> {:error, :missing_workflow}
+          end
+        end
+      end
+
       defp parse_changed_files(output) do
         output
         |> String.split("\n", trim: true)
@@ -275,21 +266,6 @@ defmodule PlatformPhx.Workspaces do
       defp shell_quote(value) do
         "'#{String.replace(to_string(value), "'", "'\"'\"'")}'"
       end
-    end
-
-    defmodule UnavailableClient do
-      @moduledoc false
-
-      def prepare_workspace(_run, _profile),
-        do: {:error, "Sprite workspace client is not configured"}
-
-      def write_prompt(_workspace, _prompt),
-        do: {:error, "Sprite workspace client is not configured"}
-
-      def load_workflow(_workspace),
-        do: {:error, "Sprite workspace client is not configured"}
-
-      def collect_artifacts(_workspace), do: {:error, "Sprite workspace client is not configured"}
     end
   end
 end

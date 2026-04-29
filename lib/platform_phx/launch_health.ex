@@ -24,14 +24,13 @@ defmodule PlatformPhx.LaunchHealth do
   end
 
   defp cache_status do
-    case RegentCache.Dragonfly.status(:platform_phx) do
+    case PlatformPhx.LocalCache.status() do
       :ready -> "ready"
-      :disabled -> "disabled"
       {:error, _reason} -> "unavailable"
     end
   end
 
-  defp overall_status(%{database: "ready", cache: cache}) when cache in ["ready", "disabled"],
+  defp overall_status(%{database: "ready", cache: "ready"}),
     do: "ready"
 
   defp overall_status(_checks), do: "unavailable"

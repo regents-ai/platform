@@ -20,12 +20,21 @@ export const TokenStakingHook = {
     const baseRpcUrl = this.el.dataset.baseRpcUrl ?? undefined;
     const baseSepoliaRpcUrl = this.el.dataset.baseSepoliaRpcUrl ?? undefined;
 
-    this.handleEvent("regent-staking:tx-request", async (payload) => {
+    this.handleEvent("regent-staking:wallet-action", async (payload) => {
       try {
-        const txHash = await sendDashboardWalletTransaction(payload.tx_request, {
+        const walletAction = payload.wallet_action;
+        const txHash = await sendDashboardWalletTransaction(
+          {
+            chain_id: walletAction.chain_id,
+            to: walletAction.to,
+            value: walletAction.value,
+            data: walletAction.data,
+          },
+          {
           baseRpcUrl,
           baseSepoliaRpcUrl,
-        });
+          }
+        );
 
         this.pushEvent("staking_tx_complete", { tx_hash: txHash, action: payload.action });
       } catch (error) {

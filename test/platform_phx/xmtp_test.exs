@@ -3,6 +3,7 @@ defmodule PlatformPhx.XmtpTest do
 
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform.Agent
+  alias PlatformPhx.AgentPlatform.Company
   alias PlatformPhx.Repo
   alias PlatformPhx.Xmtp
   alias PlatformPhxWeb.CompanyRoomSupport
@@ -106,6 +107,7 @@ defmodule PlatformPhx.XmtpTest do
     %Agent{}
     |> Agent.changeset(%{
       owner_human_id: human.id,
+      company_id: insert_company!(human, slug).id,
       template_key: "start",
       name: "Owner Split Regent",
       slug: slug,
@@ -127,6 +129,21 @@ defmodule PlatformPhx.XmtpTest do
       published_at: now,
       desired_runtime_state: "active",
       observed_runtime_state: "active"
+    })
+    |> Repo.insert!()
+  end
+
+  defp insert_company!(human, slug) do
+    %Company{}
+    |> Company.changeset(%{
+      owner_human_id: human.id,
+      name: "Owner Split Regent",
+      slug: slug,
+      claimed_label: slug,
+      status: "published",
+      public_summary: "Room ownership test company.",
+      hero_statement:
+        "Company owner should moderate the room while the Regent room agent owns it."
     })
     |> Repo.insert!()
   end

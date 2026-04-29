@@ -167,7 +167,7 @@ defmodule PlatformPhxWeb.Api.AgentSessionControllerTest do
       |> put_req_headers(agent_headers("/api/auth/agent/session", body, "techtree-receipt"))
       |> post("/api/auth/agent/session", body)
 
-    assert %{"statusMessage" => "Signed agent authentication failed"} =
+    assert %{"error" => %{"message" => "Signed agent authentication failed"}} =
              json_response(session_conn, 401)
   end
 

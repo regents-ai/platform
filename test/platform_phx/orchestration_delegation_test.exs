@@ -3,7 +3,6 @@ defmodule PlatformPhx.OrchestrationDelegationTest do
   use Oban.Testing, repo: PlatformPhx.Repo
 
   alias PlatformPhx.Accounts.HumanUser
-  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentRegistry
   alias PlatformPhx.AgentRegistry.WorkerAssignment
   alias PlatformPhx.Orchestration
@@ -282,16 +281,84 @@ defmodule PlatformPhx.OrchestrationDelegationTest do
                actor_context(company, manager)
              )
 
-    [requested, created] = RunEvents.list_events(company.id, parent_run.id)
+    [requested, accepted, created] = RunEvents.list_events(company.id, parent_run.id)
 
-    assert requested.kind == "delegation_requested"
+    assert requested.kind == "delegation.requested"
     assert requested.payload["requested_runner_kind"] == "codex_exec"
     assert requested.payload["task_count"] == 1
     refute Map.has_key?(requested.payload, "tasks")
     refute Map.has_key?(requested.payload, "instructions")
 
-    assert created.kind == "delegation_child_run_created"
+    assert accepted.kind == "delegation.accepted"
+    assert accepted.payload["child_run_count"] == 1
+
+    assert created.kind == "child_run.created"
     assert created.payload["runner_kind"] == "codex_exec"
+  end
+
+  test "parent receives child completion event once when delegated child completes" do
+    %{company: company, manager: manager, parent_run: parent_run} =
+      manager_context("child-completed-fanout", "hermes", "hermes_hosted_manager")
+
+    codex = hosted_codex_worker(company, "child-completed-fanout")
+    link_workers(company, manager, codex)
+
+    assert {:ok, %{child_runs: [child_run]}} =
+             Orchestration.handle_delegation_request(
+               parent_run,
+               delegation_payload(company, parent_run, "codex_exec"),
+               actor_context(company, manager)
+             )
+
+    assert {:ok, completed_child} =
+             WorkRuns.complete_run(child_run, %{summary: "Child finished the review."})
+
+    assert {:ok, _same_child} =
+             WorkRuns.complete_run(completed_child, %{summary: "Child finished the review again."})
+
+    completed_events =
+      parent_run
+      |> parent_event_kinds(company.id, "child_run.completed")
+
+    assert [event] = completed_events
+    assert event.payload["root_run_id"] == parent_run.id
+    assert event.payload["parent_run_id"] == parent_run.id
+    assert event.payload["child_run_id"] == child_run.id
+    assert event.payload["child_status"] == "completed"
+    assert event.payload["runner_kind"] == "codex_exec"
+    assert event.payload["worker_id"] == codex.id
+    assert event.payload["summary"] == "Child finished the review."
+  end
+
+  test "parent receives child failure event once when delegated child fails" do
+    %{company: company, manager: manager, parent_run: parent_run} =
+      manager_context("child-failed-fanout", "hermes", "hermes_hosted_manager")
+
+    codex = hosted_codex_worker(company, "child-failed-fanout")
+    link_workers(company, manager, codex)
+
+    assert {:ok, %{child_runs: [child_run]}} =
+             Orchestration.handle_delegation_request(
+               parent_run,
+               delegation_payload(company, parent_run, "codex_exec"),
+               actor_context(company, manager)
+             )
+
+    assert {:ok, failed_child} = WorkRuns.fail_run(child_run, "Child could not finish.")
+    assert {:ok, _same_child} = WorkRuns.fail_run(failed_child, "Child failed again.")
+
+    failed_events =
+      parent_run
+      |> parent_event_kinds(company.id, "child_run.failed")
+
+    assert [event] = failed_events
+    assert event.payload["root_run_id"] == parent_run.id
+    assert event.payload["parent_run_id"] == parent_run.id
+    assert event.payload["child_run_id"] == child_run.id
+    assert event.payload["child_status"] == "failed"
+    assert event.payload["runner_kind"] == "codex_exec"
+    assert event.payload["worker_id"] == codex.id
+    assert event.payload["failure_reason"] == "Child could not finish."
   end
 
   defp manager_context(key, agent_kind, runner_kind) do
@@ -485,6 +552,12 @@ defmodule PlatformPhx.OrchestrationDelegationTest do
     |> Repo.all()
   end
 
+  defp parent_event_kinds(parent_run, company_id, kind) do
+    company_id
+    |> RunEvents.list_events(parent_run.id)
+    |> Enum.filter(&(&1.kind == kind))
+  end
+
   defp manager_execution_surface("openclaw_local_manager"), do: "local_bridge"
   defp manager_execution_surface(_runner_kind), do: "hosted_sprite"
 
@@ -511,7 +584,7 @@ defmodule PlatformPhx.OrchestrationDelegationTest do
     slug = "orchestration-delegation-#{key}-#{System.unique_integer([:positive])}"
 
     {:ok, company} =
-      AgentPlatform.create_company(human, %{
+      PlatformPhx.AgentPlatform.Companies.create_company(human, %{
         name: "#{key} Regent",
         slug: slug,
         claimed_label: slug,

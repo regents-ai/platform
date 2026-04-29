@@ -1,6 +1,8 @@
 defmodule PlatformPhxWeb.Api.AgentSessionController do
   use PlatformPhxWeb, :controller
 
+  action_fallback PlatformPhxWeb.ApiFallbackController
+
   import Plug.Conn
 
   @session_key :agent_session
@@ -39,7 +41,7 @@ defmodule PlatformPhxWeb.Api.AgentSessionController do
   end
 
   defp build_session(claims) do
-    now = DateTime.utc_now()
+    now = PlatformPhx.Clock.utc_now()
     issued_at = now |> DateTime.truncate(:second) |> DateTime.to_iso8601()
 
     expires_at =
@@ -66,7 +68,7 @@ defmodule PlatformPhxWeb.Api.AgentSessionController do
         with {:ok, audience} <- session_value(session, :audience),
              true <- audience == @audience,
              {:ok, expires_at} <- session_expires_at(session),
-             :lt <- DateTime.compare(DateTime.utc_now(), expires_at) do
+             :lt <- DateTime.compare(PlatformPhx.Clock.utc_now(), expires_at) do
           {:ok, session}
         else
           _ -> :expired

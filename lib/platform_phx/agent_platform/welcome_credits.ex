@@ -71,7 +71,7 @@ defmodule PlatformPhx.AgentPlatform.WelcomeCredits do
   def promotion_key, do: @promotion_key
 
   defp grant_welcome_credit(%BillingAccount{} = account) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = PlatformPhx.Clock.now()
     amount = RuntimeConfig.welcome_credit_amount_usd_cents()
     expiry_days = RuntimeConfig.welcome_credit_expiry_days()
 
@@ -179,10 +179,12 @@ defmodule PlatformPhx.AgentPlatform.WelcomeCredits do
 
       true ->
         account = grant.billing_account
-        now = DateTime.utc_now() |> DateTime.truncate(:second)
+        now = PlatformPhx.Clock.now()
         next_attempt_count = grant.stripe_sync_attempt_count + 1
 
-        case StripeBilling.create_credit_grant(account, grant.amount_usd_cents, grant.source_ref) do
+        case StripeBilling.create_credit_grant(account, grant.amount_usd_cents, grant.source_ref,
+               idempotency_key: "welcome-credit:#{grant.id}"
+             ) do
           {:ok, result} ->
             updated =
               grant
@@ -239,7 +241,9 @@ defmodule PlatformPhx.AgentPlatform.WelcomeCredits do
          status: "active",
          expires_at: %DateTime{} = expires_at
        }) do
-    if DateTime.compare(expires_at, DateTime.utc_now()) == :lt, do: "expired", else: "active"
+    if DateTime.compare(expires_at, PlatformPhx.Clock.utc_now()) == :lt,
+      do: "expired",
+      else: "active"
   end
 
   defp effective_status(%WelcomeCreditGrant{} = grant), do: grant.status

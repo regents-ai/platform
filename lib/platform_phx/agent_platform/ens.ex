@@ -13,6 +13,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
   alias PlatformPhx.Ethereum
   alias PlatformPhx.Repo
   alias PlatformPhx.RuntimeConfig
+  alias PlatformPhx.WalletAction
 
   @ethereum_chain_id 1
   @base_chain_id 8453
@@ -47,7 +48,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
            set_claim_status(claim, %{
              claim_status: "onchain_live",
              upgrade_tx_hash: tx_hash,
-             upgraded_at: DateTime.utc_now() |> DateTime.truncate(:second)
+             upgraded_at: PlatformPhx.Clock.now()
            }) do
       {:ok, %{ok: true, claim: serialize_claim(updated_claim)}}
     else
@@ -76,6 +77,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
          {:ok, prepared} <- prepare_link_bundle(agent, claim, attrs),
          {:ok, _result} <- attach_claim_transaction(agent, claim),
          reloaded <- AgentPlatform.get_owned_agent(human, slug),
+         :ok <- AgentPlatform.clear_public_agent_cache(reloaded),
          updated_claim <- Repo.get!(Mint, claim.id) do
       {:ok,
        %{
@@ -102,6 +104,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
          {:ok, cleanup} <- prepare_detach_cleanup(agent, claim, attrs),
          {:ok, _result} <- detach_claim_transaction(agent, claim),
          reloaded <- AgentPlatform.get_owned_agent(human, slug),
+         :ok <- AgentPlatform.clear_public_agent_cache(reloaded),
          updated_claim <- Repo.get!(Mint, claim.id) do
       {:ok,
        %{
@@ -189,7 +192,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
            action: "set_primary_name",
            chain_id: tx.chain_id,
            ens_name: ens_name,
-           tx_request: serialize_tx_request(tx),
+           wallet_action: serialize_wallet_action(tx),
            caller_wallet_address: wallet_address
          }
        }}
@@ -295,7 +298,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
          action: "upgrade_regent_subname",
          chain_id: tx.chain_id,
          expected_name: claim.ens_fqdn || "#{claim.label}.regent.eth",
-         tx_request: serialize_tx_request(tx)
+         wallet_action: serialize_wallet_action(tx)
        }}
     else
       nil -> {:error, {:unavailable, "The Regent ENS registrar is not configured"}}
@@ -332,7 +335,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
   end
 
   defp attach_claim_transaction(%Agent{} = agent, %Mint{} = claim) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = PlatformPhx.Clock.now()
 
     Repo.transaction(fn ->
       locked_agent =
@@ -362,7 +365,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
   end
 
   defp detach_claim_transaction(%Agent{} = agent, %Mint{} = claim) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = PlatformPhx.Clock.now()
 
     Repo.transaction(fn ->
       locked_agent =
@@ -501,7 +504,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
           chain_id: tx.chain_id,
           target: tx.to,
           description: tx.description,
-          tx_request: serialize_tx_request(tx)
+          wallet_action: serialize_wallet_action(tx)
         }
 
       {:error, _} ->
@@ -529,7 +532,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
           chain_id: tx.chain_id,
           target: tx.to,
           description: tx.description,
-          tx_request: serialize_tx_request(tx)
+          wallet_action: serialize_wallet_action(tx)
         }
 
       {:error, _} ->
@@ -551,7 +554,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
           target: prepared.tx.to,
           description: prepared.tx.description,
           caller_wallet_address: wallet_address,
-          tx_request: serialize_tx_request(prepared.tx)
+          wallet_action: serialize_wallet_action(prepared.tx)
         }
 
       {:error, _} ->
@@ -588,7 +591,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
           target: tx.to,
           description: tx.description,
           caller_wallet_address: wallet_address,
-          tx_request: serialize_tx_request(tx)
+          wallet_action: serialize_wallet_action(tx)
         }
 
       {:error, _} ->
@@ -610,7 +613,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
           chain_id: tx.chain_id,
           target: tx.to,
           description: tx.description,
-          tx_request: serialize_tx_request(tx)
+          wallet_action: serialize_wallet_action(tx)
         }
 
       {:error, _} ->
@@ -635,7 +638,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
           chain_id: tx.chain_id,
           target: tx.to,
           description: tx.description,
-          tx_request: serialize_tx_request(tx)
+          wallet_action: serialize_wallet_action(tx)
         }
 
       {:error, _} ->
@@ -653,7 +656,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
           target: prepared.tx.to,
           description: prepared.tx.description,
           caller_wallet_address: wallet_address,
-          tx_request: serialize_tx_request(prepared.tx)
+          wallet_action: serialize_wallet_action(prepared.tx)
         }
 
       {:error, _} ->
@@ -678,7 +681,7 @@ defmodule PlatformPhx.AgentPlatform.Ens do
           target: tx.to,
           description: tx.description,
           caller_wallet_address: wallet_address,
-          tx_request: serialize_tx_request(tx)
+          wallet_action: serialize_wallet_action(tx)
         }
 
       {:error, _} ->
@@ -726,13 +729,16 @@ defmodule PlatformPhx.AgentPlatform.Ens do
     }
   end
 
-  defp serialize_tx_request(tx) do
-    %{
+  defp serialize_wallet_action(tx) do
+    WalletAction.from_tx(%{
+      resource: tx.to,
+      action: "wallet_transaction",
       chain_id: tx.chain_id,
       to: tx.to,
       value: Integer.to_string(tx.value || 0),
-      data: tx.data
-    }
+      data: tx.data,
+      risk_copy: tx.description || "Review this wallet action before confirming."
+    })
   end
 
   defp required_integer(value, _label) when is_integer(value), do: {:ok, value}

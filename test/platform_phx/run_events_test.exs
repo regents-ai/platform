@@ -2,7 +2,6 @@ defmodule PlatformPhx.RunEventsTest do
   use PlatformPhx.DataCase, async: false
 
   alias PlatformPhx.Accounts.HumanUser
-  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentRegistry
   alias PlatformPhx.RunEvents
   alias PlatformPhx.RuntimeRegistry
@@ -65,6 +64,30 @@ defmodule PlatformPhx.RunEventsTest do
                sequence: 3,
                kind: "run.updated"
              })
+  end
+
+  test "batch append is all-or-nothing when a later event has a bad sequence" do
+    %{company: company, run: run} = run_fixture()
+    :ok = RunEvents.subscribe(run.id)
+    on_exit(fn -> RunEvents.unsubscribe(run.id) end)
+
+    assert {:error, {:sequence_mismatch, %{expected: 2, received: 3}}} =
+             RunEvents.append_events([
+               %{
+                 company_id: company.id,
+                 run_id: run.id,
+                 kind: "run.started"
+               },
+               %{
+                 company_id: company.id,
+                 run_id: run.id,
+                 sequence: 3,
+                 kind: "run.updated"
+               }
+             ])
+
+    assert [] == RunEvents.list_events(company.id, run.id)
+    refute_receive {:rwr_run_event, _event}, 100
   end
 
   test "concurrent append attempts produce a complete non-duplicated sequence set", %{
@@ -245,7 +268,7 @@ defmodule PlatformPhx.RunEventsTest do
 
   defp insert_company!(human, slug) do
     {:ok, company} =
-      AgentPlatform.create_company(human, %{
+      PlatformPhx.AgentPlatform.Companies.create_company(human, %{
         name: "#{slug} Regent",
         slug: slug,
         claimed_label: slug,

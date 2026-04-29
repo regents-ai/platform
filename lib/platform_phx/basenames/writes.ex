@@ -59,12 +59,16 @@ defmodule PlatformPhx.Basenames.Writes do
          {:ok, normalized_address} <- Validation.normalize_address(params["address"]),
          {:ok, raw_label} <- Validation.require_nonblank(params["label"], "Missing label"),
          {:ok, normalized_label} <- Basenames.validate_label(raw_label),
+         {:ok, timestamp} <- Validation.parse_timestamp(params["timestamp"]),
+         :ok <- Validation.validate_signature_age(timestamp),
+         {:ok, signature} <- Validation.require_nonblank(params["signature"], "Missing signature"),
          {:ok, current_parent_node} <- Validation.namehash(Basenames.parent_name()) do
       current_parent_name = Basenames.parent_name()
       fqdn = Basenames.to_subname_fqdn(normalized_label, current_parent_name)
       is_random = Validation.truthy?(params["isRandom"])
 
-      with {:ok, node} <- Validation.namehash(fqdn) do
+      with {:ok, node} <- Validation.namehash(fqdn),
+           :ok <- verify_mark_in_use_signature(normalized_address, fqdn, timestamp, signature) do
         existing =
           from(mint in Mint,
             where: mint.node == ^node,
@@ -110,6 +114,16 @@ defmodule PlatformPhx.Basenames.Writes do
 
   defp verify_signature(address, fqdn, timestamp, signature) do
     message = Basenames.create_mint_message(address, fqdn, Basenames.base_chain_id(), timestamp)
+
+    case Ethereum.verify_signature(address, message, signature) do
+      :ok -> :ok
+      {:error, message} -> {:error, {:bad_request, message}}
+    end
+  end
+
+  defp verify_mark_in_use_signature(address, fqdn, timestamp, signature) do
+    message =
+      Basenames.create_mark_in_use_message(address, fqdn, Basenames.base_chain_id(), timestamp)
 
     case Ethereum.verify_signature(address, message, signature) do
       :ok -> :ok

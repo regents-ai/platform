@@ -7,8 +7,8 @@ defmodule PlatformPhx.AgentPlatform.RuntimeControl do
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.SpriteAudit
-  alias PlatformPhx.AgentPlatform.SpriteRuntimeClient
   alias PlatformPhx.Repo
+  alias PlatformPhx.RuntimeRegistry.SpritesClient
 
   @type reason :: {:external, :sprite, String.t()} | {:not_found, String.t()}
   @type sync_failure :: %{agent_id: integer(), slug: String.t(), reason: term()}
@@ -165,17 +165,23 @@ defmodule PlatformPhx.AgentPlatform.RuntimeControl do
   end
 
   defp stop_sprite(agent) do
-    SpriteRuntimeClient.stop_service(
-      agent.sprite_name,
-      agent.sprite_service_name || "hermes-workspace"
-    )
+    case SpritesClient.stop_service(
+           agent.sprite_name,
+           agent.sprite_service_name || "hermes-workspace"
+         ) do
+      {:error, {:external, :sprites, message}} -> {:error, {:external, :sprite, message}}
+      result -> result
+    end
   end
 
   defp start_sprite(agent) do
-    SpriteRuntimeClient.start_service(
-      agent.sprite_name,
-      agent.sprite_service_name || "hermes-workspace"
-    )
+    case SpritesClient.start_service(
+           agent.sprite_name,
+           agent.sprite_service_name || "hermes-workspace"
+         ) do
+      {:error, {:external, :sprites, message}} -> {:error, {:external, :sprite, message}}
+      result -> result
+    end
   end
 
   defp lock_agent(agent_id) do
@@ -217,7 +223,7 @@ defmodule PlatformPhx.AgentPlatform.RuntimeControl do
   defp desired_runtime_state_for_pause(agent, true), do: agent.desired_runtime_state
   defp desired_runtime_state_for_pause(_agent, false), do: "paused"
 
-  defp now, do: DateTime.utc_now() |> DateTime.truncate(:second)
+  defp now, do: PlatformPhx.Clock.now()
 
   defp audit_started(%Agent{} = agent, action, opts) do
     details = audit_details(agent)

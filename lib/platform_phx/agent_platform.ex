@@ -8,19 +8,15 @@ defmodule PlatformPhx.AgentPlatform do
   alias PlatformPhx.Agentbook
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.Artifact
-  alias PlatformPhx.AgentPlatform.BillingAccount
-  alias PlatformPhx.AgentPlatform.Company
+  alias PlatformPhx.AgentPlatform.Billing
   alias PlatformPhx.AgentPlatform.CompanyProfiles
   alias PlatformPhx.AgentPlatform.Connection
   alias PlatformPhx.AgentPlatform.FormationRun
-  alias PlatformPhx.AgentPlatform.LlmUsageEvent
   alias PlatformPhx.AgentPlatform.Profiles
   alias PlatformPhx.AgentPlatform.WorkspaceBootstrap
   alias PlatformPhx.AgentPlatform.Service
-  alias PlatformPhx.AgentPlatform.SpriteUsageRecord
   alias PlatformPhx.AgentPlatform.Subdomain
   alias PlatformPhx.AgentPlatform.TemplateCatalog
-  alias PlatformPhx.AgentPlatform.WelcomeCredits
   alias PlatformPhx.Basenames.Mint
   alias PlatformPhx.OpenSea
   alias PlatformPhx.Repo
@@ -55,7 +51,7 @@ defmodule PlatformPhx.AgentPlatform do
   end
 
   def current_human_payload(%HumanUser{} = human) do
-    billing_account = get_billing_account(human)
+    billing_account = Billing.get_account(human)
 
     {:ok,
      %{
@@ -63,7 +59,7 @@ defmodule PlatformPhx.AgentPlatform do
        authenticated: true,
        human: serialize_human(human, billing_account),
        claimed_names: claimed_names_for_human(human),
-       agents: Enum.map(list_owned_agents(human), &serialize_agent(&1, :private))
+       agents: serialize_agents(list_owned_agents(human), :private)
      }}
   end
 
@@ -84,47 +80,6 @@ defmodule PlatformPhx.AgentPlatform do
     ])
     |> Repo.all()
   end
-
-  def create_company(%HumanUser{} = human, attrs) when is_map(attrs) do
-    attrs =
-      attrs
-      |> Map.new()
-      |> put_owner_human_id(human.id)
-      |> normalize_company_attrs()
-
-    %Company{}
-    |> Company.changeset(attrs)
-    |> Repo.insert()
-  end
-
-  def list_owned_companies(nil), do: []
-
-  def list_owned_companies(%HumanUser{id: id}) do
-    Company
-    |> where([company], company.owner_human_id == ^id)
-    |> order_by([company], desc: company.updated_at, asc: company.slug)
-    |> preload([:owner_human, :agents])
-    |> Repo.all()
-  end
-
-  def get_owned_company(%HumanUser{} = human, id) when is_integer(id) do
-    Company
-    |> where([company], company.owner_human_id == ^human.id and company.id == ^id)
-    |> preload([:owner_human, :agents])
-    |> Repo.one()
-  end
-
-  def get_owned_company(%HumanUser{} = human, slug) when is_binary(slug) do
-    Company
-    |> where(
-      [company],
-      company.owner_human_id == ^human.id and company.slug == ^normalize_slug(slug)
-    )
-    |> preload([:owner_human, :agents])
-    |> Repo.one()
-  end
-
-  def get_owned_company(_human, _id_or_slug), do: nil
 
   def list_public_agents do
     CompanyProfiles.list_agents()
@@ -179,7 +134,7 @@ defmodule PlatformPhx.AgentPlatform do
   def resolve_host_payload(host) when is_binary(host) do
     cache_key = public_cache_key(:resolve_host, normalize_host(host))
 
-    RegentCache.fetch(:platform_phx, cache_key, @public_cache_ttl_seconds, fn ->
+    PlatformPhx.LocalCache.fetch(cache_key, @public_cache_ttl_seconds, fn ->
       resolve_host_payload_uncached(host)
     end)
   end
@@ -200,7 +155,7 @@ defmodule PlatformPhx.AgentPlatform do
     normalized_slug = normalize_slug(slug)
     cache_key = public_cache_key(:feed, normalized_slug)
 
-    RegentCache.fetch(:platform_phx, cache_key, @public_cache_ttl_seconds, fn ->
+    PlatformPhx.LocalCache.fetch(cache_key, @public_cache_ttl_seconds, fn ->
       feed_payload_uncached(normalized_slug)
     end)
   end
@@ -241,12 +196,12 @@ defmodule PlatformPhx.AgentPlatform do
       ]
       |> Enum.reject(&is_nil/1)
 
-    _ = RegentCache.delete(:platform_phx, keys)
+    _ = PlatformPhx.LocalCache.delete(keys)
     :ok
   end
 
   def clear_public_agent_cache(slug) when is_binary(slug) do
-    _ = RegentCache.delete(:platform_phx, public_cache_key(:feed, normalize_slug(slug)))
+    _ = PlatformPhx.LocalCache.delete(public_cache_key(:feed, normalize_slug(slug)))
     :ok
   end
 
@@ -339,12 +294,18 @@ defmodule PlatformPhx.AgentPlatform do
 
   def current_wallet_address(_human), do: nil
 
-  def serialize_agent(agent, scope \\ :private)
+  def serialize_agents(agents, scope \\ :private) when is_list(agents) do
+    ens_claims_by_slug = ens_claims_by_slug(agents)
+    Enum.map(agents, &serialize_agent(&1, scope, ens_claims_by_slug))
+  end
 
-  def serialize_agent(%Agent{} = agent, scope) do
+  def serialize_agent(agent, scope \\ :private, ens_claims_by_slug \\ nil)
+
+  def serialize_agent(%Agent{} = agent, scope, ens_claims_by_slug) do
     subdomain = subdomain_from_agent(agent)
     formation = formation_from_agent(agent)
-    metering_status = effective_metering_status(agent)
+    billing_account = billing_account_from_agent(agent)
+    metering_status = Billing.effective_metering_status(agent, billing_account)
 
     base = %{
       id: agent.id,
@@ -354,7 +315,7 @@ defmodule PlatformPhx.AgentPlatform do
       slug: agent.slug,
       claimed_label: agent.claimed_label,
       basename_fqdn: agent.basename_fqdn,
-      ens: serialize_agent_ens(agent),
+      ens: serialize_agent_ens(agent, ens_claims_by_slug),
       status: agent.status,
       public_summary: agent.public_summary,
       hero_statement: agent.hero_statement,
@@ -389,7 +350,7 @@ defmodule PlatformPhx.AgentPlatform do
           hermes_toolsets: agent.hermes_toolsets || [],
           hermes_runtime_plugins: agent.hermes_runtime_plugins || [],
           hermes_shared_skills: agent.hermes_shared_skills || [],
-          runtime_status: effective_runtime_status(agent),
+          runtime_status: Billing.effective_runtime_status(agent, billing_account),
           checkpoint_status: agent.checkpoint_status,
           runtime_last_checked_at: iso(agent.runtime_last_checked_at),
           last_formation_error: agent.last_formation_error,
@@ -402,12 +363,17 @@ defmodule PlatformPhx.AgentPlatform do
     end
   end
 
-  def serialize_agent(nil, _scope), do: nil
+  def serialize_agent(nil, _scope, _ens_claims_by_slug), do: nil
 
-  defp serialize_agent_ens(%Agent{} = agent) do
+  defp serialize_agent_ens(%Agent{} = agent, ens_claims_by_slug)
+       when is_map(ens_claims_by_slug) do
+    agent_ens_payload(agent, Map.get(ens_claims_by_slug, agent.slug))
+  end
+
+  defp serialize_agent_ens(%Agent{} = agent, _ens_claims_by_slug) do
     attached_claim =
       Repo.one(
-        from mint in Mint,
+        from(mint in Mint,
           where: mint.attached_agent_slug == ^agent.slug,
           select: %{
             id: mint.id,
@@ -415,8 +381,13 @@ defmodule PlatformPhx.AgentPlatform do
             claim_status: mint.claim_status
           },
           limit: 1
+        )
       )
 
+    agent_ens_payload(agent, attached_claim)
+  end
+
+  defp agent_ens_payload(%Agent{} = agent, attached_claim) do
     %{
       attached: not is_nil(attached_claim),
       claim_id: attached_claim && attached_claim.id,
@@ -425,17 +396,36 @@ defmodule PlatformPhx.AgentPlatform do
     }
   end
 
+  defp ens_claims_by_slug(agents) when is_list(agents) do
+    slugs =
+      agents
+      |> Enum.map(& &1.slug)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    if slugs == [] do
+      %{}
+    else
+      Mint
+      |> where([mint], mint.attached_agent_slug in ^slugs)
+      |> select([mint], %{
+        attached_agent_slug: mint.attached_agent_slug,
+        id: mint.id,
+        ens_fqdn: mint.ens_fqdn,
+        claim_status: mint.claim_status
+      })
+      |> Repo.all()
+      |> Map.new(&{&1.attached_agent_slug, &1})
+    end
+  end
+
   def runtime_payload_map(agent, billing_account \\ nil)
 
   def runtime_payload_map(%Agent{} = agent, billing_account) do
     runtime_defaults = runtime_defaults(agent)
     workspace = company_workspace(agent)
 
-    billing_account =
-      billing_account ||
-        Repo.one(
-          from account in BillingAccount, where: account.human_user_id == ^agent.owner_human_id
-        )
+    billing_account = billing_account || billing_account_from_agent(agent)
 
     %{
       sprite: runtime_sprite_payload(agent, billing_account),
@@ -447,166 +437,11 @@ defmodule PlatformPhx.AgentPlatform do
 
   def runtime_payload_map(_agent, _billing_account), do: nil
 
-  def billing_account_payload(account, companies \\ [])
-
-  def billing_account_payload(nil, companies) do
-    paid_companies =
-      Enum.count(List.wrap(companies), &(effective_metering_status(&1, nil) == "paid"))
-
-    paused_companies =
-      Enum.count(List.wrap(companies), &(effective_metering_status(&1, nil) == "paused"))
-
-    trialing_companies =
-      Enum.count(List.wrap(companies), &(effective_metering_status(&1, nil) == "trialing"))
-
-    %{
-      status: "not_connected",
-      connected: false,
-      provider: "stripe",
-      customer_id: nil,
-      subscription_id: nil,
-      model_default: @default_hermes_model,
-      margin_bps: 0,
-      runtime_credit_balance_usd_cents: 0,
-      paid_companies: paid_companies,
-      paused_companies: paused_companies,
-      trialing_companies: trialing_companies,
-      welcome_credit: nil
-    }
+  defp billing_account_from_agent(%Agent{owner_human_id: human_id}) when is_integer(human_id) do
+    Billing.get_account_by_human_id(human_id)
   end
 
-  def billing_account_payload(%BillingAccount{} = account, companies) do
-    resolved_status =
-      case account.billing_status do
-        "checkout_open" -> "checkout_open"
-        "active" -> "active"
-        "past_due" -> "past_due"
-        "paused" -> "paused"
-        _ -> "not_connected"
-      end
-
-    %{
-      status: resolved_status,
-      connected: resolved_status == "active",
-      provider: "stripe",
-      customer_id: account.stripe_customer_id,
-      subscription_id: account.stripe_pricing_plan_subscription_id,
-      model_default: @default_hermes_model,
-      margin_bps: 0,
-      runtime_credit_balance_usd_cents: account.runtime_credit_balance_usd_cents || 0,
-      paid_companies:
-        Enum.count(List.wrap(companies), &(effective_metering_status(&1, account) == "paid")),
-      paused_companies:
-        Enum.count(List.wrap(companies), &(effective_metering_status(&1, account) == "paused")),
-      trialing_companies:
-        Enum.count(List.wrap(companies), &(effective_metering_status(&1, account) == "trialing")),
-      welcome_credit: account |> WelcomeCredits.latest_grant() |> WelcomeCredits.payload()
-    }
-  end
-
-  def effective_runtime_status(%Agent{} = agent) do
-    if agent.desired_runtime_state == "paused" or effective_metering_status(agent) == "paused" do
-      "paused"
-    else
-      agent.runtime_status
-    end
-  end
-
-  def effective_metering_status(%Agent{} = agent, billing_account \\ nil) do
-    cond do
-      is_struct(agent.sprite_free_until, DateTime) and
-          DateTime.compare(agent.sprite_free_until, DateTime.utc_now()) == :gt ->
-        "trialing"
-
-      billing_allows_runtime?(billing_account) ->
-        "paid"
-
-      is_nil(billing_account) and agent.stripe_llm_billing_status == "active" ->
-        "paid"
-
-      true ->
-        "paused"
-    end
-  end
-
-  def get_billing_account(%HumanUser{} = human) do
-    Repo.one(from account in BillingAccount, where: account.human_user_id == ^human.id)
-  end
-
-  def get_billing_account(_human), do: nil
-
-  def ensure_billing_account(%HumanUser{} = human) do
-    case get_billing_account(human) do
-      %BillingAccount{} = account ->
-        {:ok, account}
-
-      nil ->
-        %BillingAccount{}
-        |> BillingAccount.changeset(%{
-          human_user_id: human.id,
-          stripe_customer_id: human.stripe_customer_id,
-          stripe_pricing_plan_subscription_id: human.stripe_pricing_plan_subscription_id,
-          billing_status: human.stripe_llm_billing_status || "not_connected",
-          runtime_credit_balance_usd_cents: 0
-        })
-        |> Repo.insert()
-        |> case do
-          {:ok, account} ->
-            {:ok, account}
-
-          {:error, %Ecto.Changeset{} = changeset} ->
-            if Keyword.has_key?(changeset.errors, :human_user_id) do
-              {:ok, get_billing_account(human)}
-            else
-              {:error, changeset}
-            end
-        end
-    end
-  end
-
-  def billing_allows_runtime?(%BillingAccount{} = account) do
-    account.billing_status == "active" or (account.runtime_credit_balance_usd_cents || 0) > 0
-  end
-
-  def billing_allows_runtime?(_account), do: false
-
-  def billing_usage_payload(%BillingAccount{} = account, companies) do
-    runtime_spend_by_agent = runtime_spend_by_agent(account)
-    llm_spend_by_agent = llm_spend_by_agent(account)
-
-    company_summaries =
-      Enum.map(companies, fn company ->
-        %{
-          slug: company.slug,
-          name: company.name,
-          runtime_status: effective_runtime_status(company),
-          desired_runtime_state: company.desired_runtime_state,
-          observed_runtime_state: company.observed_runtime_state,
-          sprite_metering_status: effective_metering_status(company, account),
-          sprite_free_until: iso(company.sprite_free_until),
-          runtime_spend_usd_cents: Map.get(runtime_spend_by_agent, company.id, 0),
-          llm_spend_usd_cents: Map.get(llm_spend_by_agent, company.id, 0)
-        }
-      end)
-
-    %{
-      runtime_credit_balance_usd_cents: account.runtime_credit_balance_usd_cents || 0,
-      runtime_spend_usd_cents:
-        Enum.reduce(company_summaries, 0, fn company, acc ->
-          acc + company.runtime_spend_usd_cents
-        end),
-      llm_spend_usd_cents:
-        Enum.reduce(company_summaries, 0, fn company, acc ->
-          acc + company.llm_spend_usd_cents
-        end),
-      paid_companies: Enum.count(company_summaries, &(&1.sprite_metering_status == "paid")),
-      paused_companies: Enum.count(company_summaries, &(&1.sprite_metering_status == "paused")),
-      trialing_companies:
-        Enum.count(company_summaries, &(&1.sprite_metering_status == "trialing")),
-      welcome_credit: account |> WelcomeCredits.latest_grant() |> WelcomeCredits.payload(),
-      companies: company_summaries
-    }
-  end
+  defp billing_account_from_agent(_agent), do: nil
 
   def normalize_slug(value) when is_binary(value) do
     value
@@ -622,27 +457,6 @@ defmodule PlatformPhx.AgentPlatform do
   end
 
   def normalize_slug(_value), do: nil
-
-  defp put_owner_human_id(attrs, human_id) do
-    if Enum.any?(Map.keys(attrs), &is_binary/1) do
-      Map.put(attrs, "owner_human_id", human_id)
-    else
-      Map.put(attrs, :owner_human_id, human_id)
-    end
-  end
-
-  defp normalize_company_attrs(attrs) do
-    attrs
-    |> normalize_attr_slug(:slug)
-    |> normalize_attr_slug("slug")
-  end
-
-  defp normalize_attr_slug(attrs, key) do
-    case Map.fetch(attrs, key) do
-      {:ok, slug} -> Map.put(attrs, key, normalize_slug(slug))
-      :error -> attrs
-    end
-  end
 
   def normalize_host(value) when is_binary(value) do
     value
@@ -676,7 +490,7 @@ defmodule PlatformPhx.AgentPlatform do
       human_backed_trust: Agentbook.human_trust_summary(human),
       display_name: human.display_name,
       avatar: serialize_avatar(human.avatar),
-      billing_account: billing_account_payload(billing_account)
+      billing_account: Billing.account_payload(billing_account)
     }
   end
 
@@ -779,21 +593,29 @@ defmodule PlatformPhx.AgentPlatform do
   end
 
   defp runtime_sprite_payload(%Agent{} = agent, billing_account) do
+    observability = Billing.runtime_cost_observability(billing_account, [agent])
+
     %{
       name: agent.sprite_name,
-      status: effective_runtime_status(agent),
+      status: Billing.effective_runtime_status(agent),
       owner: @default_sprite_owner,
       free_until: iso(agent.sprite_free_until),
-      metering_status: effective_metering_status(agent, billing_account),
+      metering_status: Billing.effective_metering_status(agent, billing_account),
       desired_runtime_state: agent.desired_runtime_state,
-      observed_runtime_state: agent.observed_runtime_state
+      observed_runtime_state: agent.observed_runtime_state,
+      prepaid_balance_usd_cents:
+        Map.get(billing_account || %{}, :runtime_credit_balance_usd_cents, 0) || 0,
+      prepaid_drawdown_state: observability.prepaid_drawdown_state,
+      last_usage_sync_at: iso(Billing.agent_last_usage_sync_at(agent)),
+      next_pause_threshold_usd_cents: observability.next_pause_threshold_usd_cents,
+      will_pause_at_zero: Billing.runtime_pause_target?(agent)
     }
   end
 
   defp runtime_workspace_payload(%Agent{} = agent, runtime_defaults, workspace) do
     base = %{
       url: agent.workspace_url,
-      status: effective_runtime_status(agent),
+      status: Billing.effective_runtime_status(agent),
       http_port: agent.workspace_http_port || runtime_defaults[:workspace_http_port] || 3000
     }
 
@@ -802,7 +624,7 @@ defmodule PlatformPhx.AgentPlatform do
 
   defp runtime_hermes_payload(%Agent{} = agent, runtime_defaults, workspace) do
     base = %{
-      status: effective_runtime_status(agent),
+      status: Billing.effective_runtime_status(agent),
       adapter_type:
         agent.hermes_adapter_type || runtime_defaults[:hermes_adapter_type] || "stock",
       model: agent.hermes_model || runtime_defaults[:hermes_model] || @default_hermes_model,
@@ -843,30 +665,6 @@ defmodule PlatformPhx.AgentPlatform do
       "animata2" => [],
       "animataPass" => []
     }
-  end
-
-  defp runtime_spend_by_agent(%BillingAccount{id: nil}), do: %{}
-
-  defp runtime_spend_by_agent(%BillingAccount{id: billing_account_id}) do
-    Repo.all(
-      from record in SpriteUsageRecord,
-        where: record.billing_account_id == ^billing_account_id,
-        group_by: record.agent_id,
-        select: {record.agent_id, coalesce(sum(record.amount_usd_cents), 0)}
-    )
-    |> Map.new()
-  end
-
-  defp llm_spend_by_agent(%BillingAccount{human_user_id: nil}), do: %{}
-
-  defp llm_spend_by_agent(%BillingAccount{human_user_id: human_user_id}) do
-    Repo.all(
-      from event in LlmUsageEvent,
-        where: event.human_user_id == ^human_user_id,
-        group_by: event.agent_id,
-        select: {event.agent_id, coalesce(sum(event.amount_usd_cents), 0)}
-    )
-    |> Map.new()
   end
 
   defp agent_avatar(%Agent{owner_human: %HumanUser{} = owner_human}), do: owner_human.avatar

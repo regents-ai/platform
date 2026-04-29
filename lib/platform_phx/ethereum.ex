@@ -65,34 +65,7 @@ defmodule PlatformPhx.Ethereum do
 
   @spec json_rpc(String.t(), String.t(), list()) :: {:ok, map() | nil} | {:error, String.t()}
   def json_rpc(url, method, params) do
-    case Application.get_env(:platform_phx, :ethereum_rpc_client) do
-      module when is_atom(module) and not is_nil(module) ->
-        module.json_rpc(url, method, params)
-
-      _ ->
-        request =
-          Req.new(
-            url: url,
-            json: %{
-              id: 1,
-              jsonrpc: "2.0",
-              method: method,
-              params: params
-            }
-          )
-
-        case Req.post(request) do
-          {:ok, response} ->
-            case response.body do
-              %{"error" => %{"message" => message}} -> {:error, message}
-              %{"result" => result} -> {:ok, result}
-              other -> {:error, "Unexpected RPC response: #{inspect(other)}"}
-            end
-
-          {:error, error} ->
-            {:error, Exception.message(error)}
-        end
-    end
+    PlatformPhx.Ethereum.RpcClient.json_rpc(url, method, params)
   end
 
   @spec hex_to_integer(term()) :: integer()

@@ -102,10 +102,7 @@ defmodule PlatformPhx.BasenamesTest do
     assert {:ok, _result} = mint_label("zeta")
 
     assert {:error, {:forbidden, "Name not owned by wallet"}} =
-             Basenames.mark_in_use(%{
-               "address" => @other_address,
-               "label" => "zeta"
-             })
+             Basenames.mark_in_use(mark_in_use_params("zeta", @other_address))
   end
 
   test "mint changeset rejects duplicate node with a controlled error" do
@@ -214,6 +211,19 @@ defmodule PlatformPhx.BasenamesTest do
       },
       extra_params
     )
+  end
+
+  defp mark_in_use_params(label, address) do
+    timestamp = System.system_time(:millisecond)
+    fqdn = "#{label}.#{Basenames.parent_name()}"
+    message = Basenames.create_mark_in_use_message(address, fqdn, 8453, timestamp)
+
+    %{
+      "address" => address,
+      "label" => label,
+      "signature" => PlatformPhx.TestEthereumAdapter.sign_message(address, message),
+      "timestamp" => timestamp
+    }
   end
 
   defp insert_allowance!(address, snapshot_total) do

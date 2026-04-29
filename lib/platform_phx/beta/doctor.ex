@@ -10,15 +10,18 @@ defmodule PlatformPhx.Beta.Doctor do
   @spec run(keyword()) :: map()
   def run(opts \\ []) do
     env = Keyword.get(opts, :env, &System.get_env/1)
+    staking_validator = staking_validator(opts)
 
     checks = [
       database_check(),
-      dragonfly_check(),
+      status_constraint_preflight_check(),
+      direct_database_check(env),
+      cache_check(),
       public_host_check(env),
       siwa_check(env),
       privy_check(env),
       staking_contract_check(env),
-      staking_rpc_check(env),
+      staking_rpc_check(env, staking_validator),
       staking_chain_check(env),
       staking_operator_wallets_check(env),
       stripe_webhook_check(env),
@@ -42,26 +45,45 @@ defmodule PlatformPhx.Beta.Doctor do
     end
   end
 
-  defp dragonfly_check do
-    if RegentCache.Dragonfly.enabled?(:platform_phx) do
-      case ensure_dragonfly_started() do
-        {:ok, dragonfly_pid, started?} ->
-          status = RegentCache.Dragonfly.status(:platform_phx)
-          maybe_stop_dragonfly(dragonfly_pid, started?)
+  defp status_constraint_preflight_check do
+    case PlatformPhx.Beta.StatusConstraintPreflight.run() do
+      {:ok, []} ->
+        check("status_constraint_preflight", "pass", "Current status values are migration-ready.")
 
-          case status do
-            :ready ->
-              check("dragonfly", "pass", "Dragonfly cache is reachable.")
+      {:ok, invalid_statuses} ->
+        check(
+          "status_constraint_preflight",
+          "blocked",
+          "Clean invalid status values before running release migrations.",
+          invalid_statuses: invalid_statuses
+        )
 
-            _other ->
-              check("dragonfly", "blocked", "Dragonfly cache is enabled but not reachable.")
-          end
+      {:error, reason} ->
+        check(
+          "status_constraint_preflight",
+          "blocked",
+          "Status preflight could not read the database.",
+          reason: inspect(reason)
+        )
+    end
+  end
 
-        {:error, _reason} ->
-          check("dragonfly", "blocked", "Dragonfly cache is enabled but not reachable.")
-      end
+  defp direct_database_check(env) do
+    if present?(env_value(env, "DATABASE_DIRECT_URL")) do
+      check("direct_database_url", "pass", "Release migration database URL is configured.")
     else
-      check("dragonfly", "not_included", "Dragonfly cache is disabled for this run.")
+      check(
+        "direct_database_url",
+        "blocked",
+        "Set DATABASE_DIRECT_URL before running release migrations."
+      )
+    end
+  end
+
+  defp cache_check do
+    case PlatformPhx.LocalCache.status() do
+      :ready -> check("cache", "pass", "Local cache is ready.")
+      {:error, _reason} -> check("cache", "blocked", "Local cache is not ready.")
     end
   end
 
@@ -113,11 +135,45 @@ defmodule PlatformPhx.Beta.Doctor do
     end
   end
 
-  defp staking_rpc_check(env) do
-    if present?(env_value(env, "REGENT_STAKING_RPC_URL") || env_value(env, "BASE_RPC_URL")) do
-      check("regent_staking_rpc", "pass", "$REGENT staking RPC is configured.")
+  defp staking_rpc_check(env, validator) do
+    rpc_url = env_value(env, "REGENT_STAKING_RPC_URL")
+    contract_address = env_value(env, "REGENT_STAKING_CONTRACT_ADDRESS")
+
+    with true <- present?(rpc_url) || :missing_rpc,
+         true <- valid_address?(contract_address) || :invalid_contract,
+         {:ok, chain_id} <- parse_integer(env_value(env, "REGENT_STAKING_CHAIN_ID")),
+         :ok <-
+           validate_staking_rpc(validator, %{
+             rpc_url: rpc_url,
+             contract_address: String.downcase(contract_address),
+             chain_id: chain_id
+           }) do
+      check("regent_staking_rpc", "pass", "$REGENT staking RPC reaches the configured contract.")
     else
-      check("regent_staking_rpc", "blocked", "Set REGENT_STAKING_RPC_URL for beta staking.")
+      :missing_rpc ->
+        check("regent_staking_rpc", "blocked", "Set REGENT_STAKING_RPC_URL for beta staking.")
+
+      :invalid_contract ->
+        check(
+          "regent_staking_rpc",
+          "blocked",
+          "Set a valid REGENT_STAKING_CONTRACT_ADDRESS before checking the staking RPC."
+        )
+
+      :error ->
+        check(
+          "regent_staking_rpc",
+          "blocked",
+          "Set REGENT_STAKING_CHAIN_ID before checking the staking RPC."
+        )
+
+      {:error, reason} ->
+        check(
+          "regent_staking_rpc",
+          "blocked",
+          "$REGENT staking RPC could not prove the configured Base contract.",
+          reason: format_staking_rpc_reason(reason)
+        )
     end
   end
 
@@ -228,6 +284,23 @@ defmodule PlatformPhx.Beta.Doctor do
     |> Map.get(name)
   end
 
+  defp staking_validator(opts) do
+    Keyword.get(opts, :staking_validator) ||
+      Application.get_env(
+        :platform_phx,
+        :beta_doctor_staking_validator,
+        PlatformPhx.RegentStaking
+      )
+  end
+
+  defp validate_staking_rpc(validator, attrs) when is_function(validator, 1),
+    do: validator.(attrs)
+
+  defp validate_staking_rpc(validator, attrs), do: validator.validate_rpc(attrs)
+
+  defp format_staking_rpc_reason({:wrong_chain_id, details}), do: inspect(Map.new(details))
+  defp format_staking_rpc_reason(reason), do: inspect(reason)
+
   defp present?(value) when is_binary(value), do: String.trim(value) != ""
   defp present?(_value), do: false
 
@@ -269,39 +342,8 @@ defmodule PlatformPhx.Beta.Doctor do
     end
   end
 
-  defp ensure_dragonfly_started do
-    name = Application.get_env(:platform_phx, :dragonfly_name, :dragonfly)
-
-    cond do
-      is_pid(name) ->
-        {:ok, name, false}
-
-      is_atom(name) and is_pid(Process.whereis(name)) ->
-        {:ok, Process.whereis(name), false}
-
-      is_atom(name) ->
-        _ = Application.ensure_all_started(:redix)
-
-        case Redix.start_link(
-               name: name,
-               host: Application.get_env(:platform_phx, :dragonfly_host, "localhost"),
-               port: Application.get_env(:platform_phx, :dragonfly_port, 6379)
-             ) do
-          {:ok, pid} -> {:ok, pid, true}
-          {:error, {:already_started, pid}} -> {:ok, pid, false}
-          {:error, _reason} = error -> error
-        end
-
-      true ->
-        {:error, :invalid_dragonfly_name}
-    end
-  end
-
-  defp maybe_stop_dragonfly(pid, true) when is_pid(pid), do: GenServer.stop(pid)
-  defp maybe_stop_dragonfly(_pid, _started?), do: :ok
-
   defp now_iso do
-    DateTime.utc_now()
+    PlatformPhx.Clock.utc_now()
     |> DateTime.truncate(:second)
     |> DateTime.to_iso8601()
   end

@@ -4,6 +4,7 @@ defmodule PlatformPhxWeb.PublicCompanyPage do
   import Phoenix.Component, only: [assign: 3]
 
   alias PlatformPhx.AgentPlatform
+  alias PlatformPhx.AgentPlatform.Billing
   alias PlatformPhxWeb.CompanyRoomSupport
   alias PlatformPhxWeb.PublicRoomLive
 
@@ -93,8 +94,8 @@ defmodule PlatformPhxWeb.PublicCompanyPage do
 
     billing_account =
       current_human
-      |> AgentPlatform.get_billing_account()
-      |> AgentPlatform.billing_account_payload(List.wrap(owned_agent))
+      |> Billing.get_account()
+      |> Billing.account_payload(List.wrap(owned_agent))
 
     {owner_company, billing_account}
   end

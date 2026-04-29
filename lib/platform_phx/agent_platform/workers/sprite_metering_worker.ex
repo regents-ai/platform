@@ -4,15 +4,15 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
 
   import Ecto.Query, warn: false
 
-  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Agent
+  alias PlatformPhx.AgentPlatform.Billing
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
   alias PlatformPhx.AgentPlatform.RuntimeControl
-  alias PlatformPhx.AgentPlatform.SpriteRuntimeClient
   alias PlatformPhx.AgentPlatform.SpriteUsageRecord
   alias PlatformPhx.AgentPlatform.Workers.SyncSpriteUsageRecordWorker
   alias PlatformPhx.Repo
+  alias PlatformPhx.RuntimeRegistry.SpritesClient
   alias Oban
 
   @hourly_cost_usd_cents 25
@@ -20,7 +20,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
 
   @impl true
   def perform(_job) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = PlatformPhx.Clock.now()
 
     Agent
     |> where(
@@ -37,7 +37,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
     billing_account = load_billing_account(agent)
 
     with {:ok, service} <-
-           SpriteRuntimeClient.service_state(
+           SpritesClient.service_state(
              agent.sprite_name,
              agent.sprite_service_name || "hermes-workspace"
            ) do
@@ -207,7 +207,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker do
   end
 
   defp runtime_allowed?(agent, billing_account, now) do
-    trial_active?(agent, now) or AgentPlatform.billing_allows_runtime?(billing_account)
+    trial_active?(agent, now) or Billing.allows_runtime?(billing_account)
   end
 
   defp trial_active?(agent, now) do

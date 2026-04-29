@@ -152,7 +152,7 @@ defmodule PlatformPhx.Basenames.Payments do
       )
       |> Repo.update_all(
         inc: [free_mints_used: 1],
-        set: [updated_at: DateTime.utc_now()]
+        set: [updated_at: PlatformPhx.Clock.utc_now()]
       )
 
     if count > 0 do
@@ -276,7 +276,7 @@ defmodule PlatformPhx.Basenames.Payments do
   defp consume_credit(credit) do
     {count, _} =
       from(row in PaymentCredit, where: row.id == ^credit.id and is_nil(row.consumed_at))
-      |> Repo.update_all(set: [consumed_at: DateTime.utc_now()])
+      |> Repo.update_all(set: [consumed_at: PlatformPhx.Clock.utc_now()])
 
     if count == 0 do
       {:error, {:conflict, "Payment already used"}}

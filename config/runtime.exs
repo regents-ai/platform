@@ -1,7 +1,5 @@
 import Config
 
-alias PlatformPhx.DatabaseUrl
-
 # config/runtime.exs is executed for all environments, including
 # during releases. It is executed after compilation and before the
 # system starts, so it is typically used to load production configuration
@@ -38,6 +36,16 @@ agent_formation_enabled =
   |> String.downcase()
   |> then(&(&1 in ~w(1 true yes on)))
 
+validate_enabled_surfaces_on_boot =
+  config_env() == :prod and
+    System.get_env("PLATFORM_SKIP_BOOT_CONFIG_VALIDATION", "false")
+    |> String.trim()
+    |> String.downcase()
+    |> then(&(&1 not in ~w(1 true yes on)))
+
+config :platform_phx,
+  validate_enabled_surfaces_on_boot: validate_enabled_surfaces_on_boot
+
 test_xmtp_key =
   "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
@@ -68,17 +76,6 @@ config :platform_phx, PlatformPhx.Xmtp,
       }
     }
   ]
-
-dragonfly_enabled =
-  System.get_env("DRAGONFLY_ENABLED", "true")
-  |> String.trim()
-  |> String.downcase()
-  |> then(&(&1 in ~w(1 true yes on)))
-
-config :platform_phx,
-  dragonfly_host: System.get_env("DRAGONFLY_HOST", "localhost"),
-  dragonfly_port: String.to_integer(System.get_env("DRAGONFLY_PORT", "6379")),
-  dragonfly_enabled: dragonfly_enabled
 
 config :agent_world, :world_id,
   app_id: System.get_env("WORLD_ID_APP_ID", ""),
@@ -130,9 +127,12 @@ if config_env() == :prod do
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
   config :platform_phx, PlatformPhx.Repo,
-    ssl: DatabaseUrl.ssl_enabled?(database_url),
+    ssl: true,
     url: database_url,
-    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
+    prepare: :unnamed,
+    pool_size: String.to_integer(System.get_env("ECTO_POOL_SIZE") || "5"),
+    migration_default_prefix: "platform",
+    migration_source: "schema_migrations_platform",
     # For machines with several cores, consider starting multiple pools of `pool_size`
     # pool_count: 4,
     socket_options: maybe_ipv6

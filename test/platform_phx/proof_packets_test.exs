@@ -2,7 +2,6 @@ defmodule PlatformPhx.ProofPacketsTest do
   use PlatformPhx.DataCase, async: false
 
   alias PlatformPhx.Accounts.HumanUser
-  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentRegistry
   alias PlatformPhx.ProofPackets
   alias PlatformPhx.RuntimeRegistry
@@ -159,7 +158,7 @@ defmodule PlatformPhx.ProofPacketsTest do
 
   defp insert_company!(human, slug) do
     {:ok, company} =
-      AgentPlatform.create_company(human, %{
+      PlatformPhx.AgentPlatform.Companies.create_company(human, %{
         name: "#{slug} Regent",
         slug: slug,
         claimed_label: slug,

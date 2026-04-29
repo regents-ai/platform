@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "check": "cd assets && bun run check",
-    "test:assets": "cd assets && bun run test"
+    "test:assets": "cd assets && bun run test",
+    "build:corpus": "npm ci --prefix learn-site && npm run build --prefix learn-site"
   }
 }

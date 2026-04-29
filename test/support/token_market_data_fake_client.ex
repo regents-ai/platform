@@ -1,6 +1,6 @@
 defmodule PlatformPhx.TokenMarketDataFakeClient do
   @moduledoc false
-  @behaviour PlatformPhx.TokenMarketData.Client
+  @behaviour PlatformPhx.TokenMarketData
 
   @impl true
   def fetch_price_usd(_token_address) do

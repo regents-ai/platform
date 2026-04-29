@@ -22,7 +22,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
     previous_responses = Application.get_env(:platform_phx, :opensea_fake_responses)
     previous_stripe_client = Application.get_env(:platform_phx, :stripe_billing_client)
     previous_sprite_runner = Application.get_env(:platform_phx, :agent_platform_sprite_runner)
-    previous_sprite_runtime_client = Application.get_env(:platform_phx, :sprite_runtime_client)
+    previous_sprites_client = Application.get_env(:platform_phx, :runtime_registry_sprites_client)
 
     previous_agent_formation_enabled =
       Application.get_env(:platform_phx, :agent_formation_enabled)
@@ -45,8 +45,8 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
 
     Application.put_env(
       :platform_phx,
-      :sprite_runtime_client,
-      PlatformPhx.SpriteRuntimeClientFake
+      :runtime_registry_sprites_client,
+      PlatformPhx.RuntimeRegistrySpritesClientFake
     )
 
     System.put_env("OPENSEA_API_KEY", "test-key")
@@ -60,7 +60,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       restore_app_env(:platform_phx, :opensea_fake_responses, previous_responses)
       restore_app_env(:platform_phx, :stripe_billing_client, previous_stripe_client)
       restore_app_env(:platform_phx, :agent_platform_sprite_runner, previous_sprite_runner)
-      restore_app_env(:platform_phx, :sprite_runtime_client, previous_sprite_runtime_client)
+      restore_app_env(:platform_phx, :runtime_registry_sprites_client, previous_sprites_client)
       restore_app_env(:platform_phx, :agent_formation_enabled, previous_agent_formation_enabled)
       restore_system_env("OPENSEA_API_KEY", previous_api_key)
       restore_system_env("STRIPE_SECRET_KEY", previous_stripe_secret_key)

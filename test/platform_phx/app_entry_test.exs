@@ -2,7 +2,7 @@ defmodule PlatformPhx.AppEntryTest do
   use PlatformPhx.DataCase, async: false
 
   alias PlatformPhx.Accounts.HumanUser
-  alias PlatformPhx.AgentPlatform
+  alias PlatformPhx.AgentPlatform.Billing
   alias PlatformPhx.AppEntry
   alias PlatformPhx.Basenames.Mint
   alias PlatformPhx.OpenSea
@@ -56,7 +56,7 @@ defmodule PlatformPhx.AppEntryTest do
 
     human = insert_human!("active")
     insert_claimed_name!(human, "staking")
-    {:ok, _billing_account} = AgentPlatform.ensure_billing_account(human)
+    {:ok, _billing_account} = Billing.ensure_account(human)
 
     Application.put_env(:platform_phx, :opensea_fake_responses, %{
       request_url(@address, "animata") =>

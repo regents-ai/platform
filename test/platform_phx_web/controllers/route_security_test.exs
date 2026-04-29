@@ -16,6 +16,7 @@ defmodule PlatformPhxWeb.RouteSecurityTest do
     {:post, "/api/agent-platform/companies/company-id/rwr/assignments/assignment-id/complete",
      %{}},
     {:post, "/api/agent-platform/companies/company-id/rwr/runs/run-id/events", %{}},
+    {:post, "/api/agent-platform/companies/company-id/rwr/runs/run-id/events/batch", %{}},
     {:post, "/api/agent-platform/companies/company-id/rwr/runs/run-id/artifacts", %{}},
     {:post, "/api/agent-platform/companies/company-id/rwr/runs/run-id/delegations", %{}}
   ]
@@ -30,6 +31,14 @@ defmodule PlatformPhxWeb.RouteSecurityTest do
     {:post, "/api/agent-platform/sprites/company/pause", %{}},
     {:post, "/api/agent-platform/companies/company-id/rwr/work-items", %{}},
     {:post, "/api/agent-platform/companies/company-id/rwr/work-items/work-item-id/runs", %{}},
+    {:post, "/api/agent-platform/companies/company-id/rwr/runs/run-id/cancel", %{}},
+    {:post, "/api/agent-platform/companies/company-id/rwr/runs/run-id/retry", %{}},
+    {:post,
+     "/api/agent-platform/companies/company-id/rwr/runs/run-id/artifacts/artifact-id/publish",
+     %{}},
+    {:post,
+     "/api/agent-platform/companies/company-id/rwr/runs/run-id/approvals/approval-id/resolve",
+     %{}},
     {:post, "/api/agent-platform/companies/company-id/rwr/runtimes", %{}},
     {:post, "/api/agent-platform/companies/company-id/rwr/runtimes/runtime-id/checkpoint", %{}},
     {:post, "/api/agent-platform/companies/company-id/rwr/runtimes/runtime-id/restore", %{}},
@@ -60,7 +69,7 @@ defmodule PlatformPhxWeb.RouteSecurityTest do
         |> call_route(method, path, body)
         |> json_response(401)
 
-      assert response["statusMessage"] == "Signed agent authentication failed"
+      assert response["error"]["message"] == "Signed agent authentication failed"
     end)
   end
 
@@ -89,7 +98,7 @@ defmodule PlatformPhxWeb.RouteSecurityTest do
       |> post("/api/bug-report", %{"summary" => "report 13", "details" => "details"})
       |> json_response(429)
 
-    assert response["statusMessage"] == "Too many requests. Try again shortly."
+    assert response["error"]["message"] == "Too many requests. Try again shortly."
   end
 
   defp call_route(conn, :get, path, _body), do: get(conn, path)

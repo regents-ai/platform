@@ -18,7 +18,8 @@ defmodule PlatformPhxWeb do
   """
 
   def static_paths,
-    do: ~w(assets fonts images favicon.ico site.webmanifest regent)
+    do:
+      ~w(_astro assets fonts images favicon.ico site.webmanifest regent learn glossary source updates pagefind llms.txt ai-index.md regents-facts.json)
 
   def router do
     quote do

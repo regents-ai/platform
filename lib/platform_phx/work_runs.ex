@@ -5,6 +5,7 @@ defmodule PlatformPhx.WorkRuns do
 
   alias PlatformPhx.Repo
   alias PlatformPhx.AgentPlatform.Company
+  alias PlatformPhx.Orchestration.ChildRunFanout
   alias PlatformPhx.WorkRuns.ApprovalRequest
   alias PlatformPhx.WorkRuns.WorkArtifact
   alias PlatformPhx.WorkRuns.WorkRun
@@ -80,18 +81,22 @@ defmodule PlatformPhx.WorkRuns do
   end
 
   def complete_run(%WorkRun{} = run, attrs \\ %{}) do
-    run
-    |> WorkRun.changeset(
-      Map.merge(
-        %{
-          status: "completed",
-          completed_at: now(),
-          failure_reason: nil
-        },
-        attrs
-      )
-    )
-    |> Repo.update()
+    with {:ok, run} <-
+           run
+           |> WorkRun.changeset(
+             Map.merge(
+               %{
+                 status: "completed",
+                 completed_at: now(),
+                 failure_reason: nil
+               },
+               attrs
+             )
+           )
+           |> Repo.update(),
+         {:ok, run} <- ChildRunFanout.maybe_append(run) do
+      {:ok, run}
+    end
   end
 
   def request_human_review(%WorkRun{} = run, attrs \\ %{}) do
@@ -109,19 +114,32 @@ defmodule PlatformPhx.WorkRuns do
     |> Repo.update()
   end
 
-  def fail_run(%WorkRun{} = run, reason, attrs \\ %{}) do
+  def cancel_run(%WorkRun{} = run) do
     run
-    |> WorkRun.changeset(
-      Map.merge(
-        %{
-          status: "failed",
-          completed_at: now(),
-          failure_reason: reason
-        },
-        attrs
-      )
-    )
+    |> WorkRun.changeset(%{
+      status: "canceled",
+      completed_at: now()
+    })
     |> Repo.update()
+  end
+
+  def fail_run(%WorkRun{} = run, reason, attrs \\ %{}) do
+    with {:ok, run} <-
+           run
+           |> WorkRun.changeset(
+             Map.merge(
+               %{
+                 status: "failed",
+                 completed_at: now(),
+                 failure_reason: reason
+               },
+               attrs
+             )
+           )
+           |> Repo.update(),
+         {:ok, run} <- ChildRunFanout.maybe_append(run) do
+      {:ok, run}
+    end
   end
 
   def create_artifact(attrs) do
@@ -141,10 +159,24 @@ defmodule PlatformPhx.WorkRuns do
     Repo.get_by(WorkArtifact, run_id: run_id, kind: kind)
   end
 
+  def publish_artifact(%WorkArtifact{visibility: "public"} = artifact), do: {:ok, artifact}
+
+  def publish_artifact(%WorkArtifact{} = artifact) do
+    artifact
+    |> WorkArtifact.changeset(%{visibility: "public"})
+    |> Repo.update()
+  end
+
   def create_approval_request(attrs) do
     %ApprovalRequest{}
     |> ApprovalRequest.changeset(attrs)
     |> Repo.insert()
+  end
+
+  def resolve_approval_request(%ApprovalRequest{} = approval, attrs) do
+    approval
+    |> ApprovalRequest.changeset(attrs)
+    |> Repo.update()
   end
 
   def list_approval_requests(company_id, run_id) do
@@ -154,5 +186,5 @@ defmodule PlatformPhx.WorkRuns do
     |> Repo.all()
   end
 
-  defp now, do: DateTime.utc_now() |> DateTime.truncate(:second)
+  defp now, do: PlatformPhx.Clock.now()
 end

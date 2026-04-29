@@ -7,6 +7,7 @@ defmodule PlatformPhx.Workers.CodexExecRunJob do
     unique: [period: :infinity, keys: [:run_id], fields: [:args]]
 
   alias Oban.Job
+  alias PlatformPhx.Runners.CodexAppServer
   alias PlatformPhx.Runners.CodexExec
   alias PlatformPhx.WorkRuns
   alias PlatformPhx.WorkRuns.WorkRun
@@ -17,9 +18,14 @@ defmodule PlatformPhx.Workers.CodexExecRunJob do
       nil ->
         {:cancel, "work run not found"}
 
-      %WorkRun{runner_kind: runner_kind} = run
-      when runner_kind in ["codex_exec", "codex_app_server"] ->
+      %WorkRun{runner_kind: "codex_exec"} = run ->
         case CodexExec.run(run) do
+          {:ok, _run} -> :ok
+          {:error, reason} -> {:error, reason}
+        end
+
+      %WorkRun{runner_kind: "codex_app_server"} = run ->
+        case CodexAppServer.run(run) do
           {:ok, _run} -> :ok
           {:error, reason} -> {:error, reason}
         end

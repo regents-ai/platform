@@ -1,13 +1,14 @@
 defmodule PlatformPhx.RuntimeRegistryTest do
   use PlatformPhx.DataCase, async: false
+  use Oban.Testing, repo: PlatformPhx.Repo
 
   alias PlatformPhx.Accounts.HumanUser
-  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
   alias PlatformPhx.AgentPlatform.SpriteUsageRecord
   alias PlatformPhx.RuntimeRegistry
+  alias PlatformPhx.RuntimeRegistry.RuntimeUsageSnapshot
   alias PlatformPhx.RuntimeRegistry.Workers.RuntimeCheckpointJob
   alias PlatformPhx.RuntimeRegistry.Workers.RuntimeHealthCheckJob
   alias PlatformPhx.RuntimeRegistry.Workers.RuntimeProvisionJob
@@ -49,6 +50,7 @@ defmodule PlatformPhx.RuntimeRegistryTest do
     assert profile.runner_kind == "codex_exec"
     assert profile.billing_mode == "platform_hosted"
     assert profile.metadata["platform_agent_id"] == agent.id
+    assert_enqueued(worker: RuntimeProvisionJob, args: %{runtime_profile_id: profile.id})
 
     assert [discovered] = RuntimeRegistry.discover_hosted_codex_runtimes(company.id)
     assert discovered.id == profile.id
@@ -154,6 +156,7 @@ defmodule PlatformPhx.RuntimeRegistryTest do
     assert Repo.aggregate(SpriteUsageRecord, :count, :id) == 0
     assert Repo.aggregate(BillingLedgerEntry, :count, :id) == 0
     assert Repo.get!(BillingAccount, billing_account.id).runtime_credit_balance_usd_cents == 100
+    refute_enqueued(worker: RuntimeProvisionJob, args: %{runtime_profile_id: profile.id})
   end
 
   test "runtime validation keeps OpenClaw local and Codex hosted" do
@@ -182,7 +185,47 @@ defmodule PlatformPhx.RuntimeRegistryTest do
     assert %{execution_surface: [_], billing_mode: [_]} = errors_on(local_codex)
   end
 
-  test "hosted Sprite protected checkpoint works and local OpenClaw protected checkpoint is rejected" do
+  test "usage snapshot validation accepts only current compute states" do
+    changeset =
+      RuntimeUsageSnapshot.changeset(%RuntimeUsageSnapshot{}, %{
+        company_id: 1,
+        runtime_profile_id: 1,
+        snapshot_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        provider: "sprites",
+        compute_state: "booting"
+      })
+
+    assert %{compute_state: [_message]} = errors_on(changeset)
+  end
+
+  test "database rejects runtime usage snapshots outside current compute states" do
+    %{company: company} = hosted_company_fixture("runtime-usage-state-check")
+
+    {:ok, profile} =
+      RuntimeRegistry.create_runtime_profile(%{
+        company_id: company.id,
+        name: "Local runtime",
+        runner_kind: "openclaw_local_executor",
+        execution_surface: "local_bridge",
+        billing_mode: "user_local"
+      })
+
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    assert_raise Postgrex.Error, ~r/runtime_usage_snapshots_compute_state_check/, fn ->
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        """
+        INSERT INTO runtime_usage_snapshots
+          (company_id, runtime_profile_id, snapshot_at, provider, compute_state, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        """,
+        [company.id, profile.id, now, "sprites", "booting", now]
+      )
+    end
+  end
+
+  test "hosted Sprite protected checkpoint is queued and local OpenClaw protected checkpoint is rejected" do
     %{company: company, agent: agent} = hosted_company_fixture("hosted-codex-checkpoint")
     {:ok, hosted_profile} = RuntimeRegistry.register_hosted_codex_runtime(company.id, agent.id)
 
@@ -192,7 +235,10 @@ defmodule PlatformPhx.RuntimeRegistryTest do
              })
 
     assert checkpoint.protected == true
-    assert checkpoint.status == "ready"
+    assert checkpoint.status == "pending"
+    assert checkpoint.checkpoint_kind == "filesystem"
+    assert checkpoint.metadata["checkpoint_semantics"] == "filesystem_rollback_point"
+    assert_enqueued(worker: RuntimeCheckpointJob, args: %{runtime_checkpoint_id: checkpoint.id})
 
     {:ok, local_profile} =
       RuntimeRegistry.create_runtime_profile(%{
@@ -207,20 +253,87 @@ defmodule PlatformPhx.RuntimeRegistryTest do
              RuntimeRegistry.create_hosted_sprite_checkpoint(local_profile, %{
                checkpoint_ref: "local-protected"
              })
+
+    refute_enqueued(worker: RuntimeCheckpointJob, args: %{runtime_profile_id: local_profile.id})
+  end
+
+  test "hosted Sprite restore marks the checkpoint pending and queues restore work" do
+    %{company: company, agent: agent} = hosted_company_fixture("hosted-codex-restore")
+
+    {:ok, profile} =
+      RuntimeRegistry.register_hosted_codex_runtime(company.id, agent.id, %{
+        provider_runtime_id: "sprite-restore"
+      })
+
+    {:ok, checkpoint} =
+      RuntimeRegistry.create_runtime_checkpoint(%{
+        company_id: company.id,
+        runtime_profile_id: profile.id,
+        checkpoint_ref: "checkpoint-restore-a",
+        status: "ready",
+        protected: true,
+        checkpoint_kind: "filesystem"
+      })
+
+    assert {:ok, restore_checkpoint} =
+             RuntimeRegistry.request_hosted_sprite_restore(profile, checkpoint)
+
+    assert restore_checkpoint.restore_status == "pending"
+    assert restore_checkpoint.metadata["checkpoint_semantics"] == "filesystem_rollback_point"
+
+    assert_enqueued(
+      worker: RuntimeRestoreJob,
+      args: %{runtime_checkpoint_id: restore_checkpoint.id}
+    )
   end
 
   test "provisions Sprite runtime, records capacity, and normalizes rate-limit upgrade URL" do
     %{company: company, agent: agent} = hosted_company_fixture("runtime-provision")
-    {:ok, profile} = RuntimeRegistry.register_hosted_codex_runtime(company.id, agent.id)
+
+    network_policy = %{
+      "ingress" => "private",
+      "egress" => ["https://api.openai.com", "https://regents.sh"],
+      "public_ports" => []
+    }
+
+    {:ok, profile} =
+      RuntimeRegistry.register_hosted_codex_runtime(company.id, agent.id, %{
+        metadata: %{"network_policy" => network_policy}
+      })
 
     assert :ok =
              RuntimeProvisionJob.perform(%Oban.Job{
                args: %{"runtime_profile_id" => profile.id}
              })
 
-    assert_receive {:create_runtime, %{"runtime_profile_id" => profile_id}}
+    assert_receive {:create_runtime,
+                    %{"runtime_profile_id" => profile_id, "network_policy" => ^network_policy}}
+
     assert profile_id == profile.id
-    assert_receive {:create_service, "sprite-runtime-" <> _, %{"name" => "codex-workspace"}}
+    assert_receive {:exec, "sprite-runtime-" <> _, %{"command" => bootstrap_command}}
+    assert bootstrap_command =~ "regent_sprite_bootstrap.sh"
+    assert bootstrap_command =~ "base64 -d"
+
+    assert_receive {:create_service, "sprite-runtime-" <> _,
+                    %{
+                      "name" => "codex-workspace",
+                      "service_kind" => "workspace",
+                      "network_policy" => ^network_policy
+                    }}
+
+    assert_receive {:create_service, "sprite-runtime-" <> _,
+                    %{
+                      "name" => "regent-bridge",
+                      "service_kind" => "bridge",
+                      "command" => "/regent/bin/regent-worker-bridge",
+                      "http_port" => 8765,
+                      "health_path" => "/healthz",
+                      "network_policy" => ^network_policy
+                    }}
+
+    assert_receive {:start_service, "sprite-runtime-" <> _, "codex-workspace"}
+    assert_receive {:start_service, "sprite-runtime-" <> _, "regent-bridge"}
+    assert_receive {:create_checkpoint, "sprite-runtime-" <> _, %{"checkpoint_ref" => "baseline"}}
 
     updated = RuntimeRegistry.get_runtime_profile(profile.id)
     assert updated.provider_runtime_id == "sprite-runtime-#{profile.id}"
@@ -228,9 +341,20 @@ defmodule PlatformPhx.RuntimeRegistryTest do
     assert updated.observed_storage_bytes == 1_024
     assert updated.rate_limit_upgrade_url == "https://sprites.example.test/upgrade?runtime=1"
 
-    assert [service] = RuntimeRegistry.list_runtime_services_for_profile(profile.id)
-    assert service.name == "codex-workspace"
-    assert service.status == "active"
+    services = RuntimeRegistry.list_runtime_services_for_profile(profile.id)
+    assert Enum.map(services, & &1.name) == ["codex-workspace", "regent-bridge"]
+    assert Enum.all?(services, &(&1.status == "active"))
+
+    assert Enum.find(services, &(&1.name == "regent-bridge")).metadata["bootstrap_role"] ==
+             "regent_bridge"
+
+    assert [baseline] = RuntimeRegistry.list_runtime_checkpoints(company.id)
+    assert baseline.runtime_profile_id == profile.id
+    assert baseline.checkpoint_ref == "baseline"
+    assert baseline.status == "ready"
+    assert baseline.protected == true
+    assert baseline.metadata["checkpoint_semantics"] == "filesystem_rollback_point"
+    assert baseline.metadata["checkpoint_reason"] == "baseline"
 
     assert :ok =
              RuntimeProvisionJob.perform(%Oban.Job{
@@ -240,6 +364,10 @@ defmodule PlatformPhx.RuntimeRegistryTest do
     runtime_id = "sprite-runtime-#{profile.id}"
     assert_receive {:get_runtime, ^runtime_id}
     assert_receive {:list_services, ^runtime_id}
+    assert_receive {:exec, ^runtime_id, %{"command" => refresh_bootstrap_command}}
+    assert refresh_bootstrap_command =~ "regent_sprite_bootstrap.sh"
+    assert_receive {:start_service, ^runtime_id, "codex-workspace"}
+    assert_receive {:start_service, ^runtime_id, "regent-bridge"}
   end
 
   test "health check updates services, log cursor, and observed capacity" do
@@ -260,14 +388,28 @@ defmodule PlatformPhx.RuntimeRegistryTest do
     assert_receive {:list_services, "sprite-health"}
     assert_receive {:service_status, "sprite-health", "codex-workspace"}
     assert_receive {:service_logs, "sprite-health", "codex-workspace", %{"cursor" => nil}}
+    assert_receive {:service_status, "sprite-health", "regent-bridge"}
+    assert_receive {:service_logs, "sprite-health", "regent-bridge", %{"cursor" => nil}}
 
     updated = RuntimeRegistry.get_runtime_profile(profile.id)
     assert updated.observed_memory_mb == 16_384
     assert updated.rate_limit_upgrade_url == "/billing/runtime"
 
-    [service] = RuntimeRegistry.list_runtime_services_for_profile(profile.id)
-    assert service.log_cursor == "cursor-2"
-    assert service.last_log_excerpt == "service ready"
+    services = RuntimeRegistry.list_runtime_services_for_profile(profile.id)
+    codex_service = Enum.find(services, &(&1.name == "codex-workspace"))
+    bridge_service = Enum.find(services, &(&1.name == "regent-bridge"))
+
+    assert codex_service.log_cursor == "codex-workspace-cursor-2"
+    assert codex_service.last_log_excerpt == "codex-workspace ready"
+    assert bridge_service.log_cursor == "regent-bridge-cursor-2"
+    assert bridge_service.last_log_excerpt == "regent-bridge ready"
+  end
+
+  test "capacity policy only stores memory reported by Sprites" do
+    attrs = PlatformPhx.RuntimeRegistry.SpritesPolicy.capacity_attrs(%{})
+
+    refute Map.has_key?(attrs, :observed_memory_mb)
+    assert %DateTime{} = attrs.observed_capacity_at
   end
 
   test "service controls and exec use Sprites client" do
@@ -391,7 +533,7 @@ defmodule PlatformPhx.RuntimeRegistryTest do
 
   defp insert_company!(human, slug) do
     {:ok, company} =
-      AgentPlatform.create_company(human, %{
+      PlatformPhx.AgentPlatform.Companies.create_company(human, %{
         name: "#{slug} Regent",
         slug: slug,
         claimed_label: slug,

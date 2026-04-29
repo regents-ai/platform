@@ -16,7 +16,7 @@ defmodule PlatformPhx.Accounts do
 
   def upsert_human_by_privy_id(privy_user_id, attrs)
       when is_binary(privy_user_id) and is_map(attrs) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = PlatformPhx.Clock.now()
 
     normalized_attrs =
       attrs

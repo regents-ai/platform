@@ -13,6 +13,10 @@ defmodule PlatformPhx.AgentPlatform.Profiles do
     with {:ok, holdings} <- avatar_holdings(human, attrs),
          {:ok, avatar} <- AvatarSelection.normalize(attrs, holdings),
          {:ok, updated_human} <- Accounts.update_human(human, %{avatar: avatar}) do
+      human
+      |> AgentPlatform.list_owned_agents()
+      |> Enum.each(&AgentPlatform.clear_public_agent_cache/1)
+
       {:ok, updated_human}
     else
       {:error, :unconfigured} ->

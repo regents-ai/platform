@@ -123,6 +123,7 @@ defmodule PlatformPhx.AgentPlatform.Agent do
       :basename_fqdn,
       :public_summary
     ])
+    |> validate_required([:company_id])
     |> validate_length(:slug, min: 2, max: 63)
     |> validate_length(:name, max: 120)
     |> validate_length(:template_key, max: 80)
@@ -140,44 +141,14 @@ defmodule PlatformPhx.AgentPlatform.Agent do
       "not_connected",
       "checkout_open",
       "active",
-      "past_due"
+      "past_due",
+      "paused"
     ])
     |> validate_inclusion(:sprite_metering_status, ["trialing", "paid", "paused"])
     |> validate_inclusion(:desired_runtime_state, ["active", "paused"])
     |> validate_inclusion(:observed_runtime_state, ["unknown", "active", "paused"])
-    |> put_company_for_insert()
     |> foreign_key_constraint(:company_id)
     |> unique_constraint(:slug)
     |> unique_constraint(:claimed_label)
-  end
-
-  defp put_company_for_insert(changeset) do
-    if changeset.valid? and is_nil(changeset.data.id) and
-         is_nil(get_field(changeset, :company_id)) do
-      prepare_changes(changeset, fn changeset ->
-        case changeset.repo.insert(Company.changeset(%Company{}, company_attrs(changeset))) do
-          {:ok, company} ->
-            put_change(changeset, :company_id, company.id)
-
-          {:error, _changeset} ->
-            add_error(changeset, :company_id, "could not be created")
-        end
-      end)
-    else
-      changeset
-    end
-  end
-
-  defp company_attrs(changeset) do
-    %{
-      owner_human_id: get_field(changeset, :owner_human_id),
-      name: get_field(changeset, :name),
-      slug: get_field(changeset, :slug),
-      claimed_label: get_field(changeset, :claimed_label),
-      status: get_field(changeset, :status) || "forming",
-      public_summary: get_field(changeset, :public_summary),
-      hero_statement: get_field(changeset, :hero_statement),
-      metadata: %{}
-    }
   end
 end

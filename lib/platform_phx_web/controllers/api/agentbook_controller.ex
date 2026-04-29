@@ -1,17 +1,22 @@
 defmodule PlatformPhxWeb.Api.AgentbookController do
   use PlatformPhxWeb, :controller
 
+  action_fallback PlatformPhxWeb.ApiFallbackController
+
   import Plug.Conn
 
   alias PlatformPhx.Accounts
   alias PlatformPhx.Agentbook
   alias PlatformPhxWeb.ApiErrors
+  alias PlatformPhxWeb.ApiRequest
 
   def create(conn, params) when is_map(params) do
-    conn.assigns[:current_agent_claims]
-    |> Agentbook.create_session(params, base_url(conn))
-    |> normalize_session_response()
-    |> then(&ApiErrors.respond(conn, &1))
+    with {:ok, attrs} <- ApiRequest.cast(params, create_fields()) do
+      conn.assigns[:current_agent_claims]
+      |> Agentbook.create_session(attrs, base_url(conn))
+      |> normalize_session_response()
+      |> then(&ApiErrors.respond(conn, &1))
+    end
   end
 
   def show(conn, %{"id" => session_id}) do
@@ -20,9 +25,10 @@ defmodule PlatformPhxWeb.Api.AgentbookController do
     |> then(&ApiErrors.respond(conn, &1))
   end
 
-  def submit(conn, %{"id" => session_id, "token" => token, "proof" => proof})
-      when is_binary(token) and is_map(proof) do
-    with %{} = human <- current_human(conn),
+  def submit(conn, %{"id" => session_id} = params) do
+    with {:ok, %{"session_token" => token, "proof" => proof}} <-
+           ApiRequest.cast(params, submit_fields()),
+         %{} = human <- current_human(conn),
          {:ok, session} <- Agentbook.complete_session(session_id, token, human, proof) do
       ApiErrors.respond(conn, {:ok, %{ok: true, session: session}})
     else
@@ -35,10 +41,6 @@ defmodule PlatformPhxWeb.Api.AgentbookController do
       {:error, reason} ->
         ApiErrors.error(conn, reason)
     end
-  end
-
-  def submit(conn, _params) do
-    ApiErrors.error(conn, {:bad_request, "The trust approval was missing required data"})
   end
 
   def lookup(conn, _params) do
@@ -59,6 +61,17 @@ defmodule PlatformPhxWeb.Api.AgentbookController do
 
   defp normalize_lookup_response({:ok, result}), do: {:ok, %{ok: true, result: result}}
   defp normalize_lookup_response({:error, reason}), do: {:error, reason}
+
+  defp create_fields do
+    [{"source", :string, []}]
+  end
+
+  defp submit_fields do
+    [
+      {"session_token", :string, required: true},
+      {"proof", :map, required: true}
+    ]
+  end
 
   defp base_url(conn) do
     %URI{

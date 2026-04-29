@@ -98,50 +98,6 @@ defmodule PlatformPhx.Repo.Migrations.AddPlatformCompanies do
     """)
 
     create index(:platform_agents, [:company_id])
-
-    execute("""
-    CREATE OR REPLACE FUNCTION platform_create_company_for_agent()
-    RETURNS trigger AS $$
-    BEGIN
-      IF NEW.company_id IS NULL THEN
-        INSERT INTO platform_companies (
-          owner_human_id,
-          name,
-          slug,
-          claimed_label,
-          status,
-          public_summary,
-          hero_statement,
-          metadata,
-          created_at,
-          updated_at
-        )
-        VALUES (
-          NEW.owner_human_id,
-          NEW.name,
-          NEW.slug,
-          NEW.claimed_label,
-          NEW.status,
-          NEW.public_summary,
-          NEW.hero_statement,
-          '{}'::jsonb,
-          COALESCE(NEW.created_at, now()),
-          COALESCE(NEW.updated_at, now())
-        )
-        RETURNING id INTO NEW.company_id;
-      END IF;
-
-      RETURN NEW;
-    END;
-    $$ LANGUAGE plpgsql
-    """)
-
-    execute("""
-    CREATE TRIGGER platform_agents_company_before_insert
-    BEFORE INSERT ON platform_agents
-    FOR EACH ROW
-    EXECUTE FUNCTION platform_create_company_for_agent()
-    """)
   end
 
   def down do

@@ -42,6 +42,7 @@ defmodule PlatformPhx.RuntimeRegistry.RuntimeUsageSnapshot do
       :metadata
     ])
     |> validate_required([:company_id, :runtime_profile_id, :snapshot_at, :provider])
+    |> validate_inclusion(:compute_state, ["active", "paused", "retired"])
     |> validate_number(:active_seconds, greater_than_or_equal_to: 0)
     |> validate_number(:storage_bytes, greater_than_or_equal_to: 0)
     |> validate_number(:reported_memory_mb, greater_than_or_equal_to: 0)

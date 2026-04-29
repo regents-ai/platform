@@ -3,6 +3,7 @@ defmodule PlatformPhx.AgentPlatform.FormationProgressTest do
 
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform.Agent
+  alias PlatformPhx.AgentPlatform.Company
   alias PlatformPhx.AgentPlatform.FormationEvent
   alias PlatformPhx.AgentPlatform.FormationProgress
   alias PlatformPhx.AgentPlatform.FormationRun
@@ -71,6 +72,7 @@ defmodule PlatformPhx.AgentPlatform.FormationProgressTest do
       %Agent{}
       |> Agent.changeset(%{
         owner_human_id: human.id,
+        company_id: insert_company!(human, slug).id,
         template_key: "start",
         name: "#{slug} Regent",
         slug: slug,
@@ -96,6 +98,19 @@ defmodule PlatformPhx.AgentPlatform.FormationProgressTest do
       claimed_label: slug,
       status: "running",
       current_step: "create_sprite"
+    })
+    |> Repo.insert!()
+  end
+
+  defp insert_company!(human, slug) do
+    %Company{}
+    |> Company.changeset(%{
+      owner_human_id: human.id,
+      name: "#{slug} Regent",
+      slug: slug,
+      claimed_label: slug,
+      status: "forming",
+      public_summary: "Test company"
     })
     |> Repo.insert!()
   end

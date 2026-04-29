@@ -3,8 +3,8 @@ defmodule PlatformPhx.AgentPlatform.SpriteUsage do
 
   import Ecto.Query, warn: false
 
-  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Agent
+  alias PlatformPhx.AgentPlatform.Billing
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
   alias PlatformPhx.AgentPlatform.RuntimeControl
@@ -83,7 +83,7 @@ defmodule PlatformPhx.AgentPlatform.SpriteUsage do
             amount_usd_cents: locked_record.amount_usd_cents,
             description: "Recovered runtime debit after Stripe usage reporting failed.",
             source_ref: recovery_source_ref,
-            effective_at: DateTime.utc_now() |> DateTime.truncate(:second)
+            effective_at: PlatformPhx.Clock.now()
           })
           |> Repo.insert!()
 
@@ -143,7 +143,7 @@ defmodule PlatformPhx.AgentPlatform.SpriteUsage do
 
   defp report_to_stripe(%SpriteUsageRecord{} = record) do
     next_attempt_count = record.stripe_sync_attempt_count + 1
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = PlatformPhx.Clock.now()
     sync_key = sync_key(record)
 
     case StripeBilling.report_runtime_usage(
@@ -211,7 +211,7 @@ defmodule PlatformPhx.AgentPlatform.SpriteUsage do
        ) do
     if agent.runtime_status == "paused_for_credits" and
          agent.desired_runtime_state == "active" and
-         AgentPlatform.billing_allows_runtime?(account) do
+         Billing.allows_runtime?(account) do
       RuntimeControl.resume(agent, source: "sprite_usage_recovery")
       :ok
     else

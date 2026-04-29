@@ -110,7 +110,7 @@ defmodule PlatformPhx.Privy do
   defp validate_audience(_claims, _app_id), do: {:error, :invalid_audience}
 
   defp validate_time_claims(claims) do
-    now = System.system_time(:second)
+    now = PlatformPhx.Clock.unix_seconds()
 
     with {:ok, exp} <- fetch_integer_claim(claims, "exp"),
          :ok <- ensure_future(exp, now),

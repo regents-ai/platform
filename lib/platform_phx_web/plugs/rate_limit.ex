@@ -4,6 +4,7 @@ defmodule PlatformPhxWeb.Plugs.RateLimit do
   import Plug.Conn
 
   @behaviour Plug
+  alias PlatformPhxWeb.ApiErrors
 
   @default_message "Too many requests. Try again shortly."
 
@@ -33,9 +34,7 @@ defmodule PlatformPhxWeb.Plugs.RateLimit do
 
       {:error, :limited} ->
         conn
-        |> put_status(:too_many_requests)
-        |> put_resp_content_type("application/json")
-        |> send_resp(429, Jason.encode!(%{"statusMessage" => @default_message}))
+        |> ApiErrors.render_status(:too_many_requests, @default_message)
         |> halt()
     end
   end
@@ -43,9 +42,12 @@ defmodule PlatformPhxWeb.Plugs.RateLimit do
   defp matching_rule(conn, rules) do
     Enum.find(rules, fn rule ->
       method = Keyword.fetch!(rule, :method)
-      paths = Keyword.fetch!(rule, :paths)
+      paths = Keyword.get(rule, :paths, [])
+      path_prefixes = Keyword.get(rule, :path_prefixes, [])
 
-      conn.method == method and conn.request_path in paths
+      conn.method == method and
+        (conn.request_path in paths or
+           Enum.any?(path_prefixes, &String.starts_with?(conn.request_path, &1)))
     end)
   end
 

@@ -30,7 +30,7 @@ defmodule PlatformPhx.Agentbook do
          {:ok, approval_token} <- create_approval_token() do
       case link_for_identity(identity) do
         %Link{} = link ->
-          now = DateTime.utc_now()
+          now = PlatformPhx.Clock.utc_now()
 
           session_attrs = %{
             session_id: Ecto.UUID.generate(),
@@ -332,7 +332,7 @@ defmodule PlatformPhx.Agentbook do
         |> Link.changeset(%{
           platform_human_user_id: human.id,
           source: session.source,
-          last_verified_at: DateTime.utc_now() |> DateTime.truncate(:second)
+          last_verified_at: PlatformPhx.Clock.now()
         })
         |> Repo.update()
 
@@ -342,7 +342,7 @@ defmodule PlatformPhx.Agentbook do
           "This Regent agent is already linked to a different human-backed trust record"}}
 
       nil ->
-        now = DateTime.utc_now() |> DateTime.truncate(:second)
+        now = PlatformPhx.Clock.now()
 
         %Link{}
         |> Link.changeset(%{
@@ -393,7 +393,6 @@ defmodule PlatformPhx.Agentbook do
       expires_at: DateTime.to_iso8601(session.expires_at),
       error_text: session.error_text,
       frontend_request: frontend_request(session),
-      tx_request: nil,
       trust:
         case link_for_session(session) do
           %Link{} = link ->
@@ -532,7 +531,7 @@ defmodule PlatformPhx.Agentbook do
 
   defp ensure_session_open(%Session{} = session) do
     cond do
-      DateTime.compare(DateTime.utc_now(), session.expires_at) != :lt ->
+      DateTime.compare(PlatformPhx.Clock.utc_now(), session.expires_at) != :lt ->
         {:error, {:conflict, "This trust session expired. Start a new one from the CLI."}}
 
       session.status != "pending" ->
@@ -544,7 +543,7 @@ defmodule PlatformPhx.Agentbook do
   end
 
   defp ensure_session_not_expired(%Session{} = session) do
-    if DateTime.compare(DateTime.utc_now(), session.expires_at) == :lt do
+    if DateTime.compare(PlatformPhx.Clock.utc_now(), session.expires_at) == :lt do
       :ok
     else
       {:error, {:not_found, "Trust session not found"}}
@@ -570,7 +569,6 @@ defmodule PlatformPhx.Agentbook do
       deep_link_uri: session.deep_link_uri,
       expires_at: session.expires_at,
       proof_payload: nil,
-      tx_request: nil,
       tx_hash: nil,
       human_id: session.world_human_id,
       error_text: session.error_text
@@ -578,7 +576,7 @@ defmodule PlatformPhx.Agentbook do
   end
 
   defp finalize_registered_session(%Session{} = session, %HumanUser{} = human, world_human_id) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = PlatformPhx.Clock.now()
 
     Multi.new()
     |> Multi.run(:human, fn repo, _changes ->
@@ -657,7 +655,7 @@ defmodule PlatformPhx.Agentbook do
         |> Link.changeset(%{
           platform_human_user_id: human.id,
           source: session.source,
-          last_verified_at: DateTime.utc_now() |> DateTime.truncate(:second)
+          last_verified_at: PlatformPhx.Clock.now()
         })
         |> Repo.update()
 

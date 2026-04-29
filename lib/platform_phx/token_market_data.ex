@@ -11,10 +11,15 @@ defmodule PlatformPhx.TokenMarketData do
   @fdv_supply Decimal.new("100000000000")
 
   @type reason :: {:unavailable, String.t()} | {:external, atom(), String.t()}
+  @callback fetch_price_usd(String.t()) :: {:ok, Decimal.t()} | {:error, String.t()}
+  @callback fetch_token_decimals(String.t(), String.t()) ::
+              {:ok, non_neg_integer()} | {:error, String.t()}
+  @callback fetch_token_balance(String.t(), String.t(), String.t()) ::
+              {:ok, non_neg_integer()} | {:error, String.t()}
 
   @spec fetch_summary() :: {:ok, map()} | {:error, reason()}
   def fetch_summary do
-    RegentCache.fetch(:platform_phx, @cache_key, @cache_ttl_seconds, fn ->
+    PlatformPhx.LocalCache.fetch(@cache_key, @cache_ttl_seconds, fn ->
       with {:ok, summary} <- build_summary() do
         {:ok, encode_summary(summary)}
       end
@@ -27,8 +32,18 @@ defmodule PlatformPhx.TokenMarketData do
 
   @spec clear_cache() :: :ok
   def clear_cache do
-    _ = RegentCache.delete(:platform_phx, @cache_key)
+    _ = PlatformPhx.LocalCache.delete(@cache_key)
     :ok
+  end
+
+  def fetch_price_usd(token_address), do: __MODULE__.HttpClient.fetch_price_usd(token_address)
+
+  def fetch_token_decimals(rpc_url, token_address) do
+    __MODULE__.HttpClient.fetch_token_decimals(rpc_url, token_address)
+  end
+
+  def fetch_token_balance(rpc_url, token_address, owner_address) do
+    __MODULE__.HttpClient.fetch_token_balance(rpc_url, token_address, owner_address)
   end
 
   defp build_summary do
@@ -76,11 +91,7 @@ defmodule PlatformPhx.TokenMarketData do
   end
 
   defp client do
-    Application.get_env(
-      :platform_phx,
-      :token_market_data_client,
-      PlatformPhx.TokenMarketData.ReqClient
-    )
+    Application.get_env(:platform_phx, :token_market_data_client, __MODULE__.HttpClient)
   end
 
   defp format_short_usd(value) do
@@ -140,5 +151,60 @@ defmodule PlatformPhx.TokenMarketData do
 
   defp field(summary, key) do
     Map.get(summary, key) || Map.get(summary, Atom.to_string(key))
+  end
+
+  defmodule HttpClient do
+    @moduledoc false
+    @behaviour PlatformPhx.TokenMarketData
+
+    alias PlatformPhx.Ethereum
+    alias PlatformPhx.ExternalHttpClient
+
+    @impl true
+    def fetch_price_usd(token_address) do
+      url = "https://api.geckoterminal.com/api/v2/networks/base/tokens/#{token_address}"
+
+      case ExternalHttpClient.get(url, headers: [{"accept", "application/json"}]) do
+        {:ok, %{status: status, body: %{"data" => %{"attributes" => %{"price_usd" => price}}}}}
+        when status in 200..299 and is_binary(price) ->
+          {:ok, Decimal.new(price)}
+
+        {:ok, %{status: status, body: body}} when status in 200..299 ->
+          {:error, "GeckoTerminal response invalid: #{inspect(body)}"}
+
+        {:ok, %{status: status}} ->
+          {:error, "GeckoTerminal request failed with status #{status}"}
+
+        {:error, error} ->
+          {:error, ExternalHttpClient.format_error(error)}
+      end
+    end
+
+    @impl true
+    def fetch_token_decimals(rpc_url, token_address) do
+      with {:ok, hex} <-
+             Ethereum.json_rpc(rpc_url, "eth_call", [
+               %{"to" => token_address, "data" => "0x313ce567"},
+               "latest"
+             ]) do
+        {:ok, Ethereum.hex_to_integer(hex)}
+      end
+    end
+
+    @impl true
+    def fetch_token_balance(rpc_url, token_address, owner_address) do
+      data =
+        "0x70a08231" <>
+          String.duplicate("0", 24) <> String.replace_prefix(owner_address, "0x", "")
+
+      with {:ok, hex} <-
+             Ethereum.json_rpc(
+               rpc_url,
+               "eth_call",
+               [%{"to" => token_address, "data" => data}, "latest"]
+             ) do
+        {:ok, Ethereum.hex_to_integer(hex)}
+      end
+    end
   end
 end

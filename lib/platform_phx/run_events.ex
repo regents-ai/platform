@@ -44,6 +44,33 @@ defmodule PlatformPhx.RunEvents do
     end
   end
 
+  def append_events(attrs_list) when is_list(attrs_list) do
+    attrs_list = Enum.map(attrs_list, &normalize_event_attrs/1)
+
+    case Repo.transaction(fn ->
+           Enum.reduce(attrs_list, [], fn attrs, events ->
+             case append_event_in_transaction(attrs) do
+               {:inserted, event} -> [{:inserted, event} | events]
+               {:existing, event} -> [{:existing, event} | events]
+             end
+           end)
+         end) do
+      {:ok, tagged_events} ->
+        tagged_events = Enum.reverse(tagged_events)
+
+        tagged_events
+        |> Enum.each(fn
+          {:inserted, event} -> :ok = broadcast_event(event)
+          {:existing, _event} -> :ok
+        end)
+
+        {:ok, Enum.map(tagged_events, fn {_status, event} -> event end)}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   def list_events(run_id) do
     RunEvent
     |> where([event], event.run_id == ^run_id)

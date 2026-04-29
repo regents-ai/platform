@@ -1,71 +1,24 @@
 defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
   use PlatformPhxWeb, :controller
 
+  action_fallback PlatformPhxWeb.ApiFallbackController
+
   alias PlatformPhx.Accounts
-  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Company
-  alias PlatformPhx.AgentPlatform.RuntimeControl
-  alias PlatformPhx.AgentRegistry
-  alias PlatformPhx.AgentRegistry.AgentWorker
+  alias PlatformPhx.AgentPlatform.Companies
+  alias PlatformPhx.AgentPlatform.RegentWorkRuntime, as: RWR
   alias PlatformPhx.Orchestration
   alias PlatformPhx.ProofPackets
-  alias PlatformPhx.Repo
   alias PlatformPhx.RunEvents
-  alias PlatformPhx.RuntimeRegistry
   alias PlatformPhx.RuntimeRegistry.RuntimeCheckpoint
   alias PlatformPhx.RuntimeRegistry.RuntimeProfile
   alias PlatformPhx.RuntimeRegistry.RuntimeService
-  alias PlatformPhx.Work
   alias PlatformPhx.Work.WorkItem
-  alias PlatformPhx.WorkRuns
+  alias PlatformPhx.WorkRuns.ApprovalRequest
+  alias PlatformPhx.WorkRuns.WorkArtifact
   alias PlatformPhx.WorkRuns.WorkRun
   alias PlatformPhxWeb.ApiErrors
-
-  @async_runner_kinds ["fake", "codex_exec", "codex_app_server"]
-  @local_runner_kinds [
-    "hermes_local_manager",
-    "openclaw_local_manager",
-    "openclaw_local_executor",
-    "openclaw_code_agent_local"
-  ]
-  @runner_worker_shapes %{
-    "hermes_local_manager" => %{
-      agent_kind: "hermes",
-      execution_surface: "local_bridge",
-      runner_kinds: ["hermes_local_manager"]
-    },
-    "hermes_hosted_manager" => %{
-      agent_kind: "hermes",
-      execution_surface: "hosted_sprite",
-      runner_kinds: ["hermes_hosted_manager"]
-    },
-    "openclaw_local_manager" => %{
-      agent_kind: "openclaw",
-      execution_surface: "local_bridge",
-      runner_kinds: ["openclaw_local_manager"]
-    },
-    "openclaw_local_executor" => %{
-      agent_kind: "openclaw",
-      execution_surface: "local_bridge",
-      runner_kinds: ["openclaw_local_executor", "openclaw_code_agent_local"]
-    },
-    "openclaw_code_agent_local" => %{
-      agent_kind: "openclaw",
-      execution_surface: "local_bridge",
-      runner_kinds: ["openclaw_local_executor", "openclaw_code_agent_local"]
-    },
-    "codex_exec" => %{
-      agent_kind: "codex",
-      execution_surface: "hosted_sprite",
-      runner_kinds: ["codex_exec", "codex_app_server"]
-    },
-    "codex_app_server" => %{
-      agent_kind: "codex",
-      execution_surface: "hosted_sprite",
-      runner_kinds: ["codex_exec", "codex_app_server"]
-    }
-  }
-  @worker_claim_fields ~w(wallet_address chain_id registry_address token_id)
+  alias PlatformPhxWeb.ApiRequest
 
   def account(conn, _params) do
     case current_human(conn) do
@@ -76,14 +29,14 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
         json(conn, %{
           ok: true,
           authenticated: true,
-          companies: Enum.map(AgentPlatform.list_owned_companies(human), &company_payload/1)
+          companies: Enum.map(Companies.list_owned_companies(human), &company_payload/1)
         })
     end
   end
 
   def work_items(conn, %{"company_id" => company_id}) do
     with_owned_company(conn, company_id, fn company, human ->
-      items = Work.list_items_for_owned_company(human.id, company.id)
+      items = RWR.list_owned_work_items(human.id, company.id)
 
       json(conn, %{
         ok: true,
@@ -96,7 +49,8 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
   def create_work_item(conn, %{"company_id" => company_id} = params) do
     with_owned_company(conn, company_id, fn company, _human ->
       with :ok <- body_company_id_matches_path(conn, company.id),
-           {:ok, item} <- Work.create_item(work_item_attrs(company.id, params)) do
+           {:ok, attrs} <- ApiRequest.cast(params, work_item_fields()),
+           {:ok, item} <- RWR.create_work_item(work_item_attrs(company.id, attrs)) do
         conn
         |> put_status(:created)
         |> json(%{ok: true, work_item: work_item_payload(item)})
@@ -119,16 +73,17 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     with_owned_company(conn, company_id, fn company, human ->
       with :ok <- body_company_id_matches_path(conn, company.id),
            :ok <- body_work_item_id_matches_path(conn, work_item_id),
+           {:ok, attrs} <- ApiRequest.cast(params, run_fields()),
            %WorkItem{} = item <- owned_work_item(human.id, company.id, work_item_id),
            {:ok, worker} <-
-             optional_worker(
+             RWR.optional_worker(
                company.id,
-               Map.get(params, "worker_id"),
-               Map.get(params, "runner_kind")
+               Map.get(attrs, "worker_id"),
+               Map.get(attrs, "runner_kind")
              ),
-           :ok <- ensure_run_can_start(worker, Map.get(params, "runner_kind")),
-           {:ok, run} <- WorkRuns.create_run(run_attrs(company.id, item.id, worker, params)),
-           :ok <- after_run_created(worker, run) do
+           :ok <- RWR.ensure_run_can_start(worker, Map.get(attrs, "runner_kind")),
+           {:ok, run} <- RWR.create_run(run_attrs(company.id, item.id, worker, attrs)),
+           :ok <- RWR.after_run_created(worker, run) do
         conn
         |> put_status(:created)
         |> json(%{ok: true, run: run_payload(run)})
@@ -148,12 +103,72 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     end)
   end
 
+  def run_tree(conn, %{"company_id" => company_id, "run_id" => run_id}) do
+    with_owned_company(conn, company_id, fn company, human ->
+      case owned_run(human.id, company.id, run_id) do
+        %WorkRun{} = run ->
+          json(conn, %{ok: true, run_id: run.id, tree: run_tree_payload(RWR.run_tree(run))})
+
+        nil ->
+          respond_error(conn, {:not_found, "Run not found"})
+      end
+    end)
+  end
+
+  def cancel_run(conn, %{"company_id" => company_id, "run_id" => run_id}) do
+    with_owned_company(conn, company_id, fn company, human ->
+      case owned_run(human.id, company.id, run_id) do
+        %WorkRun{} = run ->
+          case RWR.cancel_run(run) do
+            {:ok, run} -> json(conn, %{ok: true, run: run_payload(run)})
+            {:error, reason} -> respond_error(conn, reason)
+          end
+
+        nil ->
+          respond_error(conn, {:not_found, "Run not found"})
+      end
+    end)
+  end
+
+  def retry_run(conn, %{"company_id" => company_id, "run_id" => run_id}) do
+    with_owned_company(conn, company_id, fn company, human ->
+      with %WorkRun{} = run <- owned_run(human.id, company.id, run_id),
+           {:ok, retry} <- RWR.retry_run(run) do
+        conn
+        |> put_status(:created)
+        |> json(%{ok: true, run: run_payload(retry)})
+      else
+        nil -> respond_error(conn, {:not_found, "Run not found"})
+        {:error, reason} -> respond_error(conn, reason)
+      end
+    end)
+  end
+
   def run_events(conn, %{"company_id" => company_id, "run_id" => run_id}) do
     with_owned_company(conn, company_id, fn company, human ->
       case owned_run(human.id, company.id, run_id) do
         %WorkRun{} = run ->
-          events = RunEvents.list_events(company.id, run.id)
+          events = RWR.list_run_events(company.id, run.id)
           json(conn, %{ok: true, run_id: run.id, events: Enum.map(events, &event_payload/1)})
+
+        nil ->
+          respond_error(conn, {:not_found, "Run not found"})
+      end
+    end)
+  end
+
+  def run_event_stream(conn, %{"company_id" => company_id, "run_id" => run_id}) do
+    with_owned_company(conn, company_id, fn company, human ->
+      case owned_run(human.id, company.id, run_id) do
+        %WorkRun{} = run ->
+          events = RWR.replay_run_events(company.id, run.id)
+
+          json(conn, %{
+            ok: true,
+            run_id: run.id,
+            stream: %{mode: "replay"},
+            events: Enum.map(events, &event_payload/1)
+          })
 
         nil ->
           respond_error(conn, {:not_found, "Run not found"})
@@ -165,7 +180,7 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     with_owned_company(conn, company_id, fn company, human ->
       case owned_run(human.id, company.id, run_id) do
         %WorkRun{} = run ->
-          artifacts = WorkRuns.list_artifacts(company.id, run.id)
+          artifacts = RWR.list_artifacts(company.id, run.id)
 
           json(conn, %{
             ok: true,
@@ -179,9 +194,104 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     end)
   end
 
+  def artifact(conn, %{
+        "company_id" => company_id,
+        "run_id" => run_id,
+        "artifact_id" => artifact_id
+      }) do
+    with_owned_company(conn, company_id, fn company, human ->
+      with %WorkRun{} = run <- owned_run(human.id, company.id, run_id),
+           %WorkArtifact{} = artifact <- RWR.get_run_artifact(company.id, run.id, artifact_id) do
+        json(conn, %{ok: true, artifact: artifact_payload(artifact)})
+      else
+        nil -> respond_error(conn, {:not_found, "Artifact not found"})
+      end
+    end)
+  end
+
+  def company_artifact(conn, %{"company_id" => company_id, "artifact_id" => artifact_id}) do
+    with_owned_company(conn, company_id, fn company, _human ->
+      case RWR.get_company_artifact(company.id, artifact_id) do
+        %WorkArtifact{} = artifact ->
+          json(conn, %{ok: true, artifact: artifact_payload(artifact)})
+
+        nil ->
+          respond_error(conn, {:not_found, "Artifact not found"})
+      end
+    end)
+  end
+
+  def publish_artifact(conn, %{
+        "company_id" => company_id,
+        "run_id" => run_id,
+        "artifact_id" => artifact_id
+      }) do
+    with_owned_company(conn, company_id, fn company, human ->
+      with %WorkRun{} = run <- owned_run(human.id, company.id, run_id),
+           %WorkArtifact{} = artifact <- RWR.get_run_artifact(company.id, run.id, artifact_id),
+           {:ok, artifact} <- RWR.publish_artifact(artifact) do
+        json(conn, %{ok: true, artifact: artifact_payload(artifact)})
+      else
+        nil -> respond_error(conn, {:not_found, "Artifact not found"})
+        {:error, reason} -> respond_error(conn, reason)
+      end
+    end)
+  end
+
+  def approvals(conn, %{"company_id" => company_id, "run_id" => run_id}) do
+    with_owned_company(conn, company_id, fn company, human ->
+      case owned_run(human.id, company.id, run_id) do
+        %WorkRun{} = run ->
+          approvals = RWR.list_approvals(company.id, run.id)
+
+          json(conn, %{
+            ok: true,
+            run_id: run.id,
+            approvals: Enum.map(approvals, &approval_payload/1)
+          })
+
+        nil ->
+          respond_error(conn, {:not_found, "Run not found"})
+      end
+    end)
+  end
+
+  def approval(conn, %{
+        "company_id" => company_id,
+        "run_id" => run_id,
+        "approval_id" => approval_id
+      }) do
+    with_owned_company(conn, company_id, fn company, human ->
+      with %WorkRun{} = run <- owned_run(human.id, company.id, run_id),
+           %ApprovalRequest{} = approval <- RWR.get_approval(company.id, run.id, approval_id) do
+        json(conn, %{ok: true, approval: approval_payload(approval)})
+      else
+        nil -> respond_error(conn, {:not_found, "Approval not found"})
+      end
+    end)
+  end
+
+  def resolve_approval(
+        conn,
+        %{"company_id" => company_id, "run_id" => run_id, "approval_id" => approval_id} = params
+      ) do
+    with_owned_company(conn, company_id, fn company, human ->
+      with :ok <- body_company_id_matches_path(conn, company.id),
+           %WorkRun{} = run <- owned_run(human.id, company.id, run_id),
+           :ok <- body_run_id_matches_path(conn, run.id),
+           %ApprovalRequest{} = approval <- RWR.get_approval(company.id, run.id, approval_id),
+           {:ok, approval} <- RWR.resolve_approval(approval, human.id, params) do
+        json(conn, %{ok: true, approval: approval_payload(approval)})
+      else
+        nil -> respond_error(conn, {:not_found, "Approval not found"})
+        {:error, reason} -> respond_error(conn, reason)
+      end
+    end)
+  end
+
   def workers(conn, %{"company_id" => company_id}) do
     with_owned_company(conn, company_id, fn company, _human ->
-      workers = AgentRegistry.list_workers_with_details(company.id)
+      workers = RWR.list_workers(company.id)
 
       json(conn, %{
         ok: true,
@@ -193,7 +303,7 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
 
   def runtimes(conn, %{"company_id" => company_id}) do
     with_owned_company(conn, company_id, fn company, _human ->
-      runtimes = RuntimeRegistry.list_runtime_profiles_with_details(company.id)
+      runtimes = RWR.list_runtimes(company.id)
 
       json(conn, %{
         ok: true,
@@ -206,8 +316,9 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
   def create_runtime(conn, %{"company_id" => company_id} = params) do
     with_owned_company(conn, company_id, fn company, _human ->
       with :ok <- body_company_id_matches_path(conn, company.id),
+           {:ok, attrs} <- ApiRequest.cast(params, runtime_fields()),
            {:ok, runtime} <-
-             RuntimeRegistry.create_runtime_profile(runtime_attrs(company.id, params)) do
+             RWR.create_runtime(runtime_attrs(company.id, attrs)) do
         conn
         |> put_status(:created)
         |> json(%{ok: true, runtime: runtime_payload(runtime)})
@@ -230,8 +341,9 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     with_owned_company(conn, company_id, fn company, _human ->
       with :ok <- body_company_id_matches_path(conn, company.id),
            :ok <- body_runtime_id_matches_path(conn, runtime_id),
+           {:ok, attrs} <- ApiRequest.cast(params, checkpoint_fields()),
            %RuntimeProfile{} = runtime <- owned_runtime(company.id, runtime_id),
-           {:ok, checkpoint} <- create_runtime_checkpoint(runtime, params) do
+           {:ok, checkpoint} <- RWR.create_runtime_checkpoint(runtime, attrs) do
         conn
         |> put_status(:created)
         |> json(%{ok: true, checkpoint: checkpoint_payload(checkpoint)})
@@ -246,8 +358,10 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     with_owned_company(conn, company_id, fn company, _human ->
       with :ok <- body_company_id_matches_path(conn, company.id),
            :ok <- body_runtime_id_matches_path(conn, runtime_id),
+           {:ok, attrs} <- ApiRequest.cast(params, restore_fields()),
            %RuntimeProfile{} = runtime <- owned_runtime(company.id, runtime_id),
-           %RuntimeCheckpoint{} = checkpoint <- owned_checkpoint(company.id, runtime.id, params) do
+           %RuntimeCheckpoint{} = checkpoint <- owned_checkpoint(company.id, runtime.id, attrs),
+           {:ok, checkpoint} <- RWR.request_runtime_restore(runtime, checkpoint) do
         json(conn, %{
           ok: true,
           runtime: runtime_payload(runtime),
@@ -283,7 +397,7 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     with_owned_company(conn, company_id, fn company, _human ->
       case owned_runtime(company.id, runtime_id) do
         %RuntimeProfile{} = runtime ->
-          services = RuntimeRegistry.list_runtime_services(company.id, runtime.id)
+          services = RWR.list_runtime_services(company.id, runtime.id)
 
           json(conn, %{
             ok: true,
@@ -317,7 +431,7 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
 
   def relationships(conn, %{"company_id" => company_id, "source_id" => source_id}) do
     with_owned_company(conn, company_id, fn company, _human ->
-      relationships = AgentRegistry.list_relationships_for_member(company.id, source_id)
+      relationships = RWR.list_relationships(company.id, source_id)
 
       json(conn, %{
         ok: true,
@@ -330,8 +444,9 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
   def create_relationship(conn, %{"company_id" => company_id, "source_id" => source_id} = params) do
     with_owned_company(conn, company_id, fn company, _human ->
       with :ok <- body_company_id_matches_path(conn, company.id),
+           {:ok, attrs} <- ApiRequest.cast(params, relationship_fields()),
            {:ok, relationship} <-
-             AgentRegistry.create_agent_relationship(company.id, source_id, params) do
+             RWR.create_relationship(company.id, source_id, attrs) do
         conn
         |> put_status(:created)
         |> json(%{ok: true, relationship: relationship_payload(relationship)})
@@ -343,7 +458,7 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
 
   def execution_pool(conn, %{"company_id" => company_id, "manager_id" => manager_id}) do
     with_owned_company(conn, company_id, fn company, _human ->
-      pool = AgentRegistry.list_execution_pool(company.id, manager_id)
+      pool = RWR.list_execution_pool(company.id, manager_id)
       json(conn, %{ok: true, company_id: company.id, workers: Enum.map(pool, &worker_payload/1)})
     end)
   end
@@ -353,7 +468,7 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
         "relationship_id" => relationship_id
       }) do
     with_owned_company(conn, company_id, fn company, _human ->
-      case AgentRegistry.delete_relationship(company.id, relationship_id) do
+      case RWR.delete_relationship(company.id, relationship_id) do
         {:ok, relationship} ->
           json(conn, %{ok: true, relationship: relationship_payload(relationship)})
 
@@ -366,7 +481,8 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
   def register_worker(conn, %{"company_id" => company_id} = params) do
     with_signed_company(conn, company_id, fn company ->
       with :ok <- body_company_id_matches_path(conn, company.id),
-           {:ok, profile, worker} <- create_worker_with_profile(company.id, params, conn) do
+           {:ok, attrs} <- ApiRequest.cast(params, worker_fields()),
+           {:ok, profile, worker} <- create_worker_with_profile(company.id, attrs, conn) do
         conn
         |> put_status(:created)
         |> json(%{
@@ -382,7 +498,7 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
 
   def heartbeat(conn, %{"company_id" => company_id, "worker_id" => worker_id} = params) do
     with_signed_worker(conn, company_id, worker_id, fn company, _worker ->
-      case AgentRegistry.heartbeat_worker(company.id, worker_id, params) do
+      case RWR.heartbeat_worker(company.id, worker_id, params) do
         {:ok, worker} -> json(conn, %{ok: true, worker: worker_payload(worker)})
         {:error, reason} -> respond_error(conn, reason)
       end
@@ -391,7 +507,7 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
 
   def assignments(conn, %{"company_id" => company_id, "worker_id" => worker_id}) do
     with_signed_worker(conn, company_id, worker_id, fn company, _worker ->
-      assignments = AgentRegistry.list_worker_assignments(company.id, worker_id)
+      assignments = RWR.list_worker_assignments(company.id, worker_id)
       json(conn, %{ok: true, assignments: Enum.map(assignments, &assignment_payload/1)})
     end)
   end
@@ -400,7 +516,7 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     with_signed_assignment_worker(conn, company_id, assignment_id, fn company,
                                                                       worker,
                                                                       assignment ->
-      case AgentRegistry.claim_worker_assignment(company.id, worker.id, assignment.id) do
+      case RWR.claim_worker_assignment(company.id, worker.id, assignment.id) do
         {:ok, assignment} -> json(conn, %{ok: true, assignment: assignment_payload(assignment)})
         {:error, reason} -> respond_error(conn, reason)
       end
@@ -411,7 +527,7 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     with_signed_assignment_worker(conn, company_id, assignment_id, fn company,
                                                                       worker,
                                                                       assignment ->
-      case AgentRegistry.release_worker_assignment(company.id, worker.id, assignment.id) do
+      case RWR.release_worker_assignment(company.id, worker.id, assignment.id) do
         {:ok, assignment} -> json(conn, %{ok: true, assignment: assignment_payload(assignment)})
         {:error, reason} -> respond_error(conn, reason)
       end
@@ -422,7 +538,7 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     with_signed_assignment_worker(conn, company_id, assignment_id, fn company,
                                                                       worker,
                                                                       assignment ->
-      case AgentRegistry.complete_worker_assignment(company.id, worker.id, assignment.id) do
+      case RWR.complete_worker_assignment(company.id, worker.id, assignment.id) do
         {:ok, assignment} -> json(conn, %{ok: true, assignment: assignment_payload(assignment)})
         {:error, reason} -> respond_error(conn, reason)
       end
@@ -433,10 +549,26 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     with_signed_run_worker(conn, company_id, run_id, fn company, _run, _worker ->
       with :ok <- body_company_id_matches_path(conn, company.id),
            :ok <- body_run_id_matches_path(conn, run_id),
-           {:ok, event} <- RunEvents.append_event(params) do
+           {:ok, attrs} <- ApiRequest.cast(params, event_fields()),
+           {:ok, event} <- RunEvents.append_event(attrs) do
         conn
         |> put_status(:created)
         |> json(%{ok: true, event: event_payload(event)})
+      else
+        {:error, reason} -> respond_error(conn, reason)
+      end
+    end)
+  end
+
+  def append_event_batch(conn, %{"company_id" => company_id, "run_id" => run_id} = params) do
+    with_signed_run_worker(conn, company_id, run_id, fn company, _run, _worker ->
+      with :ok <- body_company_id_matches_path(conn, company.id),
+           :ok <- body_run_id_matches_path(conn, run_id),
+           {:ok, attrs} <- ApiRequest.cast(params, event_batch_fields()),
+           {:ok, events} <- RWR.append_event_batch(attrs, company.id, parse_id(run_id)) do
+        conn
+        |> put_status(:created)
+        |> json(%{ok: true, run_id: parse_id(run_id), events: Enum.map(events, &event_payload/1)})
       else
         {:error, reason} -> respond_error(conn, reason)
       end
@@ -447,7 +579,8 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     with_signed_run_worker(conn, company_id, run_id, fn company, run, _worker ->
       with :ok <- body_company_id_matches_path(conn, company.id),
            :ok <- body_run_id_matches_path(conn, run_id),
-           {:ok, artifact} <- ProofPackets.record_artifact(artifact_attrs(run, params)) do
+           {:ok, attrs} <- ApiRequest.cast(params, artifact_fields()),
+           {:ok, artifact} <- ProofPackets.record_artifact(artifact_attrs(run, attrs)) do
         conn
         |> put_status(:created)
         |> json(%{ok: true, artifact: artifact_payload(artifact)})
@@ -461,8 +594,9 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     with_signed_run_worker(conn, company_id, run_id, fn company, run, _worker ->
       with :ok <- body_company_id_matches_path(conn, company.id),
            :ok <- body_run_id_matches_path(conn, run_id),
+           {:ok, attrs} <- cast_delegation_request(params),
            {:ok, result} <-
-             Orchestration.handle_delegation_request(run, params, actor_context(company.id, run)) do
+             Orchestration.handle_delegation_request(run, attrs, actor_context(company.id, run)) do
         conn
         |> put_status(:created)
         |> json(%{
@@ -482,7 +616,7 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
         respond_error(conn, {:unauthorized, "Sign in before using company work"})
 
       human ->
-        case AgentPlatform.get_owned_company(human, parse_id(company_id)) do
+        case Companies.get_owned_company(human, parse_id(company_id)) do
           %Company{} = company -> fun.(company, human)
           nil -> respond_error(conn, {:not_found, "Company not found"})
         end
@@ -490,84 +624,30 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
   end
 
   defp with_signed_company(conn, company_id, fun) do
-    case Repo.get(Company, parse_id(company_id)) |> Repo.preload(:owner_human) do
-      %Company{} = company ->
-        if agent_claims_match_company_owner?(conn.assigns[:current_agent_claims] || %{}, company) do
-          fun.(company)
-        else
-          respond_error(conn, {:forbidden, "Signed agent is not connected to this company"})
-        end
-
-      nil ->
-        respond_error(conn, {:not_found, "Company not found"})
+    case RWR.signed_company(company_id, current_agent_claims(conn)) do
+      {:ok, %Company{} = company} -> fun.(company)
+      {:error, reason} -> respond_error(conn, reason)
     end
   end
 
   defp with_signed_worker(conn, company_id, worker_id, fun) do
-    with_signed_company(conn, company_id, fn company ->
-      case AgentRegistry.get_worker(company.id, worker_id) do
-        %AgentWorker{} = worker ->
-          case signed_agent_matches_worker(conn, worker) do
-            :ok -> fun.(company, worker)
-            {:error, reason} -> respond_error(conn, reason)
-          end
-
-        nil ->
-          respond_error(conn, {:not_found, "Worker not found"})
-      end
-    end)
+    case RWR.signed_worker(company_id, worker_id, current_agent_claims(conn)) do
+      {:ok, company, worker} -> fun.(company, worker)
+      {:error, reason} -> respond_error(conn, reason)
+    end
   end
 
   defp with_signed_assignment_worker(conn, company_id, assignment_id, fun) do
-    with_signed_company(conn, company_id, fn company ->
-      case AgentRegistry.get_worker_assignment(company.id, assignment_id) do
-        nil ->
-          respond_error(conn, {:not_found, "Assignment not found"})
-
-        assignment ->
-          case AgentRegistry.get_worker(company.id, assignment.worker_id) do
-            %AgentWorker{} = worker ->
-              case signed_agent_matches_worker(conn, worker) do
-                :ok -> fun.(company, worker, assignment)
-                {:error, reason} -> respond_error(conn, reason)
-              end
-
-            nil ->
-              respond_error(conn, {:not_found, "Worker not found"})
-          end
-      end
-    end)
+    case RWR.signed_assignment_worker(company_id, assignment_id, current_agent_claims(conn)) do
+      {:ok, company, worker, assignment} -> fun.(company, worker, assignment)
+      {:error, reason} -> respond_error(conn, reason)
+    end
   end
 
   defp with_signed_run_worker(conn, company_id, run_id, fun) do
-    with_signed_company(conn, company_id, fn company ->
-      case WorkRuns.get_run(company.id, run_id) do
-        nil ->
-          respond_error(conn, {:not_found, "Run not found"})
-
-        %WorkRun{worker_id: nil} ->
-          respond_error(conn, {:forbidden, "Signed agent is not assigned to this run"})
-
-        %WorkRun{} = run ->
-          case AgentRegistry.get_worker(company.id, run.worker_id) do
-            %AgentWorker{} = worker ->
-              case signed_agent_matches_worker(conn, worker) do
-                :ok -> fun.(company, run, worker)
-                {:error, reason} -> respond_error(conn, reason)
-              end
-
-            nil ->
-              respond_error(conn, {:not_found, "Worker not found"})
-          end
-      end
-    end)
-  end
-
-  defp signed_agent_matches_worker(conn, %AgentWorker{} = worker) do
-    if agent_claims_match_worker?(conn.assigns[:current_agent_claims] || %{}, worker) do
-      :ok
-    else
-      {:error, {:forbidden, "Signed agent is not assigned to this worker"}}
+    case RWR.signed_run_worker(company_id, run_id, current_agent_claims(conn)) do
+      {:ok, company, run, worker} -> fun.(company, run, worker)
+      {:error, reason} -> respond_error(conn, reason)
     end
   end
 
@@ -577,43 +657,7 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     |> Accounts.get_human()
   end
 
-  defp agent_claims_match_company_owner?(%{"wallet_address" => wallet_address}, %Company{
-         owner_human: owner
-       }) do
-    wallet_address = normalize_wallet(wallet_address)
-
-    owner
-    |> owner_wallets()
-    |> Enum.any?(&(normalize_wallet(&1) == wallet_address))
-  end
-
-  defp agent_claims_match_company_owner?(_claims, _company), do: false
-
-  defp agent_claims_match_worker?(claims, %AgentWorker{siwa_subject: subject})
-       when is_map(claims) and is_map(subject) do
-    Enum.all?(@worker_claim_fields, fn field ->
-      stored = normalize_claim(Map.get(subject, field))
-      current = normalize_claim(Map.get(claims, field))
-
-      not is_nil(stored) and stored == current
-    end)
-  end
-
-  defp agent_claims_match_worker?(_claims, _worker), do: false
-
-  defp owner_wallets(nil), do: []
-
-  defp owner_wallets(owner) do
-    [owner.wallet_address | owner.wallet_addresses || []]
-    |> Enum.reject(&is_nil/1)
-  end
-
-  defp normalize_wallet(value) when is_binary(value), do: String.downcase(value)
-  defp normalize_wallet(_value), do: nil
-
-  defp normalize_claim(value) when is_binary(value), do: String.downcase(value)
-  defp normalize_claim(value) when is_integer(value), do: Integer.to_string(value)
-  defp normalize_claim(_value), do: nil
+  defp current_agent_claims(conn), do: conn.assigns[:current_agent_claims] || %{}
 
   defp body_company_id_matches_path(conn, company_id),
     do:
@@ -645,129 +689,196 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
 
   defp owned_work_item(human_id, company_id, work_item_id) do
     human_id
-    |> Work.list_items_for_owned_company(company_id)
+    |> RWR.list_owned_work_items(company_id)
     |> Enum.find(&(to_string(&1.id) == to_string(work_item_id)))
   end
 
   defp owned_run(human_id, company_id, run_id) do
-    case WorkRuns.get_owned_run(human_id, parse_id(run_id)) do
-      %WorkRun{company_id: ^company_id} = run -> run
-      _run -> nil
-    end
+    RWR.get_owned_run(human_id, company_id, run_id)
   end
 
   defp owned_runtime(company_id, runtime_id) do
-    RuntimeRegistry.get_runtime_profile(company_id, parse_id(runtime_id))
+    RWR.get_runtime(company_id, runtime_id)
   end
 
   defp owned_checkpoint(company_id, runtime_id, params) do
-    RuntimeRegistry.get_runtime_checkpoint(
-      company_id,
-      runtime_id,
-      parse_id(Map.get(params, "checkpoint_id"))
-    )
+    RWR.get_checkpoint(company_id, runtime_id, Map.get(params, "checkpoint_id"))
   end
-
-  defp create_runtime_checkpoint(%RuntimeProfile{} = runtime, params) do
-    attrs = checkpoint_attrs(runtime, params)
-
-    if hosted_sprite_runtime?(runtime) do
-      RuntimeRegistry.create_hosted_sprite_checkpoint(runtime, attrs)
-    else
-      RuntimeRegistry.create_runtime_checkpoint(attrs)
-    end
-  end
-
-  defp hosted_sprite_runtime?(%RuntimeProfile{
-         execution_surface: "hosted_sprite",
-         billing_mode: "platform_hosted",
-         platform_agent: %PlatformPhx.AgentPlatform.Agent{}
-       }),
-       do: true
-
-  defp hosted_sprite_runtime?(_runtime), do: false
 
   defp change_runtime_state(conn, %RuntimeProfile{} = runtime, target_state, human) do
-    runtime = Repo.preload(runtime, :platform_agent)
-
-    result =
-      case {target_state, runtime.platform_agent} do
-        {"paused", %PlatformPhx.AgentPlatform.Agent{} = agent} ->
-          RuntimeControl.pause(agent,
-            actor_type: "human",
-            human_user_id: human.id,
-            source: "rwr_api"
-          )
-
-        {"active", %PlatformPhx.AgentPlatform.Agent{} = agent} ->
-          RuntimeControl.resume(agent,
-            actor_type: "human",
-            human_user_id: human.id,
-            source: "rwr_api"
-          )
-
-        _other ->
-          {:ok, nil}
-      end
-
-    with {:ok, _agent} <- result,
-         {:ok, updated_runtime} <-
-           RuntimeRegistry.update_runtime_profile_status(runtime, target_state) do
+    with {:ok, updated_runtime} <- RWR.change_runtime_state(runtime, target_state, human) do
       json(conn, %{ok: true, runtime: runtime_payload(updated_runtime)})
     else
       {:error, reason} -> respond_error(conn, reason)
     end
   end
 
-  defp optional_worker(_company_id, nil, runner_kind) when runner_kind in @local_runner_kinds,
-    do: {:error, {:bad_request, "Local work needs an assigned local worker"}}
+  defp work_item_fields do
+    [
+      {"title", :string, required: true},
+      {"description", :string, []},
+      {"priority", :string, default: "normal"},
+      {"visibility", :string, default: "operator"},
+      {"metadata", :map, default: %{}}
+    ]
+  end
 
-  defp optional_worker(_company_id, "", runner_kind) when runner_kind in @local_runner_kinds,
-    do: {:error, {:bad_request, "Local work needs an assigned local worker"}}
+  defp run_fields do
+    [
+      {"worker_id", :integer, []},
+      {"runner_kind", :string, []},
+      {"instructions", :string, []},
+      {"metadata", :map, default: %{}}
+    ]
+  end
 
-  defp optional_worker(_company_id, nil, _runner_kind), do: {:ok, nil}
-  defp optional_worker(_company_id, "", _runner_kind), do: {:ok, nil}
+  defp runtime_fields do
+    [
+      {"platform_agent_id", :integer, []},
+      {"name", :string, required: true},
+      {"runner_kind", :string, required: true},
+      {"execution_surface", :string, required: true},
+      {"billing_mode", :string, required: true},
+      {"status", :string, default: "active"},
+      {"visibility", :string, default: "operator"},
+      {"config", :map, default: %{}},
+      {"metadata", :map, default: %{}}
+    ]
+  end
 
-  defp optional_worker(company_id, worker_id, runner_kind) do
-    case AgentRegistry.get_worker(company_id, worker_id) do
-      %AgentWorker{} = worker -> validate_worker_for_runner(worker, runner_kind)
-      nil -> {:error, {:not_found, "Worker not found"}}
+  defp checkpoint_fields do
+    [
+      {"work_run_id", :integer, []},
+      {"checkpoint_ref", :string, []},
+      {"status", :string, default: "ready"},
+      {"captured_at", :string, []},
+      {"metadata", :map, default: %{}}
+    ]
+  end
+
+  defp restore_fields, do: [{"checkpoint_id", :integer, required: true}]
+
+  defp relationship_fields do
+    [
+      {"source_agent_profile_id", :integer, []},
+      {"target_agent_profile_id", :integer, []},
+      {"source_worker_id", :integer, []},
+      {"target_worker_id", :integer, []},
+      {"relationship_kind", :string, required: true},
+      {"status", :string, default: "active"},
+      {"max_parallel_runs", :integer, []},
+      {"metadata", :map, default: %{}}
+    ]
+  end
+
+  defp worker_fields do
+    [
+      {"agent_kind", :string, required: true},
+      {"worker_role", :string, required: true},
+      {"execution_surface", :string, required: true},
+      {"runner_kind", :string, required: true},
+      {"billing_mode", :string, required: true},
+      {"trust_scope", :string, required: true},
+      {"reported_usage_policy", :string, []},
+      {"display_name", :string, []},
+      {"endpoint_url", :string, []},
+      {"capabilities", :list, default: []}
+    ]
+  end
+
+  defp event_fields do
+    [
+      {"company_id", :integer, required: true},
+      {"run_id", :integer, required: true},
+      {"kind", :string, required: true},
+      {"actor_kind", :string, []},
+      {"actor_id", :string, []},
+      {"visibility", :string, []},
+      {"sensitivity", :string, []},
+      {"payload", :map, default: %{}},
+      {"idempotency_key", :string, []},
+      {"sequence", :integer, []},
+      {"occurred_at", :string, []}
+    ]
+  end
+
+  defp event_batch_fields, do: [{"events", :list, required: true}]
+
+  defp artifact_fields do
+    [
+      {"artifact_type", :string, required: true},
+      {"title", :string, []},
+      {"body", :string, []},
+      {"url", :string, []},
+      {"visibility", :string, default: "operator"},
+      {"metadata", :map, default: %{}},
+      {"publish_action", :string, []}
+    ]
+  end
+
+  defp delegation_fields do
+    [
+      {"company_id", :integer, required: true},
+      {"run_id", :integer, required: true},
+      {"work_item_id", :integer, []},
+      {"relationship_kind", :enum,
+       values: ["manager_of", "preferred_executor", "can_delegate_to", "reports_to"]},
+      {"requested_runner_kind", :enum,
+       required: true,
+       values: [
+         "hermes_local_manager",
+         "hermes_hosted_manager",
+         "openclaw_local_manager",
+         "codex_exec",
+         "codex_app_server",
+         "openclaw_local_executor",
+         "openclaw_code_agent_local",
+         "fake",
+         "custom_worker"
+       ]},
+      {"preferred_agent_kind", :enum, values: ["codex", "openclaw", "custom"]},
+      {"target_agent_profile_id", :integer, []},
+      {"target_worker_id", :integer, []},
+      {"execution_surface", :enum,
+       values: ["hosted_sprite", "local_bridge", "external_webhook", "manager_decides"]},
+      {"strategy", :enum, required: true, values: ["parallel", "serial", "manager_decides"]},
+      {"tasks", :list, required: true},
+      {"budget_limit_usd_cents", :integer, []},
+      {"instructions", :string, []},
+      {"metadata", :map, default: %{}}
+    ]
+  end
+
+  defp delegation_task_fields do
+    [
+      {"title", :string, required: true},
+      {"instructions", :string, []},
+      {"metadata", :map, default: %{}}
+    ]
+  end
+
+  defp cast_delegation_request(params) do
+    with {:ok, attrs} <- ApiRequest.cast(params, delegation_fields()),
+         {:ok, tasks} <- cast_delegation_tasks(Map.get(attrs, "tasks")) do
+      {:ok, Map.put(attrs, "tasks", tasks)}
     end
   end
 
-  defp validate_worker_for_runner(%AgentWorker{} = worker, runner_kind) do
-    if worker_can_run?(worker, runner_kind) do
-      {:ok, worker}
-    else
-      {:error, {:bad_request, "This worker cannot run the selected work"}}
+  defp cast_delegation_tasks(tasks) when is_list(tasks) and tasks != [] do
+    tasks
+    |> Enum.reduce_while({:ok, []}, fn task, {:ok, acc} ->
+      case ApiRequest.cast(task, delegation_task_fields()) do
+        {:ok, attrs} -> {:cont, {:ok, [attrs | acc]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, tasks} -> {:ok, Enum.reverse(tasks)}
+      {:error, reason} -> {:error, reason}
     end
   end
 
-  defp worker_can_run?(_worker, nil), do: true
-
-  defp worker_can_run?(%AgentWorker{} = worker, runner_kind) do
-    case Map.fetch(@runner_worker_shapes, runner_kind) do
-      {:ok, shape} ->
-        worker.agent_kind == shape.agent_kind and
-          worker.execution_surface == shape.execution_surface and
-          worker.runner_kind in shape.runner_kinds
-
-      :error ->
-        worker.runner_kind == runner_kind
-    end
-  end
-
-  defp ensure_run_can_start(%AgentWorker{execution_surface: "local_bridge"}, _runner_kind),
-    do: :ok
-
-  defp ensure_run_can_start(_worker, runner_kind) when runner_kind in @async_runner_kinds,
-    do: :ok
-
-  defp ensure_run_can_start(nil, _runner_kind),
-    do: {:error, {:bad_request, "Selected work needs an assigned worker"}}
-
-  defp ensure_run_can_start(%AgentWorker{}, _runner_kind),
-    do: {:error, {:bad_request, "Selected work cannot start yet"}}
+  defp cast_delegation_tasks(_tasks), do: {:error, {:bad_request, "tasks is required"}}
 
   defp work_item_attrs(company_id, params) do
     %{
@@ -810,107 +921,19 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     }
   end
 
-  defp checkpoint_attrs(%RuntimeProfile{} = runtime, params) do
+  defp run_tree_payload(%{run: %WorkRun{} = run, children: children}) do
     %{
-      company_id: runtime.company_id,
-      runtime_profile_id: runtime.id,
-      work_run_id: parse_optional_id(Map.get(params, "work_run_id")),
-      checkpoint_ref: Map.get(params, "checkpoint_ref"),
-      status: Map.get(params, "status", "ready"),
-      captured_at: parse_datetime(Map.get(params, "captured_at")),
-      metadata: Map.get(params, "metadata", %{})
+      run: run_payload(run),
+      children: Enum.map(children, &run_tree_payload/1)
     }
   end
 
-  defp after_run_created(
-         %AgentWorker{execution_surface: "local_bridge"} = worker,
-         %WorkRun{} = run
-       ) do
-    case AgentRegistry.create_worker_assignment(worker.company_id, worker.id, %{
-           work_run_id: run.id
-         }) do
-      {:ok, _assignment} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp after_run_created(_worker, %WorkRun{runner_kind: runner_kind} = run)
-       when runner_kind in @async_runner_kinds do
-    case WorkRuns.enqueue_start(run) do
-      {:ok, _job} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp after_run_created(_worker, _run),
-    do: {:error, {:bad_request, "Selected work cannot start yet"}}
-
-  defp create_worker_profile(company_id, params) do
-    AgentRegistry.create_agent_profile(%{
-      company_id: company_id,
-      name: display_name(params),
-      agent_kind: Map.get(params, "agent_kind"),
-      default_runner_kind: Map.get(params, "runner_kind"),
-      default_visibility: "operator",
-      capabilities: Map.get(params, "capabilities", []),
-      public_description: "Connected worker"
-    })
-  end
-
   defp create_worker_with_profile(company_id, params, conn) do
-    Repo.transaction(fn ->
-      with {:ok, profile} <- create_worker_profile(company_id, params),
-           {:ok, worker} <- register_worker_for_profile(company_id, profile.id, params, conn) do
-        {profile, worker}
-      else
-        {:error, reason} -> Repo.rollback(reason)
-      end
-    end)
-    |> case do
-      {:ok, {profile, worker}} -> {:ok, profile, worker}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp register_worker_for_profile(company_id, profile_id, params, conn) do
-    attrs =
-      params
-      |> Map.take([
-        "agent_kind",
-        "worker_role",
-        "execution_surface",
-        "runner_kind",
-        "billing_mode",
-        "trust_scope",
-        "reported_usage_policy"
-      ])
-      |> Map.merge(%{
-        "agent_profile_id" => profile_id,
-        "name" => display_name(params),
-        "capabilities" => Map.get(params, "capabilities", []),
-        "connection_metadata" => %{"endpoint_url" => Map.get(params, "endpoint_url")},
-        "siwa_subject" => conn.assigns[:current_agent_claims] || %{}
-      })
-
-    if Map.get(params, "agent_kind") == "openclaw" do
-      AgentRegistry.register_openclaw_worker(
-        company_id,
-        attrs,
-        conn.assigns[:current_agent_claims] || %{}
-      )
-    else
-      AgentRegistry.register_worker(company_id, attrs, conn.assigns[:current_agent_claims] || %{})
-    end
-  end
-
-  defp display_name(params) do
-    case Map.get(params, "display_name") do
-      name when is_binary(name) and name != "" ->
-        name
-
-      _other ->
-        "#{Map.get(params, "agent_kind", "agent")} #{Map.get(params, "worker_role", "worker")}"
-    end
+    RWR.register_worker_with_profile(
+      company_id,
+      params,
+      conn.assigns[:current_agent_claims] || %{}
+    )
   end
 
   defp artifact_attrs(%WorkRun{} = run, params) do
@@ -1078,6 +1101,25 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
     }
   end
 
+  defp approval_payload(%ApprovalRequest{} = approval) do
+    %{
+      id: approval.id,
+      company_id: approval.company_id,
+      run_id: approval.work_run_id,
+      approval_type: approval.kind,
+      status: approval.status,
+      requested_by_actor_kind: approval.requested_by_actor_kind,
+      requested_by_actor_id: approval.requested_by_actor_id,
+      risk_summary: approval.risk_summary,
+      payload: approval.payload || %{},
+      resolved_by_human_id: approval.resolved_by_human_id,
+      resolved_at: iso8601(approval.resolved_at),
+      expires_at: iso8601(approval.expires_at),
+      created_at: iso8601(approval.created_at),
+      updated_at: iso8601(approval.updated_at)
+    }
+  end
+
   defp worker_payload(worker) do
     %{
       id: worker.id,
@@ -1143,39 +1185,16 @@ defmodule PlatformPhxWeb.Api.RegentWorkRuntimeController do
   end
 
   defp runtime_health_payload(%RuntimeProfile{} = runtime) do
-    if hosted_sprite_runtime?(Repo.preload(runtime, :platform_agent)) do
-      case RuntimeRegistry.hosted_runtime_availability(runtime) do
-        %{available?: available?, status: status, metering_status: metering_status} ->
-          %{available: available?, status: status, metering_status: metering_status}
-      end
-    else
-      %{
-        available: runtime.status == "active",
-        status: runtime.status,
-        metering_status: "unmetered"
-      }
-    end
+    RWR.runtime_health(runtime)
   end
 
   defp runtime_health_payload(_runtime) do
-    %{available: false, status: "unavailable", metering_status: "unmetered"}
+    RWR.runtime_health(nil)
   end
 
   defp parse_optional_id(nil), do: nil
   defp parse_optional_id(""), do: nil
   defp parse_optional_id(value), do: parse_id(value)
-
-  defp parse_datetime(nil), do: nil
-  defp parse_datetime(""), do: nil
-
-  defp parse_datetime(value) when is_binary(value) do
-    case DateTime.from_iso8601(value) do
-      {:ok, datetime, _offset} -> DateTime.truncate(datetime, :second)
-      _other -> value
-    end
-  end
-
-  defp parse_datetime(value), do: value
 
   defp relationship_payload(relationship) do
     %{

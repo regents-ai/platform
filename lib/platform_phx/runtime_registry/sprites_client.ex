@@ -1,6 +1,7 @@
 defmodule PlatformPhx.RuntimeRegistry.SpritesClient do
   @moduledoc false
 
+  alias PlatformPhx.ExternalHttpClient
   alias PlatformPhx.OperatorSecrets.SpriteControlSecret
 
   @callback list_services(String.t()) :: {:ok, list(map())} | {:error, term()}
@@ -32,6 +33,12 @@ defmodule PlatformPhx.RuntimeRegistry.SpritesClient do
   def service_logs(runtime_id, service_name, opts \\ %{}),
     do: client().service_logs(runtime_id, service_name, opts)
 
+  def service_state(runtime_id, service_name) do
+    with {:ok, service} <- service_status(runtime_id, service_name) do
+      {:ok, %{state: normalize_service_state(service), raw: service}}
+    end
+  end
+
   def create_runtime(attrs), do: client().create_runtime(attrs)
   def get_runtime(runtime_id), do: client().get_runtime(runtime_id)
   def create_sprite(attrs), do: create_runtime(attrs)
@@ -43,6 +50,17 @@ defmodule PlatformPhx.RuntimeRegistry.SpritesClient do
     do: client().restore_checkpoint(runtime_id, checkpoint_ref)
 
   def observe_capacity(runtime_id), do: client().observe_capacity(runtime_id)
+
+  defp normalize_service_state(nil), do: "paused"
+
+  defp normalize_service_state(service) when is_map(service) do
+    cond do
+      service["state"] in ["running", "active", "started"] -> "active"
+      service["status"] in ["running", "active", "started"] -> "active"
+      service["running"] == true -> "active"
+      true -> "paused"
+    end
+  end
 
   def client do
     Application.get_env(:platform_phx, :runtime_registry_sprites_client, __MODULE__.HttpClient)
@@ -134,15 +152,20 @@ defmodule PlatformPhx.RuntimeRegistry.SpritesClient do
     defp request(method, path, opts \\ []) do
       with {:ok, token} <- SpriteControlSecret.fetch_token(),
            {:ok, response} <-
-             Req.request(
+             ExternalHttpClient.request(
                [method: method, url: base_url() <> path, headers: headers(token)] ++ opts
              ),
            true <- response.status in 200..299 do
         {:ok, response.body || %{}}
       else
-        false -> {:error, {:external, :sprites, "Sprites request failed"}}
-        {:error, reason} -> {:error, {:external, :sprites, format_error(reason)}}
-        error -> error
+        false ->
+          {:error, {:external, :sprites, "Sprites request failed"}}
+
+        {:error, reason} ->
+          {:error, {:external, :sprites, ExternalHttpClient.format_error(reason)}}
+
+        error ->
+          error
       end
     end
 
@@ -154,8 +177,5 @@ defmodule PlatformPhx.RuntimeRegistry.SpritesClient do
 
     defp headers(token),
       do: [{"authorization", "Bearer #{token}"}, {"accept", "application/json"}]
-
-    defp format_error(%{__exception__: true} = error), do: Exception.message(error)
-    defp format_error(error), do: inspect(error)
   end
 end

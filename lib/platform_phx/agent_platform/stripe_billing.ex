@@ -4,6 +4,7 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
 
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.SpriteUsageRecord
+  alias PlatformPhx.ExternalHttpClient
   alias PlatformPhx.PublicErrors
   alias PlatformPhx.RuntimeConfig
 
@@ -21,7 +22,8 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
         metadata: %{
           "checkout_kind" => "billing_setup",
           "human_user_id" => Integer.to_string(human_user_id)
-        }
+        },
+        idempotency_key: "billing-setup:#{account.id}:#{human_user_id}"
       })
     end
   end
@@ -40,7 +42,8 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
           "checkout_kind" => "runtime_topup",
           "billing_account_id" => Integer.to_string(account.id),
           "amount_usd_cents" => Integer.to_string(amount_usd_cents)
-        }
+        },
+        idempotency_key: "runtime-topup:#{account.id}:#{amount_usd_cents}"
       })
     end
   end
@@ -204,22 +207,59 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
   end
 
   defp normalize_event(%{"id" => id, "type" => type, "data" => %{"object" => object}}) do
-    {:ok,
-     %{
-       "event_id" => id,
-       "event_type" => type,
-       "customer_id" => object["customer"],
-       "subscription_id" =>
-         object["subscription"] || object["id"] ||
-           get_in(object, ["items", "data", Access.at(0), "subscription"]),
-       "subscription_status" => object["status"],
-       "mode" => object["mode"],
-       "metadata" => object["metadata"] || %{}
-     }}
+    metadata = object["metadata"] || %{}
+
+    with :ok <- validate_event_metadata(type, metadata) do
+      {:ok,
+       %{
+         "event_id" => id,
+         "event_type" => type,
+         "customer_id" => object["customer"],
+         "subscription_id" =>
+           object["subscription"] || object["id"] ||
+             get_in(object, ["items", "data", Access.at(0), "subscription"]),
+         "subscription_status" => object["status"],
+         "mode" => object["mode"],
+         "metadata" => metadata
+       }}
+    end
   end
 
   defp normalize_event(_payload),
     do: {:error, {:bad_request, "Stripe webhook payload is invalid"}}
+
+  defp validate_event_metadata("checkout.session.completed", %{
+         "checkout_kind" => "billing_setup",
+         "human_user_id" => human_user_id
+       })
+       when is_binary(human_user_id) and human_user_id != "",
+       do: :ok
+
+  defp validate_event_metadata("checkout.session.completed", %{
+         "checkout_kind" => "runtime_topup",
+         "billing_account_id" => billing_account_id,
+         "amount_usd_cents" => amount_usd_cents
+       })
+       when is_binary(billing_account_id) and billing_account_id != "" and
+              is_binary(amount_usd_cents) and amount_usd_cents != "",
+       do: :ok
+
+  defp validate_event_metadata(event_type, metadata)
+       when event_type in [
+              "customer.subscription.updated",
+              "customer.subscription.paused",
+              "customer.subscription.resumed"
+            ] do
+    if present?(metadata["billing_account_id"]) or present?(metadata["human_user_id"]) do
+      :ok
+    else
+      {:error, {:bad_request, "Stripe webhook metadata is invalid"}}
+    end
+  end
+
+  defp validate_event_metadata(_event_type, _metadata), do: :ok
+
+  defp present?(value), do: is_binary(value) and String.trim(value) != ""
 
   defp parse_signature(signature) do
     parts =
@@ -242,7 +282,7 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
   end
 
   defp validate_signature_timestamp(timestamp) when is_integer(timestamp) do
-    now = System.system_time(:second)
+    now = PlatformPhx.Clock.unix_seconds()
     tolerance = RuntimeConfig.stripe_webhook_tolerance_seconds()
 
     if abs(now - timestamp) <= tolerance do
@@ -282,22 +322,22 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
           form
         end
 
-      case Req.post("https://api.stripe.com/v1/checkout/sessions",
+      case ExternalHttpClient.post("https://api.stripe.com/v1/checkout/sessions",
              form: form,
              auth: {:bearer, params.secret_key},
-             headers: [{"stripe-version", @checkout_preview_header}]
+             headers: [{"stripe-version", @checkout_preview_header}] ++ request_headers(params)
            ) do
         {:ok, %{status: status, body: %{"url" => url} = body}} when status in 200..299 ->
           {:ok, %{url: url, customer_id: body["customer"]}}
 
         {:ok, %{status: status, body: body}} ->
-          Logger.warning("stripe billing setup failed #{inspect(%{status: status, body: body})}")
+          log_stripe_response_failure("billing setup", status, body)
 
           {:error, {:external, :stripe, PublicErrors.billing()}}
 
         {:error, error} ->
           Logger.warning(
-            "stripe billing setup request failed #{inspect(%{reason: Exception.message(error)})}"
+            "stripe billing setup request failed #{inspect(%{reason: ExternalHttpClient.format_error(error)})}"
           )
 
           {:error, {:external, :stripe, PublicErrors.billing()}}
@@ -329,21 +369,22 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
           form
         end
 
-      case Req.post("https://api.stripe.com/v1/checkout/sessions",
+      case ExternalHttpClient.post("https://api.stripe.com/v1/checkout/sessions",
              form: form,
-             auth: {:bearer, params.secret_key}
+             auth: {:bearer, params.secret_key},
+             headers: request_headers(params)
            ) do
         {:ok, %{status: status, body: %{"url" => url} = body}} when status in 200..299 ->
           {:ok, %{url: url, customer_id: body["customer"]}}
 
         {:ok, %{status: status, body: body}} ->
-          Logger.warning("stripe top-up failed #{inspect(%{status: status, body: body})}")
+          log_stripe_response_failure("top-up", status, body)
 
           {:error, {:external, :stripe, PublicErrors.billing()}}
 
         {:error, error} ->
           Logger.warning(
-            "stripe top-up request failed #{inspect(%{reason: Exception.message(error)})}"
+            "stripe top-up request failed #{inspect(%{reason: ExternalHttpClient.format_error(error)})}"
           )
 
           {:error, {:external, :stripe, PublicErrors.billing()}}
@@ -364,7 +405,7 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
 
       headers = request_headers(params)
 
-      case Req.post("https://api.stripe.com/v1/billing/credit_grants",
+      case ExternalHttpClient.post("https://api.stripe.com/v1/billing/credit_grants",
              form: form,
              auth: {:bearer, params.secret_key},
              headers: headers
@@ -373,13 +414,13 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
           {:ok, %{credit_grant_id: id}}
 
         {:ok, %{status: status, body: body}} ->
-          Logger.warning("stripe credit grant failed #{inspect(%{status: status, body: body})}")
+          log_stripe_response_failure("credit grant", status, body)
 
           {:error, {:external, :stripe, PublicErrors.billing()}}
 
         {:error, error} ->
           Logger.warning(
-            "stripe credit grant request failed #{inspect(%{reason: Exception.message(error)})}"
+            "stripe credit grant request failed #{inspect(%{reason: ExternalHttpClient.format_error(error)})}"
           )
 
           {:error, {:external, :stripe, PublicErrors.billing()}}
@@ -406,7 +447,7 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
 
       headers = request_headers(params)
 
-      case Req.post("https://api.stripe.com/v1/billing/meter_events",
+      case ExternalHttpClient.post("https://api.stripe.com/v1/billing/meter_events",
              form: form,
              auth: {:bearer, params.secret_key},
              headers: headers
@@ -415,15 +456,13 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
           {:ok, %{meter_event_id: identifier}}
 
         {:ok, %{status: status, body: body}} ->
-          Logger.warning(
-            "stripe runtime reporting failed #{inspect(%{status: status, body: body})}"
-          )
+          log_stripe_response_failure("runtime reporting", status, body)
 
           {:error, {:external, :stripe, PublicErrors.billing()}}
 
         {:error, error} ->
           Logger.warning(
-            "stripe runtime reporting request failed #{inspect(%{reason: Exception.message(error)})}"
+            "stripe runtime reporting request failed #{inspect(%{reason: ExternalHttpClient.format_error(error)})}"
           )
 
           {:error, {:external, :stripe, PublicErrors.billing()}}
@@ -441,5 +480,24 @@ defmodule PlatformPhx.AgentPlatform.StripeBilling do
     defp maybe_put_header(headers, key, value) when is_binary(value) do
       [{key, value} | headers]
     end
+
+    defp log_stripe_response_failure(operation, status, body) do
+      Logger.warning(
+        "stripe #{operation} failed #{inspect(%{status: status, body: stripe_body_summary(body)})}"
+      )
+    end
+
+    defp stripe_body_summary(%{"error" => %{} = error}) do
+      %{
+        "error" =>
+          error
+          |> Map.take(["type", "code", "decline_code"])
+          |> Enum.reject(fn {_key, value} -> is_nil(value) or value == "" end)
+          |> Map.new()
+      }
+    end
+
+    defp stripe_body_summary(%{}), do: %{"shape" => "object"}
+    defp stripe_body_summary(_body), do: %{"shape" => "non_object"}
   end
 end

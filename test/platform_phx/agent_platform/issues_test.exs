@@ -5,6 +5,7 @@ defmodule PlatformPhx.AgentPlatform.IssuesTest do
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
+  alias PlatformPhx.AgentPlatform.Company
   alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.AgentPlatform.Issues
   alias PlatformPhx.AgentPlatform.SpriteUsageRecord
@@ -56,6 +57,7 @@ defmodule PlatformPhx.AgentPlatform.IssuesTest do
     %Agent{}
     |> Agent.changeset(%{
       owner_human_id: human.id,
+      company_id: insert_company!(human, slug).id,
       template_key: "start",
       name: "Issue Agent",
       slug: slug,
@@ -66,6 +68,19 @@ defmodule PlatformPhx.AgentPlatform.IssuesTest do
       public_summary: "Issue test",
       runtime_status: runtime_status,
       checkpoint_status: checkpoint_status
+    })
+    |> Repo.insert!()
+  end
+
+  defp insert_company!(human, slug) do
+    %Company{}
+    |> Company.changeset(%{
+      owner_human_id: human.id,
+      name: "Issue Agent",
+      slug: slug,
+      claimed_label: slug,
+      status: "published",
+      public_summary: "Issue test"
     })
     |> Repo.insert!()
   end

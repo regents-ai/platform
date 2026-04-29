@@ -1,43 +1,155 @@
 defmodule PlatformPhxWeb.AppRwrLiveTest do
   use PlatformPhxWeb.ConnCase, async: false
+  use Oban.Testing, repo: PlatformPhx.Repo
 
   import Phoenix.LiveViewTest
 
   alias PlatformPhx.Accounts.HumanUser
-  alias PlatformPhx.AgentPlatform
+  alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentRegistry
   alias PlatformPhx.Repo
   alias PlatformPhx.RunEvents
   alias PlatformPhx.RuntimeRegistry
+  alias PlatformPhx.RuntimeRegistry.Workers.RuntimeCheckpointJob
+  alias PlatformPhx.RuntimeRegistry.Workers.RuntimeRestoreJob
   alias PlatformPhx.Work
   alias PlatformPhx.WorkRuns
 
   @wallet "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
 
   test "work, run, runtimes, and agents pages render seeded company work", %{conn: conn} do
-    %{human: human, run: run} = rwr_fixture()
+    %{
+      human: human,
+      runtime: runtime,
+      hosted_runtime: hosted_runtime,
+      run: run,
+      child_run: child_run
+    } =
+      rwr_fixture()
+
     conn = init_test_session(conn, %{current_human_id: human.id})
 
-    {:ok, _view, work_html} = live(conn, "/app/work")
+    {:ok, work_view, work_html} = live(conn, "/app/work")
     assert work_html =~ "Draft operator notes"
     assert work_html =~ "Assigned worker"
     assert work_html =~ "Runs with"
     assert work_html =~ "OpenClaw local worker"
     assert work_html =~ "Completed"
+    assert work_html =~ "Proof"
+    assert work_html =~ "1 proof, 1 approval"
+    refute has_element?(work_view, "button[disabled]", "Publish")
 
-    {:ok, _view, run_html} = live(conn, "/app/runs/#{run.id}")
-    assert run_html =~ "Run path"
+    work_view
+    |> form("#create-work-form", %{
+      "title" => "Prepare launch checklist",
+      "body" => "List the next operator actions.",
+      "worker_id" => runtime_worker_id(runtime.id)
+    })
+    |> render_submit()
+
+    assert render(work_view) =~ "Work added."
+    assert render(work_view) =~ "Prepare launch checklist"
+    created_item = work_item_by_title(human.id, run.company_id, "Prepare launch checklist")
+
+    work_view
+    |> element(
+      "button[phx-click='start_run'][phx-value-item_id='#{created_item.id}']",
+      "Start run"
+    )
+    |> render_click()
+
+    assert render(work_view) =~ "Run started."
+
+    {:ok, run_view, run_html} = live(conn, "/app/runs/#{run.id}")
+    assert run_html =~ "Run family"
+    assert run_html =~ "Full run tree"
+    assert run_html =~ "Root run #{run.id}"
+    assert run_html =~ "Child run"
+    assert run_html =~ "Child notes were prepared."
     assert run_html =~ "Event timeline"
     assert run_html =~ "Artifacts"
     assert run_html =~ "Approvals"
     assert run_html =~ "Assigned worker"
+    assert run_html =~ "Publish proof"
+    assert run_html =~ "Pending review"
     refute run_html =~ "keep this private"
 
-    {:ok, _view, runtimes_html} = live(conn, "/app/runtimes")
+    run_view
+    |> element("button[phx-click='resolve_approval'][phx-value-decision='approved']", "Approve")
+    |> render_click()
+
+    assert render(run_view) =~ "Review approved."
+    assert render(run_view) =~ "Approved review"
+
+    run_view
+    |> element("button[phx-click='publish_artifact']", "Publish proof")
+    |> render_click()
+
+    assert render(run_view) =~ "Proof published."
+    assert render(run_view) =~ "Published"
+
+    {:ok, work_view, _work_html} = live(conn, "/app/work")
+
+    work_view
+    |> element("button[phx-click='publish_run_artifacts'][phx-value-run_id='#{child_run.id}']")
+    |> render_click()
+
+    assert render(work_view) =~ "Proof published."
+
+    assert Enum.any?(
+             WorkRuns.list_artifacts(run.company_id, run.id),
+             &(&1.visibility == "public")
+           )
+
+    {:ok, runtimes_view, runtimes_html} = live(conn, "/app/runtimes")
     assert runtimes_html =~ "Runtimes"
     assert runtimes_html =~ "Operator machine"
     assert runtimes_html =~ "Checkpoints"
     assert runtimes_html =~ "Runs with"
+    assert runtimes_html =~ "Capacity"
+    assert runtimes_html =~ "512 MB"
+    assert runtimes_html =~ "Upgrade capacity"
+    assert runtimes_html =~ "Latest note: Worker ready"
+    assert runtimes_html =~ "Restore pending"
+    assert runtimes_html =~ "Save checkpoint"
+    assert has_element?(runtimes_view, "button[phx-click='restore_runtime']", "Restore")
+
+    runtimes_view
+    |> element("button[phx-click='pause_runtime'][phx-value-runtime_id='#{runtime.id}']")
+    |> render_click()
+
+    assert render(runtimes_view) =~ "Runtime paused."
+    assert render(runtimes_view) =~ "Resume"
+
+    runtimes_view
+    |> element("button[phx-click='checkpoint_runtime'][phx-value-runtime_id='#{runtime.id}']")
+    |> render_click()
+
+    assert render(runtimes_view) =~ "Checkpoint saved."
+
+    runtimes_view
+    |> element(
+      "button[phx-click='checkpoint_runtime'][phx-value-runtime_id='#{hosted_runtime.id}']"
+    )
+    |> render_click()
+
+    assert render(runtimes_view) =~ "Checkpoint requested."
+
+    assert_enqueued(
+      worker: RuntimeCheckpointJob,
+      args: %{runtime_checkpoint_id: pending_checkpoint_id(hosted_runtime.id)}
+    )
+
+    runtimes_view
+    |> element("button[phx-click='restore_runtime'][phx-value-runtime_id='#{hosted_runtime.id}']")
+    |> render_click()
+
+    assert render(runtimes_view) =~ "Restore requested."
+
+    assert_enqueued(
+      worker: RuntimeRestoreJob,
+      args: %{runtime_checkpoint_id: hosted_runtime.ready_checkpoint_id}
+    )
 
     {:ok, _view, agents_html} = live(conn, "/app/agents")
     assert agents_html =~ "Connected agents and workers"
@@ -77,13 +189,29 @@ defmodule PlatformPhxWeb.AppRwrLiveTest do
   defp rwr_fixture do
     human = insert_human!(System.unique_integer([:positive]))
     company = insert_company!(human, "browser-rwr-#{System.unique_integer([:positive])}")
+    platform_agent = insert_agent!(human, company, "browser-rwr")
 
     {:ok, runtime} =
       RuntimeRegistry.create_runtime_profile(%{
         company_id: company.id,
         name: "Local OpenClaw",
         runner_kind: "openclaw_local_executor",
-        execution_surface: "local_bridge"
+        execution_surface: "local_bridge",
+        observed_memory_mb: 512,
+        observed_storage_bytes: 1_500_000_000,
+        observed_capacity_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        rate_limit_upgrade_url: "https://billing.example.test/upgrade"
+      })
+
+    {:ok, hosted_runtime} =
+      RuntimeRegistry.create_runtime_profile(%{
+        company_id: company.id,
+        platform_agent_id: platform_agent.id,
+        name: "Hosted Codex",
+        runner_kind: "codex_exec",
+        execution_surface: "hosted_sprite",
+        billing_mode: "platform_hosted",
+        provider_runtime_id: "sprite-browser-rwr"
       })
 
     {:ok, profile} =
@@ -132,6 +260,21 @@ defmodule PlatformPhxWeb.AppRwrLiveTest do
         summary: "Notes were prepared."
       })
 
+    {:ok, child_run} =
+      WorkRuns.create_run(%{
+        company_id: company.id,
+        work_item_id: item.id,
+        parent_run_id: run.id,
+        root_run_id: run.id,
+        delegated_by_run_id: run.id,
+        worker_id: worker.id,
+        runtime_profile_id: runtime.id,
+        runner_kind: "openclaw_local_executor",
+        status: "completed",
+        summary: "Child notes were prepared.",
+        completed_at: DateTime.utc_now() |> DateTime.truncate(:second)
+      })
+
     {:ok, _event} =
       RunEvents.append_event(%{
         company_id: company.id,
@@ -159,13 +302,34 @@ defmodule PlatformPhxWeb.AppRwrLiveTest do
         risk_summary: "Operator review requested."
       })
 
+    {:ok, _child_artifact} =
+      WorkRuns.create_artifact(%{
+        company_id: company.id,
+        work_item_id: item.id,
+        run_id: child_run.id,
+        kind: "proof_packet",
+        title: "Child run proof"
+      })
+
+    {:ok, _child_approval} =
+      WorkRuns.create_approval_request(%{
+        company_id: company.id,
+        work_run_id: child_run.id,
+        kind: "protected_action",
+        requested_by_actor_kind: "worker",
+        risk_summary: "Child operator review requested."
+      })
+
     {:ok, _service} =
       RuntimeRegistry.create_runtime_service(%{
         company_id: company.id,
         runtime_profile_id: runtime.id,
         name: "Operator machine",
         service_kind: "bridge",
-        status: "active"
+        status: "active",
+        status_observed_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        log_cursor: "log-1",
+        last_log_excerpt: "Worker ready"
       })
 
     {:ok, _checkpoint} =
@@ -174,7 +338,9 @@ defmodule PlatformPhxWeb.AppRwrLiveTest do
         runtime_profile_id: runtime.id,
         work_run_id: run.id,
         checkpoint_ref: "notes-ready",
-        status: "ready"
+        status: "ready",
+        captured_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        restore_status: "pending"
       })
 
     {:ok, _usage} =
@@ -195,7 +361,24 @@ defmodule PlatformPhxWeb.AppRwrLiveTest do
         relationship_kind: "preferred_executor"
       })
 
-    %{human: human, company: company, run: run}
+    {:ok, hosted_checkpoint} =
+      RuntimeRegistry.create_runtime_checkpoint(%{
+        company_id: company.id,
+        runtime_profile_id: hosted_runtime.id,
+        checkpoint_ref: "hosted-ready",
+        status: "ready",
+        protected: true,
+        captured_at: DateTime.utc_now() |> DateTime.truncate(:second)
+      })
+
+    %{
+      human: human,
+      company: company,
+      runtime: runtime,
+      hosted_runtime: Map.put(hosted_runtime, :ready_checkpoint_id, hosted_checkpoint.id),
+      run: run,
+      child_run: child_run
+    }
   end
 
   defp insert_human!(key) do
@@ -210,7 +393,7 @@ defmodule PlatformPhxWeb.AppRwrLiveTest do
 
   defp insert_company!(human, slug) do
     {:ok, company} =
-      AgentPlatform.create_company(human, %{
+      PlatformPhx.AgentPlatform.Companies.create_company(human, %{
         name: "#{slug} Regent",
         slug: slug,
         claimed_label: slug,
@@ -219,5 +402,47 @@ defmodule PlatformPhxWeb.AppRwrLiveTest do
       })
 
     company
+  end
+
+  defp insert_agent!(human, company, key) do
+    %Agent{}
+    |> Agent.changeset(%{
+      owner_human_id: human.id,
+      company_id: company.id,
+      template_key: "start",
+      name: "#{key} Hosted Agent",
+      slug: "#{key}-agent-#{System.unique_integer([:positive])}",
+      claimed_label: "#{key}-agent",
+      basename_fqdn: "#{key}.agent.base.eth",
+      ens_fqdn: "#{key}.regent.eth",
+      status: "published",
+      public_summary: "#{key} hosted agent",
+      sprite_name: "#{key}-sprite",
+      sprite_service_name: "codex-workspace",
+      runtime_status: "ready",
+      desired_runtime_state: "active",
+      observed_runtime_state: "active"
+    })
+    |> Repo.insert!()
+  end
+
+  defp pending_checkpoint_id(runtime_profile_id) do
+    RuntimeRegistry.list_runtime_checkpoints(
+      Repo.get!(RuntimeRegistry.RuntimeProfile, runtime_profile_id).company_id
+    )
+    |> Enum.find(&(&1.runtime_profile_id == runtime_profile_id and &1.status == "pending"))
+    |> Map.fetch!(:id)
+  end
+
+  defp runtime_worker_id(runtime_profile_id) do
+    PlatformPhx.AgentRegistry.AgentWorker
+    |> Repo.get_by!(runtime_profile_id: runtime_profile_id)
+    |> Map.fetch!(:id)
+  end
+
+  defp work_item_by_title(human_id, company_id, title) do
+    human_id
+    |> Work.list_items_for_owned_company(company_id)
+    |> Enum.find(&(&1.title == title))
   end
 end

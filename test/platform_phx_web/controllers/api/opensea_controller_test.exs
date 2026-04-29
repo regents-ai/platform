@@ -49,7 +49,7 @@ defmodule PlatformPhxWeb.Api.OpenseaControllerTest do
       |> get("/api/opensea", %{address: "nope"})
       |> json_response(400)
 
-    assert response["statusMessage"] == "Invalid query params"
+    assert response["error"]["message"] == "Invalid query params"
   end
 
   test "returns 503 when the server is missing the api key", %{conn: conn} do
@@ -60,8 +60,8 @@ defmodule PlatformPhxWeb.Api.OpenseaControllerTest do
       |> get("/api/opensea", %{address: @address})
       |> json_response(503)
 
-    assert response["statusMessage"] == "Collectible lookup is unavailable right now."
-    refute response["statusMessage"] =~ "OPENSEA_API_KEY"
+    assert response["error"]["message"] == "Collectible lookup is unavailable right now."
+    refute response["error"]["message"] =~ "OPENSEA_API_KEY"
   end
 
   test "returns 502 when opensea fails upstream", %{conn: conn} do
@@ -78,10 +78,10 @@ defmodule PlatformPhxWeb.Api.OpenseaControllerTest do
       |> get("/api/opensea", %{address: @address})
       |> json_response(502)
 
-    assert response["statusMessage"] == "Collectible lookup is unavailable right now."
-    refute response["statusMessage"] =~ "500"
-    refute response["statusMessage"] =~ "boom"
-    refute response["statusMessage"] =~ "%{"
+    assert response["error"]["message"] == "Collectible lookup is unavailable right now."
+    refute response["error"]["message"] =~ "500"
+    refute response["error"]["message"] =~ "boom"
+    refute response["error"]["message"] =~ "%{"
   end
 
   test "returns redeem collection supply stats", %{conn: conn} do
@@ -124,7 +124,7 @@ defmodule PlatformPhxWeb.Api.OpenseaControllerTest do
       |> get("/api/opensea/redeem-stats")
       |> json_response(429)
 
-    assert response["statusMessage"] == "Too many requests. Try again shortly."
+    assert response["error"]["message"] == "Too many requests. Try again shortly."
   end
 
   test "returns 502 when redeem stats fail upstream", %{conn: conn} do
@@ -140,10 +140,10 @@ defmodule PlatformPhxWeb.Api.OpenseaControllerTest do
       |> get("/api/opensea/redeem-stats")
       |> json_response(502)
 
-    assert response["statusMessage"] == "Collectible lookup is unavailable right now."
-    refute response["statusMessage"] =~ "500"
-    refute response["statusMessage"] =~ "boom"
-    refute response["statusMessage"] =~ "%{"
+    assert response["error"]["message"] == "Collectible lookup is unavailable right now."
+    refute response["error"]["message"] =~ "500"
+    refute response["error"]["message"] =~ "boom"
+    refute response["error"]["message"] =~ "%{"
   end
 
   defp request_url(address, collection) do

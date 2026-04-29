@@ -1,11 +1,14 @@
 defmodule PlatformPhxWeb.Api.PrivySessionController do
   use PlatformPhxWeb, :controller
+
+  action_fallback PlatformPhxWeb.ApiFallbackController
   require Logger
 
   alias PlatformPhx.Accounts
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.Privy
   alias PlatformPhxWeb.ApiErrors
+  alias PlatformPhxWeb.ApiRequest
   alias PlatformPhx.PublicErrors
 
   def csrf(conn, _params) do
@@ -19,9 +22,10 @@ defmodule PlatformPhxWeb.Api.PrivySessionController do
   def create(conn, params) when is_map(params) do
     log_create_attempt(conn, params)
 
-    with {:ok, token} <- fetch_bearer_token(conn),
+    with {:ok, attrs} <- ApiRequest.cast(params, create_fields()),
+         {:ok, token} <- fetch_bearer_token(conn),
          {:ok, verified_human} <- privy_module().verify_token(token),
-         {:ok, human} <- upsert_human(verified_human, params),
+         {:ok, human} <- upsert_human(verified_human, attrs),
          {:ok, payload} <- AgentPlatform.current_human_payload(human) do
       Logger.info(
         "privy session create succeeded #{inspect(%{privy_user_id: human.privy_user_id, wallet_address: redact_wallet(human.wallet_address), wallet_count: length(List.wrap(human.wallet_addresses)), display_name_present: present?(human.display_name)})}"
@@ -31,6 +35,9 @@ defmodule PlatformPhxWeb.Api.PrivySessionController do
       |> put_session(:current_human_id, human.id)
       |> json(payload)
     else
+      {:error, {:bad_request, _message} = reason} ->
+        ApiErrors.error(conn, reason)
+
       {:error, changeset} when is_map(changeset) ->
         Logger.warning(
           "privy session create rejected invalid human payload #{inspect(%{errors: changeset.errors})}"
@@ -73,12 +80,16 @@ defmodule PlatformPhxWeb.Api.PrivySessionController do
 
   def update_avatar(conn, params) when is_map(params) do
     with %{} = human <- current_human(conn),
-         {:ok, updated_human} <- AgentPlatform.save_human_avatar(human, params),
+         {:ok, attrs} <- avatar_attrs(params),
+         {:ok, updated_human} <- AgentPlatform.save_human_avatar(human, attrs),
          {:ok, payload} <- AgentPlatform.current_human_payload(updated_human) do
       json(conn, payload)
     else
       nil ->
         ApiErrors.error(conn, {:unauthorized, "Sign in before saving an avatar"})
+
+      {:error, {:bad_request, _message} = reason} ->
+        ApiErrors.error(conn, reason)
 
       {:error, reason} ->
         ApiErrors.error(conn, reason)
@@ -134,6 +145,37 @@ defmodule PlatformPhxWeb.Api.PrivySessionController do
     :platform_phx
     |> Application.get_env(:privy_session_controller, [])
     |> Keyword.get(:privy_module, Privy)
+  end
+
+  defp create_fields do
+    [{"display_name", :string, []}]
+  end
+
+  defp avatar_attrs(params) do
+    with {:ok, %{"kind" => kind}} <-
+           ApiRequest.cast(params, [
+             {"kind", :enum, required: true, values: ["custom_shader", "collection_token"]}
+           ]) do
+      case kind do
+        "custom_shader" ->
+          ApiRequest.cast(params, [
+            {"kind", :enum, required: true, values: ["custom_shader"]},
+            {"shader_id", :string, required: true},
+            {"define_values", :map, default: %{}}
+          ])
+
+        "collection_token" ->
+          collection_avatar_attrs(params)
+      end
+    end
+  end
+
+  defp collection_avatar_attrs(params) do
+    ApiRequest.cast(params, [
+      {"kind", :enum, required: true, values: ["collection_token"]},
+      {"collection", :enum, required: true, values: ["animata1", "animata2", "animataPass"]},
+      {"token_id", :integer, required: true}
+    ])
   end
 
   defp log_create_attempt(conn, params) do

@@ -7,10 +7,14 @@ defmodule PlatformPhx.Application do
 
   @impl true
   def start(_type, _args) do
+    PlatformPhx.Contracts.validate_release_artifacts!()
+    PlatformPhx.RuntimeConfig.validate_enabled_surfaces!()
+
     children =
       [
         PlatformPhxWeb.Telemetry,
         PlatformPhx.Repo,
+        PlatformPhx.LocalCache.child_spec(),
         PlatformPhx.RateLimiter,
         {Oban, Application.fetch_env!(:platform_phx, Oban)},
         {DNSCluster, query: Application.get_env(:platform_phx, :dns_cluster_query) || :ignore},
@@ -21,7 +25,6 @@ defmodule PlatformPhx.Application do
         # Start to serve requests, typically the last entry
         PlatformPhxWeb.Endpoint
       ]
-      |> maybe_add_dragonfly()
       |> maybe_add_sprite_control_secret()
       |> maybe_add_prometheus_exporter()
 
@@ -70,14 +73,6 @@ defmodule PlatformPhx.Application do
 
       true ->
         children
-    end
-  end
-
-  defp maybe_add_dragonfly(children) do
-    if RegentCache.Dragonfly.enabled?(:platform_phx) do
-      children ++ [RegentCache.Dragonfly.child_spec(:platform_phx)]
-    else
-      children
     end
   end
 end

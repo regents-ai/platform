@@ -112,10 +112,10 @@ defmodule PlatformPhxWeb.Api.PrivySessionControllerTest do
       |> post("/api/auth/privy/session", %{display_name: "Regent Operator"})
       |> json_response(400)
 
-    assert response["statusMessage"] ==
+    assert response["error"]["message"] ==
              "We could not save that profile. Check the name and try again."
 
-    refute_public_leak(response["statusMessage"])
+    refute_public_leak(response["error"]["message"])
   end
 
   test "signed-in human can save a shader avatar through the profile route", %{conn: conn} do

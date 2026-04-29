@@ -1,6 +1,8 @@
 defmodule PlatformPhxWeb.Api.OpenseaController do
   use PlatformPhxWeb, :controller
 
+  action_fallback PlatformPhxWeb.ApiFallbackController
+
   alias PlatformPhx.OpenSea
   alias PlatformPhxWeb.ApiErrors
 

@@ -143,5 +143,5 @@ defmodule PlatformPhx.OperatorSecrets.SpriteControlSecret do
     end
   end
 
-  defp now, do: DateTime.utc_now() |> DateTime.truncate(:second)
+  defp now, do: PlatformPhx.Clock.now()
 end

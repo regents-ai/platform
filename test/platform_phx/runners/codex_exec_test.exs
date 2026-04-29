@@ -3,7 +3,6 @@ defmodule PlatformPhx.Runners.CodexExecTest do
   use Oban.Testing, repo: PlatformPhx.Repo
 
   alias PlatformPhx.Accounts.HumanUser
-  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.RunEvents
   alias PlatformPhx.RuntimeRegistry
   alias PlatformPhx.Work
@@ -19,12 +18,29 @@ defmodule PlatformPhx.Runners.CodexExecTest do
   setup do
     previous_client = Application.get_env(:platform_phx, :codex_exec_client)
     previous_sprites_client = Application.get_env(:platform_phx, :runtime_registry_sprites_client)
+
+    previous_sprites_test_pid =
+      Application.get_env(:platform_phx, :runtime_registry_sprites_client_test_pid)
+
+    previous_codex_command = Application.get_env(:platform_phx, :codex_exec_command)
+    previous_app_server_client = Application.get_env(:platform_phx, :codex_app_server_client)
+
     Application.put_env(:platform_phx, :codex_exec_client, __MODULE__.Client)
 
     on_exit(fn ->
       restore_app_env(:platform_phx, :codex_exec_client, previous_client)
       restore_app_env(:platform_phx, :runtime_registry_sprites_client, previous_sprites_client)
+
+      restore_app_env(
+        :platform_phx,
+        :runtime_registry_sprites_client_test_pid,
+        previous_sprites_test_pid
+      )
+
+      restore_app_env(:platform_phx, :codex_exec_command, previous_codex_command)
+      restore_app_env(:platform_phx, :codex_app_server_client, previous_app_server_client)
       Application.delete_env(:platform_phx, :codex_exec_client_result)
+      Application.delete_env(:platform_phx, :codex_app_server_client_result)
     end)
 
     :ok
@@ -79,7 +95,7 @@ defmodule PlatformPhx.Runners.CodexExecTest do
 
   test "codex_app_server uses the hosted Codex runner path" do
     %{run: run} = run_fixture("codex_app_server")
-    configure_client_success()
+    configure_app_server_client_success()
 
     assert :ok = perform_job(CodexExecRunJob, %{run_id: run.id})
 
@@ -88,6 +104,7 @@ defmodule PlatformPhx.Runners.CodexExecTest do
 
     artifact = Repo.get_by!(WorkArtifact, run_id: run.id, kind: "proof_packet")
     assert artifact.metadata["runner_kind"] == "codex_app_server"
+    assert artifact.metadata["proof_source"] == "codex_app_server"
   end
 
   test "Codex client failure appends a failure event and marks the run failed" do
@@ -241,6 +258,85 @@ defmodule PlatformPhx.Runners.CodexExecTest do
     assert collected.test_output == "mix test passed\n"
   end
 
+  test "hosted Sprite Codex run executes the configured command through the Sprites client" do
+    %{run: run, company: company} = run_fixture("codex_exec")
+    original_workspace_path = run.workspace_path
+    File.rm_rf!(original_workspace_path)
+
+    {:ok, runtime} =
+      RuntimeRegistry.create_runtime_profile(%{
+        company_id: company.id,
+        name: "Hosted Sprite Codex",
+        runner_kind: "codex_exec",
+        execution_surface: "hosted_sprite",
+        billing_mode: "platform_hosted",
+        provider_runtime_id: "sprite-hosted-codex-test"
+      })
+
+    run =
+      run
+      |> WorkRun.changeset(%{runtime_profile_id: runtime.id, workspace_path: nil})
+      |> Repo.update!()
+
+    Application.put_env(
+      :platform_phx,
+      :runtime_registry_sprites_client,
+      PlatformPhx.RuntimeRegistrySpritesClientFake
+    )
+
+    Application.put_env(:platform_phx, :runtime_registry_sprites_client_test_pid, self())
+
+    Application.put_env(
+      :platform_phx,
+      :codex_exec_client,
+      PlatformPhx.Runners.CodexExec.SystemCommandClient
+    )
+
+    Application.put_env(
+      :platform_phx,
+      :codex_exec_command,
+      {"codex", ["exec", "--model", "gpt-5"]}
+    )
+
+    assert :ok = perform_job(CodexExecRunJob, %{run_id: run.id})
+
+    exec_commands =
+      receive_exec_commands()
+      |> Enum.filter(fn command -> String.contains?(command, "codex") end)
+
+    assert [codex_command] = exec_commands
+    assert codex_command =~ "cd '/regent/workspaces/#{run.work_item_id}/#{run.id}'"
+    assert codex_command =~ "'codex' 'exec' '--model' 'gpt-5'"
+
+    assert codex_command =~
+             "< '/regent/workspaces/#{run.work_item_id}/#{run.id}/REGENT_PROMPT.md'"
+
+    refute codex_command =~ original_workspace_path
+
+    completed_run = Repo.get!(WorkRun, run.id)
+    assert completed_run.status == "waiting_for_approval"
+    assert completed_run.summary == "Codex finished the assigned work."
+
+    events = RunEvents.list_events(company.id, run.id)
+
+    assert Enum.map(events, & &1.kind) == [
+             "run.started",
+             "codex.stdout",
+             "artifact.created",
+             "run.human_review"
+           ]
+
+    artifact = Repo.get_by!(WorkArtifact, run_id: run.id, kind: "proof_packet")
+    assert artifact.content_inline =~ "Hosted Codex completed inside the Sprite."
+    assert artifact.content_inline =~ "remote.txt"
+    assert artifact.content_inline =~ "mix test passed"
+
+    assert artifact.metadata["collected_artifacts"]["changed_files"] == [
+             "remote.txt",
+             "proof.txt"
+           ]
+  end
+
   test "Codex success without human review marks the run succeeded" do
     %{company: company, run: run} = run_fixture("codex_exec", review_required: false)
     configure_client_success()
@@ -288,6 +384,14 @@ defmodule PlatformPhx.Runners.CodexExecTest do
     end
   end
 
+  defmodule AppServerClient do
+    def run(%{workspace: workspace}) do
+      File.write!(Path.join(workspace.path, "app-server-proof.txt"), "proof\n")
+
+      Application.fetch_env!(:platform_phx, :codex_app_server_client_result)
+    end
+  end
+
   defmodule SpritesClient do
     @behaviour PlatformPhx.RuntimeRegistry.SpritesClient
 
@@ -315,6 +419,7 @@ defmodule PlatformPhx.Runners.CodexExecTest do
         String.starts_with?(command, "cat ") ->
           {:ok,
            %{
+             "exit_code" => 0,
              "stdout" => """
              ---
              name: sprite-workspace-test
@@ -360,6 +465,25 @@ defmodule PlatformPhx.Runners.CodexExecTest do
     })
   end
 
+  defp configure_app_server_client_success do
+    Application.put_env(:platform_phx, :codex_app_server_client, __MODULE__.AppServerClient)
+
+    Application.put_env(:platform_phx, :codex_app_server_client_result, {
+      :ok,
+      %{
+        events: [
+          %{
+            kind: "codex.message",
+            payload: %{message: "App Server accepted the run."}
+          }
+        ],
+        proof_title: "Codex App Server proof",
+        proof: "Codex App Server completed the work and reported proof.",
+        summary: "Codex App Server finished the assigned work."
+      }
+    })
+  end
+
   defp run_fixture(runner_kind, opts \\ []) do
     key = System.unique_integer([:positive])
     human = insert_human!(key)
@@ -393,6 +517,7 @@ defmodule PlatformPhx.Runners.CodexExecTest do
         goal_id: goal.id,
         budget_policy_id: budget.id,
         title: "Record Codex proof",
+        body: "Check the Codex proof output.",
         desired_runner_kind: runner_kind
       })
 
@@ -425,6 +550,16 @@ defmodule PlatformPhx.Runners.CodexExecTest do
     Path.join(System.tmp_dir!(), "#{prefix}-#{System.unique_integer([:positive])}")
   end
 
+  defp receive_exec_commands(commands \\ []) do
+    receive do
+      {:exec, _runtime_id, %{"command" => command}} -> receive_exec_commands([command | commands])
+      {:exec, _runtime_id, %{command: command}} -> receive_exec_commands([command | commands])
+      _message -> receive_exec_commands(commands)
+    after
+      0 -> Enum.reverse(commands)
+    end
+  end
+
   defp insert_human!(key) do
     %HumanUser{}
     |> HumanUser.changeset(%{
@@ -437,7 +572,7 @@ defmodule PlatformPhx.Runners.CodexExecTest do
 
   defp insert_company!(human, slug) do
     {:ok, company} =
-      AgentPlatform.create_company(human, %{
+      PlatformPhx.AgentPlatform.Companies.create_company(human, %{
         name: "#{slug} Regent",
         slug: slug,
         claimed_label: slug,

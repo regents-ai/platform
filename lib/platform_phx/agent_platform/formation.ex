@@ -4,10 +4,13 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   import Ecto.Query, warn: false
   require Logger
 
+  alias Ecto.Multi
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Agent
+  alias PlatformPhx.AgentPlatform.Billing
   alias PlatformPhx.AgentPlatform.BillingAccount
+  alias PlatformPhx.AgentPlatform.Company
   alias PlatformPhx.AgentPlatform.Connection
   alias PlatformPhx.AgentPlatform.FormationProgress
   alias PlatformPhx.AgentPlatform.Formation.Readiness
@@ -15,8 +18,10 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   alias PlatformPhx.AgentPlatform.RuntimeControl
   alias PlatformPhx.AgentPlatform.Service
   alias PlatformPhx.AgentPlatform.StripeBilling
+  alias PlatformPhx.AgentPlatform.StripeEvent
   alias PlatformPhx.AgentPlatform.Subdomain
   alias PlatformPhx.AgentPlatform.Workers.RunFormationWorker
+  alias PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker
   alias PlatformPhx.Basenames.Mint
   alias PlatformPhx.PublicErrors
   alias PlatformPhx.Repo
@@ -26,9 +31,26 @@ defmodule PlatformPhx.AgentPlatform.Formation do
 
   @default_template_key "start"
   @bootstrap_script_version "agent-formation-v1"
+  @approved_collection_keys ["animata1", "animata2", "animataPass"]
+  @runtime_hourly_cost_usd_cents 25
 
   def formation_payload(nil) do
-    billing_account = AgentPlatform.billing_account_payload(nil, [])
+    billing_account = Billing.account_payload(nil, [])
+    holdings = empty_holdings()
+
+    readiness =
+      Readiness.payload(%{
+        authenticated: false,
+        wallet_connected?: false,
+        eligible: false,
+        available_claims: [],
+        billing_account: billing_account,
+        template_ready?: template_ready?(),
+        owned_companies: [],
+        active_formations: []
+      })
+
+    blockers = formation_blockers(readiness, [], billing_account)
 
     {:ok,
      %{
@@ -36,23 +58,18 @@ defmodule PlatformPhx.AgentPlatform.Formation do
        authenticated: false,
        wallet_address: nil,
        eligible: false,
-       collections: empty_holdings(),
+       access_eligibility: access_eligibility_payload(holdings, false, [], []),
+       formation_state: formation_state_payload(readiness, [], [], blockers),
+       billing_state: billing_state_payload(billing_account, []),
+       runtime_cost_state: runtime_cost_state_payload(billing_account, []),
+       blockers: blockers,
+       collections: holdings,
        claimed_names: [],
        available_claims: [],
        billing_account: billing_account,
        owned_companies: [],
        active_formations: [],
-       readiness:
-         Readiness.payload(%{
-           authenticated: false,
-           wallet_connected?: false,
-           eligible: false,
-           available_claims: [],
-           billing_account: billing_account,
-           template_ready?: template_ready?(),
-           owned_companies: [],
-           active_formations: []
-         })
+       readiness: readiness
      }}
   end
 
@@ -60,9 +77,9 @@ defmodule PlatformPhx.AgentPlatform.Formation do
     with {:ok, holdings} <- AgentPlatform.holdings_for_human(human) do
       claimed_names = AgentPlatform.claimed_names_for_human(human)
       companies = AgentPlatform.list_owned_agents(human)
-      billing_account = AgentPlatform.get_billing_account(human)
+      billing_account = Billing.get_account(human)
       available_claims = Enum.reject(claimed_names, &formation_claim_used?/1)
-      billing_account_payload = AgentPlatform.billing_account_payload(billing_account, companies)
+      billing_account_payload = Billing.account_payload(billing_account, companies)
 
       active_formations =
         companies
@@ -70,29 +87,105 @@ defmodule PlatformPhx.AgentPlatform.Formation do
         |> Enum.reject(&is_nil/1)
         |> Enum.map(&serialize_formation/1)
 
+      wallet_connected? = AgentPlatform.linked_wallet_addresses(human) != []
+
+      readiness =
+        Readiness.payload(%{
+          authenticated: true,
+          wallet_connected?: wallet_connected?,
+          eligible: AgentPlatform.eligible_holdings?(holdings),
+          available_claims: available_claims,
+          billing_account: billing_account_payload,
+          template_ready?: template_ready?(),
+          owned_companies: companies,
+          active_formations: active_formations
+        })
+
+      blockers = formation_blockers(readiness, companies, billing_account_payload)
+
       {:ok,
        %{
          ok: true,
          authenticated: true,
          wallet_address: AgentPlatform.current_wallet_address(human),
          eligible: AgentPlatform.eligible_holdings?(holdings),
+         access_eligibility:
+           access_eligibility_payload(
+             holdings,
+             wallet_connected?,
+             claimed_names,
+             available_claims
+           ),
+         formation_state:
+           formation_state_payload(readiness, companies, active_formations, blockers),
+         billing_state: billing_state_payload(billing_account_payload, companies),
+         runtime_cost_state: runtime_cost_state_payload(billing_account_payload, companies),
+         blockers: blockers,
          collections: holdings,
          claimed_names: claimed_names,
          available_claims: available_claims,
          billing_account: billing_account_payload,
-         owned_companies: Enum.map(companies, &AgentPlatform.serialize_agent(&1, :private)),
+         owned_companies: AgentPlatform.serialize_agents(companies, :private),
          active_formations: active_formations,
-         readiness:
-           Readiness.payload(%{
-             authenticated: true,
-             wallet_connected?: AgentPlatform.linked_wallet_addresses(human) != [],
-             eligible: AgentPlatform.eligible_holdings?(holdings),
-             available_claims: available_claims,
-             billing_account: billing_account_payload,
-             template_ready?: template_ready?(),
-             owned_companies: companies,
-             active_formations: active_formations
-           })
+         readiness: readiness
+       }}
+    end
+  end
+
+  def doctor_payload(nil),
+    do: {:error, {:unauthorized, "Sign in before reading formation doctor"}}
+
+  def doctor_payload(%HumanUser{} = human) do
+    with {:ok, payload} <- formation_payload(human) do
+      {:ok, %{ok: true, doctor: doctor_from_formation(payload)}}
+    end
+  end
+
+  def projection_payload(nil),
+    do: {:error, {:unauthorized, "Sign in before reading Platform state"}}
+
+  def projection_payload(%HumanUser{} = human) do
+    with {:ok, formation} <- formation_payload(human) do
+      companies = AgentPlatform.list_owned_agents(human)
+      billing_account = Billing.get_account(human)
+      billing_payload = Billing.account_payload(billing_account, companies)
+
+      usage_payload =
+        case billing_account do
+          %BillingAccount{} = account -> Billing.usage_payload(account, companies)
+          nil -> Billing.usage_payload(%BillingAccount{}, companies)
+        end
+
+      private_companies_by_id =
+        companies
+        |> AgentPlatform.serialize_agents(:private)
+        |> Map.new(&{&1.id, &1})
+
+      public_companies_by_id =
+        companies
+        |> AgentPlatform.serialize_agents(:public)
+        |> Map.new(&{&1.id, &1})
+
+      company_projections =
+        Enum.map(companies, fn agent ->
+          %{
+            company: Map.fetch!(private_companies_by_id, agent.id),
+            runtime: AgentPlatform.runtime_payload_map(agent, billing_account),
+            formation: serialize_formation(agent.formation_run),
+            public_profile: Map.fetch!(public_companies_by_id, agent.id)
+          }
+        end)
+
+      {:ok,
+       %{
+         ok: true,
+         projection: %{
+           formation: formation,
+           billing_account: billing_payload,
+           billing_usage: usage_payload,
+           companies: company_projections,
+           public_profiles: Enum.map(companies, &Map.fetch!(public_companies_by_id, &1.id))
+         }
        }}
     end
   end
@@ -105,7 +198,10 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   def start_billing_setup_checkout(%HumanUser{} = human, attrs) when is_map(attrs) do
     with :ok <- require_agent_formation_enabled(),
          :ok <- ensure_wallet_connected(human),
-         {:ok, billing_account} <- AgentPlatform.ensure_billing_account(human),
+         {:ok, holdings} <- AgentPlatform.holdings_for_human(human),
+         :ok <- ensure_eligible_holdings(holdings),
+         {:ok, _mint} <- require_available_claimed_name(human, attrs),
+         {:ok, billing_account} <- Billing.ensure_account(human),
          {:ok, checkout_urls} <- build_billing_setup_checkout_urls(attrs),
          {:ok, checkout} <-
            StripeBilling.create_billing_setup_checkout_session(
@@ -125,7 +221,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
        %{
          ok: true,
          checkout_url: checkout.url,
-         billing_account: AgentPlatform.billing_account_payload(updated_account)
+         billing_account: Billing.account_payload(updated_account)
        }}
     else
       {:error, _reason} = error -> error
@@ -166,14 +262,14 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   def runtime_payload(%HumanUser{} = human, slug) when is_binary(slug) do
     case AgentPlatform.get_owned_agent(human, slug) do
       %Agent{} = agent ->
-        billing_account = AgentPlatform.get_billing_account(human)
+        billing_account = Billing.get_account(human)
 
         {:ok,
          %{
            ok: true,
            agent: AgentPlatform.serialize_agent(agent, :private),
            runtime: AgentPlatform.runtime_payload_map(agent, billing_account),
-           billing_account: AgentPlatform.billing_account_payload(billing_account, [agent]),
+           billing_account: Billing.account_payload(billing_account, [agent]),
            formation: serialize_formation(agent.formation_run)
          }}
 
@@ -187,12 +283,12 @@ defmodule PlatformPhx.AgentPlatform.Formation do
 
   def billing_account_payload(%HumanUser{} = human) do
     companies = AgentPlatform.list_owned_agents(human)
-    billing_account = AgentPlatform.get_billing_account(human)
+    billing_account = Billing.get_account(human)
 
     {:ok,
      %{
        ok: true,
-       billing_account: AgentPlatform.billing_account_payload(billing_account, companies)
+       billing_account: Billing.account_payload(billing_account, companies)
      }}
   end
 
@@ -201,12 +297,12 @@ defmodule PlatformPhx.AgentPlatform.Formation do
 
   def billing_usage(%HumanUser{} = human) do
     companies = AgentPlatform.list_owned_agents(human)
-    billing_account = AgentPlatform.get_billing_account(human)
+    billing_account = Billing.get_account(human)
 
     usage =
       case billing_account do
-        %BillingAccount{} = account -> AgentPlatform.billing_usage_payload(account, companies)
-        nil -> AgentPlatform.billing_usage_payload(%BillingAccount{}, companies)
+        %BillingAccount{} = account -> Billing.usage_payload(account, companies)
+        nil -> Billing.usage_payload(%BillingAccount{}, companies)
       end
 
     {:ok, %{ok: true, usage: usage}}
@@ -219,7 +315,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
     with :ok <- require_agent_formation_enabled(),
          amount when is_integer(amount) and amount > 0 <-
            normalize_positive_integer(Map.get(attrs, "amountUsdCents")),
-         {:ok, billing_account} <- AgentPlatform.ensure_billing_account(human),
+         {:ok, billing_account} <- Billing.ensure_account(human),
          {:ok, checkout} <- StripeBilling.create_topup_checkout_session(billing_account, amount),
          {:ok, updated_account} <-
            billing_account
@@ -231,7 +327,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
        %{
          ok: true,
          checkout_url: checkout.url,
-         billing_account: AgentPlatform.billing_account_payload(updated_account)
+         billing_account: Billing.account_payload(updated_account)
        }}
     else
       false -> {:error, {:bad_request, "Amount must be a positive integer"}}
@@ -275,7 +371,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
        %{
          ok: true,
          sprite: sprite_runtime_control_payload(updated),
-         billing_account: AgentPlatform.billing_account_payload(billing_account, [updated])
+         billing_account: Billing.account_payload(billing_account, [updated])
        }}
     else
       nil -> {:error, {:not_found, "Company not found"}}
@@ -287,11 +383,42 @@ defmodule PlatformPhx.AgentPlatform.Formation do
 
   def handle_stripe_webhook(raw_body, headers) when is_binary(raw_body) and is_map(headers) do
     with {:ok, event} <- StripeBilling.parse_webhook_event(raw_body, headers),
-         {:ok, _job} <-
-           PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker.new(event)
-           |> Oban.insert() do
+         {:ok, _result} <- persist_stripe_event_and_enqueue(event) do
       {:ok, %{ok: true}}
     end
+  end
+
+  defp persist_stripe_event_and_enqueue(event) do
+    Multi.new()
+    |> Multi.insert(
+      :stripe_event,
+      StripeEvent.changeset(%StripeEvent{}, stripe_event_attrs(event)),
+      on_conflict: :nothing,
+      conflict_target: [:event_id, :event_type]
+    )
+    |> Multi.run(:sync_job, fn _repo, %{stripe_event: stripe_event} ->
+      if stripe_event.id do
+        %{"stripe_event_id" => stripe_event.id}
+        |> SyncStripeBillingWorker.new()
+        |> Oban.insert()
+      else
+        {:ok, :already_recorded}
+      end
+    end)
+    |> Repo.transaction()
+  end
+
+  defp stripe_event_attrs(event) do
+    %{
+      event_id: event["event_id"],
+      event_type: event["event_type"],
+      customer_id: event["customer_id"],
+      subscription_id: event["subscription_id"],
+      subscription_status: event["subscription_status"],
+      mode: event["mode"],
+      metadata: event["metadata"] || %{},
+      processing_status: "queued"
+    }
   end
 
   defp create_company_records(
@@ -300,7 +427,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
          %Mint{} = mint,
          template
        ) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = PlatformPhx.Clock.now()
     slug = mint.label
 
     attrs = %{
@@ -335,63 +462,81 @@ defmodule PlatformPhx.AgentPlatform.Formation do
       observed_runtime_state: "unknown"
     }
 
-    Repo.transaction(fn ->
-      with {:ok, agent} <- %Agent{} |> Agent.changeset(attrs) |> Repo.insert(),
-           {:ok, _subdomain} <-
-             %Subdomain{}
-             |> Subdomain.changeset(%{
-               agent_id: agent.id,
-               slug: slug,
-               hostname: "#{slug}.regents.sh",
-               basename_fqdn: mint.fqdn,
-               ens_fqdn: mint.ens_fqdn || "#{slug}.regent.eth",
-               active: false
-             })
-             |> Repo.insert(),
-           {:ok, _mint_count} <- mark_mint_formation_used(mint),
-           :ok <- insert_default_services(agent, template),
-           :ok <- insert_default_connections(agent, template),
-           {:ok, formation} <-
-             %FormationRun{}
-             |> FormationRun.changeset(%{
-               agent_id: agent.id,
-               human_user_id: human.id,
-               claimed_label: slug,
-               status: "queued",
-               current_step: "reserve_claim",
-               bootstrap_script_version: @bootstrap_script_version
-             })
-             |> Repo.insert(),
-           event =
-             FormationProgress.insert_event!(
-               formation,
-               "reserve_claim",
-               "succeeded",
-               "Your company name is saved."
-             ),
-           {:ok, _job} <- enqueue_formation(agent.id) do
-        %{
-          agent:
-            Repo.preload(agent, [:subdomain, :services, :connections, :artifacts, :formation_run]),
-          formation: formation,
-          event: event
-        }
-      else
-        {:error, changeset} when is_map(changeset) ->
-          Repo.rollback({:bad_request, AgentPlatform.format_changeset(changeset)})
-
-        {:error, reason} ->
-          Repo.rollback(reason)
-      end
+    Multi.new()
+    |> Multi.insert(:company, Company.changeset(%Company{}, company_attrs(attrs)))
+    |> Multi.insert(:agent, fn %{company: company} ->
+      Agent.changeset(%Agent{}, Map.put(attrs, :company_id, company.id))
     end)
-    |> case do
-      {:ok, %{formation: formation, event: event} = result} ->
-        FormationProgress.broadcast(formation, event)
-        {:ok, Map.delete(result, :event)}
+    |> Multi.insert(:subdomain, fn %{agent: agent} ->
+      Subdomain.changeset(%Subdomain{}, %{
+        agent_id: agent.id,
+        slug: slug,
+        hostname: "#{slug}.regents.sh",
+        basename_fqdn: mint.fqdn,
+        ens_fqdn: mint.ens_fqdn || "#{slug}.regent.eth",
+        active: false
+      })
+    end)
+    |> Multi.run(:mint_count, fn _repo, _changes -> mark_mint_formation_used(mint) end)
+    |> Multi.run(:services, fn _repo, %{agent: agent} ->
+      with :ok <- insert_default_services(agent, template), do: {:ok, :inserted}
+    end)
+    |> Multi.run(:connections, fn _repo, %{agent: agent} ->
+      with :ok <- insert_default_connections(agent, template), do: {:ok, :inserted}
+    end)
+    |> Multi.insert(:formation, fn %{agent: agent} ->
+      FormationRun.changeset(%FormationRun{}, %{
+        agent_id: agent.id,
+        human_user_id: human.id,
+        claimed_label: slug,
+        status: "queued",
+        current_step: "reserve_claim",
+        bootstrap_script_version: @bootstrap_script_version
+      })
+    end)
+    |> Multi.run(:event, fn _repo, %{formation: formation} ->
+      event =
+        FormationProgress.insert_event!(
+          formation,
+          "reserve_claim",
+          "succeeded",
+          "Your company name is saved."
+        )
 
-      {:error, reason} ->
+      {:ok, event}
+    end)
+    |> Multi.run(:job, fn _repo, %{agent: agent} -> enqueue_formation(agent.id) end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{agent: agent, formation: formation, event: event}} ->
+        FormationProgress.broadcast(formation, event)
+
+        {:ok,
+         %{
+           agent:
+             Repo.preload(agent, [:subdomain, :services, :connections, :artifacts, :formation_run]),
+           formation: formation
+         }}
+
+      {:error, _step, %Ecto.Changeset{} = changeset, _changes} ->
+        {:error, {:bad_request, AgentPlatform.format_changeset(changeset)}}
+
+      {:error, _step, reason, _changes} ->
         {:error, reason}
     end
+  end
+
+  defp company_attrs(attrs) do
+    %{
+      owner_human_id: attrs.owner_human_id,
+      name: attrs.name,
+      slug: attrs.slug,
+      claimed_label: attrs.claimed_label,
+      status: attrs.status,
+      public_summary: attrs.public_summary,
+      hero_statement: attrs.hero_statement,
+      metadata: %{}
+    }
   end
 
   defp require_agent_formation_enabled do
@@ -401,6 +546,337 @@ defmodule PlatformPhx.AgentPlatform.Formation do
       {:error, {:unavailable, "Hosted company opening is not available right now."}}
     end
   end
+
+  defp access_eligibility_payload(holdings, wallet_connected?, claimed_names, available_claims) do
+    approved_collection_nft? = AgentPlatform.eligible_holdings?(holdings)
+    claimed_name_ready? = claimed_names != []
+
+    %{
+      eligible: wallet_connected? and approved_collection_nft? and claimed_name_ready?,
+      rule: "hold_approved_collection_nft_and_claim_name",
+      wallet_connected: wallet_connected?,
+      approved_collection_nft: approved_collection_nft?,
+      claimed_name_ready: claimed_name_ready?,
+      qualifying_nft_count: qualifying_nft_count(holdings),
+      available_claim_count: length(available_claims),
+      approved_collections: @approved_collection_keys
+    }
+  end
+
+  defp formation_state_payload(readiness, companies, active_formations, blockers) do
+    active_formation = Enum.find(active_formations, &formation_active?/1)
+
+    state =
+      cond do
+        companies_ready?(companies) and blockers == [] ->
+          "ready"
+
+        not is_nil(active_formation) or Enum.any?(companies, &(&1.status == "forming")) ->
+          "provisioning"
+
+        blockers != [] ->
+          "blocked"
+
+        readiness.ready ->
+          "pending"
+
+        true ->
+          "pending"
+      end
+
+    %{
+      state: state,
+      ready: state == "ready",
+      blocked: state == "blocked",
+      active_formation_id: active_formation && map_value(active_formation, :id),
+      current_step: active_formation && map_value(active_formation, :current_step),
+      blockers: blockers
+    }
+  end
+
+  defp doctor_from_formation(payload) do
+    blockers = Map.get(payload, :blockers, [])
+    state = Map.fetch!(payload, :formation_state)
+    readiness = Map.fetch!(payload, :readiness)
+    readiness_steps = Map.get(readiness, :steps, [])
+
+    blocker_checks =
+      blockers
+      |> Enum.reject(fn blocker ->
+        Enum.any?(readiness_steps, &(map_value(&1, :key) == map_value(blocker, :key)))
+      end)
+      |> Enum.map(&doctor_check_from_blocker/1)
+
+    status = doctor_status(state)
+
+    %{
+      status: status,
+      summary: doctor_summary(status, blockers),
+      checks: readiness_steps ++ blocker_checks,
+      blockers: blockers
+    }
+  end
+
+  defp doctor_status(formation_state) do
+    cond do
+      map_value(formation_state, :ready) == true -> "ready"
+      map_value(formation_state, :state) == "provisioning" -> "provisioning"
+      true -> "blocked"
+    end
+  end
+
+  defp doctor_summary("ready", _blockers), do: "Company opening is ready."
+  defp doctor_summary("provisioning", _blockers), do: "Company opening is in progress."
+
+  defp doctor_summary("blocked", [first | _rest]) do
+    "Blocked: #{map_value(first, :message)}"
+  end
+
+  defp doctor_summary("blocked", _blockers), do: "Company opening is blocked."
+
+  defp doctor_check_from_blocker(blocker) do
+    key = map_value(blocker, :key)
+
+    %{
+      key: key,
+      label: doctor_label(key),
+      status: "needs_action",
+      message: map_value(blocker, :message),
+      action_label: map_value(blocker, :action_label),
+      action_path: map_value(blocker, :action_path)
+    }
+  end
+
+  defp doctor_label("failed_provisioning"), do: "Company opening"
+  defp doctor_label("missing_subdomain"), do: "Company address"
+  defp doctor_label("missing_runtime_status"), do: "Runtime status"
+  defp doctor_label("failed_runtime"), do: "Hosted runtime"
+  defp doctor_label("missing_hosted_service"), do: "Hosted service"
+  defp doctor_label("zero_balance"), do: "Runtime credit"
+
+  defp doctor_label(key) when is_binary(key) do
+    key
+    |> String.replace("_", " ")
+    |> String.capitalize()
+  end
+
+  defp doctor_label(_key), do: "Formation"
+
+  defp billing_state_payload(billing_account, companies) do
+    prepaid_balance = Map.get(billing_account, :runtime_credit_balance_usd_cents, 0) || 0
+    free_day_ends_at = next_free_day_ends_at(companies)
+    account_allows_runtime? = billing_account_allows_runtime?(billing_account)
+    runtime_allowed? = account_allows_runtime? or not is_nil(free_day_ends_at)
+
+    state =
+      cond do
+        Map.get(billing_account, :status) == "past_due" ->
+          "failed"
+
+        Map.get(billing_account, :status) == "paused" ->
+          "paused"
+
+        not is_nil(free_day_ends_at) ->
+          "free_day"
+
+        account_allows_runtime? ->
+          "prepaid"
+
+        companies != [] ->
+          "zero"
+
+        true ->
+          "trial"
+      end
+
+    %{
+      state: state,
+      account_status: Map.get(billing_account, :status, "not_connected"),
+      connected: Map.get(billing_account, :connected) == true,
+      prepaid_balance_usd_cents: prepaid_balance,
+      free_day_ends_at: AgentPlatform.iso(free_day_ends_at),
+      runtime_allowed: runtime_allowed?
+    }
+  end
+
+  defp runtime_cost_state_payload(billing_account, companies) do
+    free_day_ends_at = next_free_day_ends_at(companies)
+    prepaid_balance = Map.get(billing_account, :runtime_credit_balance_usd_cents, 0) || 0
+    runtime_allowed? = runtime_allowed?(billing_account, companies)
+    paused_at_zero? = companies != [] and is_nil(free_day_ends_at) and not runtime_allowed?
+    observability = Billing.runtime_cost_observability(billing_account, companies)
+
+    phase =
+      cond do
+        not is_nil(free_day_ends_at) -> "free_day"
+        runtime_allowed? -> "prepaid"
+        paused_at_zero? -> "paused_at_zero"
+        true -> "unavailable"
+      end
+
+    %{
+      phase: phase,
+      hourly_cost_usd_cents: @runtime_hourly_cost_usd_cents,
+      free_day_ends_at: AgentPlatform.iso(free_day_ends_at),
+      prepaid_balance_usd_cents: prepaid_balance,
+      prepaid_drawdown_state: observability.prepaid_drawdown_state,
+      last_usage_sync_at: observability.last_usage_sync_at,
+      next_pause_threshold_usd_cents: observability.next_pause_threshold_usd_cents,
+      pause_targets: observability.pause_targets,
+      runtime_allowed: runtime_allowed?,
+      paused_at_zero: paused_at_zero?,
+      next_pause_reason: if(paused_at_zero?, do: "zero_balance", else: nil)
+    }
+  end
+
+  defp formation_blockers(readiness, companies, billing_account) do
+    readiness_blocker =
+      case readiness.blocked_step do
+        nil ->
+          []
+
+        blocked_step ->
+          [
+            %{
+              key: to_string(blocked_step.key),
+              message: blocked_step.message,
+              action_label: blocked_step.action_label,
+              action_path: blocked_step.action_path
+            }
+          ]
+      end
+
+    runtime_blockers =
+      if Enum.any?(companies, &formation_in_progress?/1) do
+        []
+      else
+        companies
+        |> Enum.flat_map(&company_blockers(&1, billing_account))
+      end
+
+    (readiness_blocker ++ runtime_blockers)
+    |> Enum.uniq_by(& &1.key)
+  end
+
+  defp company_blockers(%Agent{} = agent, billing_account) do
+    []
+    |> maybe_add_blocker(formation_failed?(agent), %{
+      key: "failed_provisioning",
+      message: "Company opening needs attention.",
+      action_label: "View progress",
+      action_path: provisioning_path(agent)
+    })
+    |> maybe_add_blocker(missing_subdomain?(agent), %{
+      key: "missing_subdomain",
+      message: "The company address is not active yet.",
+      action_label: "View company",
+      action_path: "/app/agents/#{agent.slug}"
+    })
+    |> maybe_add_blocker(is_nil(agent.runtime_status), %{
+      key: "missing_runtime_status",
+      message: "Runtime status is not available yet.",
+      action_label: "View company",
+      action_path: "/app/agents/#{agent.slug}"
+    })
+    |> maybe_add_blocker(agent.runtime_status == "failed", %{
+      key: "failed_runtime",
+      message: "The hosted runtime needs attention.",
+      action_label: "View company",
+      action_path: "/app/agents/#{agent.slug}"
+    })
+    |> maybe_add_blocker(is_nil(agent.sprite_name) or is_nil(agent.sprite_service_name), %{
+      key: "missing_hosted_service",
+      message: "The hosted service is not connected yet.",
+      action_label: "View company",
+      action_path: "/app/agents/#{agent.slug}"
+    })
+    |> maybe_add_blocker(
+      Billing.effective_metering_status(agent, billing_account) == "paused",
+      %{
+        key: "zero_balance",
+        message: "Runtime credit has reached zero.",
+        action_label: "Add credit",
+        action_path: "/app/billing"
+      }
+    )
+    |> Enum.reverse()
+  end
+
+  defp company_blockers(_agent, _billing_account), do: []
+
+  defp maybe_add_blocker(blockers, true, blocker), do: [blocker | blockers]
+  defp maybe_add_blocker(blockers, false, _blocker), do: blockers
+
+  defp qualifying_nft_count(holdings) when is_map(holdings) do
+    Enum.reduce(@approved_collection_keys, 0, fn key, total ->
+      total + (holdings |> Map.get(key, []) |> List.wrap() |> length())
+    end)
+  end
+
+  defp qualifying_nft_count(_holdings), do: 0
+
+  defp companies_ready?(companies) do
+    Enum.any?(companies, fn
+      %Agent{} = agent ->
+        agent.status == "published" and agent.runtime_status in ["ready", "paused"]
+
+      _other ->
+        false
+    end)
+  end
+
+  defp formation_active?(formation) do
+    map_value(formation, :status) in ["queued", "running"]
+  end
+
+  defp formation_in_progress?(%Agent{status: "forming"}), do: true
+
+  defp formation_in_progress?(%Agent{formation_run: %FormationRun{} = formation}) do
+    formation.status in ["queued", "running"]
+  end
+
+  defp formation_in_progress?(_agent), do: false
+
+  defp formation_failed?(%Agent{formation_run: %FormationRun{} = formation}),
+    do: formation.status == "failed"
+
+  defp formation_failed?(_agent), do: false
+
+  defp provisioning_path(%Agent{formation_run: %FormationRun{id: id}}) when is_integer(id),
+    do: "/app/provisioning/#{id}"
+
+  defp provisioning_path(_agent), do: "/app/formation"
+
+  defp missing_subdomain?(%Agent{subdomain: %Subdomain{active: true}}), do: false
+  defp missing_subdomain?(%Agent{subdomain: %Subdomain{}}), do: true
+  defp missing_subdomain?(%Agent{subdomain: %Ecto.Association.NotLoaded{}}), do: false
+  defp missing_subdomain?(%Agent{}), do: true
+
+  defp next_free_day_ends_at(companies) do
+    now = PlatformPhx.Clock.utc_now()
+
+    companies
+    |> Enum.map(& &1.sprite_free_until)
+    |> Enum.filter(&(is_struct(&1, DateTime) and DateTime.compare(&1, now) == :gt))
+    |> Enum.sort(DateTime)
+    |> List.first()
+  end
+
+  defp runtime_allowed?(billing_account, companies) do
+    companies != [] and
+      ((Map.get(billing_account, :runtime_credit_balance_usd_cents, 0) || 0) > 0 or
+         not is_nil(next_free_day_ends_at(companies)))
+  end
+
+  defp billing_account_allows_runtime?(billing_account) do
+    (Map.get(billing_account, :runtime_credit_balance_usd_cents, 0) || 0) > 0
+  end
+
+  defp map_value(map, key) when is_map(map) do
+    Map.get(map, key) || Map.get(map, to_string(key))
+  end
+
+  defp map_value(_map, _key), do: nil
 
   defp enqueue_formation(agent_id) do
     case %{"agent_id" => agent_id}
@@ -438,7 +914,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   end
 
   defp require_active_billing_account(%HumanUser{} = human) do
-    case AgentPlatform.ensure_billing_account(human) do
+    case Billing.ensure_account(human) do
       {:ok, %BillingAccount{billing_status: "active"} = billing_account} ->
         {:ok, billing_account}
 
@@ -451,11 +927,11 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   end
 
   defp require_active_or_funded_billing_account(%HumanUser{} = human, %Agent{} = agent) do
-    case AgentPlatform.ensure_billing_account(human) do
+    case Billing.ensure_account(human) do
       {:ok, %BillingAccount{} = billing_account} ->
-        if AgentPlatform.billing_allows_runtime?(billing_account) or
+        if Billing.allows_runtime?(billing_account) or
              (is_struct(agent.sprite_free_until, DateTime) and
-                DateTime.compare(agent.sprite_free_until, DateTime.utc_now()) == :gt) do
+                DateTime.compare(agent.sprite_free_until, PlatformPhx.Clock.utc_now()) == :gt) do
           {:ok, billing_account}
         else
           {:error, {:payment_required, "Add runtime credit before resuming this company"}}
@@ -499,9 +975,10 @@ defmodule PlatformPhx.AgentPlatform.Formation do
 
       true ->
         case Repo.one(
-               from mint in Mint,
+               from(mint in Mint,
                  where: mint.label == ^claimed_label and mint.owner_address in ^wallets,
                  limit: 1
+               )
              ) do
           %Mint{formation_agent_slug: formation_agent_slug}
           when is_binary(formation_agent_slug) ->
@@ -517,7 +994,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   end
 
   defp slug_taken?(slug) when is_binary(slug) do
-    Repo.exists?(from agent in Agent, where: agent.slug == ^AgentPlatform.normalize_slug(slug))
+    Repo.exists?(from(agent in Agent, where: agent.slug == ^AgentPlatform.normalize_slug(slug)))
   end
 
   defp slug_taken?(_slug), do: false
@@ -573,7 +1050,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
         details: %{},
         connected_at:
           if(connection.status == "connected",
-            do: DateTime.utc_now() |> DateTime.truncate(:second),
+            do: PlatformPhx.Clock.now(),
             else: nil
           )
       }
@@ -702,7 +1179,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
       slug: agent.slug,
       desired_runtime_state: agent.desired_runtime_state,
       observed_runtime_state: agent.observed_runtime_state,
-      runtime_status: AgentPlatform.effective_runtime_status(agent)
+      runtime_status: Billing.effective_runtime_status(agent)
     }
   end
 

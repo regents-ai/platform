@@ -30,7 +30,7 @@ defmodule PlatformPhx.RuntimeConfig do
   def sprites_api_token_file, do: fetch("SPRITES_API_TOKEN_FILE")
   def sprite_cli_path, do: fetch("SPRITE_CLI_PATH") || "sprite"
   def workspace_http_port, do: fetch("WORKSPACE_HTTP_PORT") || "3000"
-  def regent_staking_rpc_url, do: fetch("REGENT_STAKING_RPC_URL") || base_rpc_url()
+  def regent_staking_rpc_url, do: fetch("REGENT_STAKING_RPC_URL")
   def regent_staking_contract_address, do: fetch("REGENT_STAKING_CONTRACT_ADDRESS")
   def regent_staking_operator_wallets, do: fetch_csv("REGENT_STAKING_OPERATOR_WALLETS")
   def regent_staking_chain_id, do: fetch_integer("REGENT_STAKING_CHAIN_ID", 8453)
@@ -58,6 +58,29 @@ defmodule PlatformPhx.RuntimeConfig do
 
   def basenames_payment_recipient, do: fetch("AGENT_BASENAME_PAYMENT_RECIPIENT")
   def basenames_price_wei, do: fetch("AGENT_BASENAME_PRICE_WEI") || "2500000000000000"
+
+  def validate_enabled_surfaces! do
+    if Application.get_env(:platform_phx, :validate_enabled_surfaces_on_boot, false) do
+      []
+      |> require_present("SIWA_SERVER_BASE_URL", siwa_server_base_url())
+      |> require_present("REGENT_STAKING_CONTRACT_ADDRESS", regent_staking_contract_address())
+      |> require_present("REGENT_STAKING_RPC_URL", fetch("REGENT_STAKING_RPC_URL"))
+      |> require_present("REGENT_STAKING_CHAIN_ID", fetch("REGENT_STAKING_CHAIN_ID"))
+      |> require_present("REGENT_STAKING_CHAIN_LABEL", fetch("REGENT_STAKING_CHAIN_LABEL"))
+      |> require_base_staking_chain()
+      |> require_staking_rpc_truth()
+      |> require_formation_config()
+      |> case do
+        [] ->
+          :ok
+
+        missing ->
+          raise "Platform enabled surface config is incomplete: #{Enum.join(missing, ", ")}"
+      end
+    else
+      :ok
+    end
+  end
 
   defp fetch(name) do
     System.get_env(name)
@@ -115,6 +138,40 @@ defmodule PlatformPhx.RuntimeConfig do
         |> Enum.reject(&(&1 == ""))
         |> Enum.map(&String.downcase/1)
         |> Enum.uniq()
+    end
+  end
+
+  defp require_present(missing, name, value) do
+    if is_binary(value) and String.trim(value) != "", do: missing, else: [name | missing]
+  end
+
+  defp require_base_staking_chain(missing) do
+    chain_id = regent_staking_chain_id()
+    chain_label = regent_staking_chain_label()
+
+    cond do
+      chain_id != 8453 -> ["REGENT_STAKING_CHAIN_ID=8453" | missing]
+      chain_label != "Base" -> ["REGENT_STAKING_CHAIN_LABEL=Base" | missing]
+      true -> missing
+    end
+  end
+
+  defp require_staking_rpc_truth(missing) do
+    case PlatformPhx.RegentStaking.validate_config() do
+      :ok -> missing
+      {:error, _reason} -> ["REGENT_STAKING_RPC_URL reachable Base staking contract" | missing]
+    end
+  end
+
+  defp require_formation_config(missing) do
+    if agent_formation_enabled?() do
+      missing
+      |> require_present("STRIPE_SECRET_KEY", stripe_secret_key())
+      |> require_present("STRIPE_WEBHOOK_SECRET", stripe_webhook_secret())
+      |> require_present("STRIPE_BILLING_PRICING_PLAN_ID", stripe_billing_pricing_plan_id())
+      |> require_present("SPRITES_API_TOKEN_FILE", sprites_api_token_file())
+    else
+      missing
     end
   end
 

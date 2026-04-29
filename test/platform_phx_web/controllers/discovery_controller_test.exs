@@ -3,6 +3,7 @@ defmodule PlatformPhxWeb.DiscoveryControllerTest do
 
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform.Agent
+  alias PlatformPhx.AgentPlatform.Company
   alias PlatformPhx.AgentPlatform.Subdomain
   alias PlatformPhx.Repo
   alias PlatformPhxWeb.Discovery
@@ -34,6 +35,13 @@ defmodule PlatformPhxWeb.DiscoveryControllerTest do
     assert body =~ "<loc>http://localhost:4000/cli</loc>"
     assert body =~ "<loc>http://localhost:4000/techtree</loc>"
     assert body =~ "<loc>http://localhost:4000/autolaunch</loc>"
+    assert body =~ "<loc>http://localhost:4000/learn/what-is-regents/</loc>"
+    assert body =~ "<loc>http://localhost:4000/glossary/public-proof/</loc>"
+    assert body =~ "<loc>http://localhost:4000/source/source-of-truth-matrix/</loc>"
+    assert body =~ "<loc>http://localhost:4000/updates/2026-04-29-build-note/</loc>"
+    assert body =~ "<loc>http://localhost:4000/llms.txt</loc>"
+    assert body =~ "<loc>http://localhost:4000/ai-index.md</loc>"
+    assert body =~ "<loc>http://localhost:4000/regents-facts.json</loc>"
     assert body =~ "<loc>http://discovery-test.regents.sh:4000/</loc>"
   end
 
@@ -47,6 +55,12 @@ defmodule PlatformPhxWeb.DiscoveryControllerTest do
 
     assert Enum.at(body["linkset"], 0)["item"]
            |> Enum.any?(&(&1["href"] == "http://localhost:4000/docs"))
+
+    assert Enum.at(body["linkset"], 0)["item"]
+           |> Enum.any?(&(&1["href"] == "http://localhost:4000/learn/what-is-regents/"))
+
+    assert Enum.at(body["linkset"], 0)["item"]
+           |> Enum.any?(&(&1["href"] == "http://localhost:4000/regents-facts.json"))
   end
 
   test "agent card, skills index, and mcp server card are published", %{conn: conn} do
@@ -59,6 +73,8 @@ defmodule PlatformPhxWeb.DiscoveryControllerTest do
 
     assert agent_card["name"] == "Regents Site Agent"
     assert agent_card["documentationUrl"] == "http://localhost:4000/docs"
+    assert agent_card["corpusUrl"] == "http://localhost:4000/learn/what-is-regents/"
+    assert agent_card["factsUrl"] == "http://localhost:4000/regents-facts.json"
 
     assert Enum.at(agent_card["skills"], 0)["url"] ==
              "http://localhost:4000/agent-skills/regents-cli.md"
@@ -84,16 +100,14 @@ defmodule PlatformPhxWeb.DiscoveryControllerTest do
     assert mcp_card["serverInfo"]["name"] == "Regents Discovery"
     assert mcp_card["documentationUrl"] == "http://localhost:4000/docs"
     assert mcp_card["transports"] == []
+
+    assert Enum.any?(
+             mcp_card["resources"],
+             &(&1["url"] == "http://localhost:4000/learn/what-is-regents/")
+           )
   end
 
   test "health, contracts, and published skill are served from the app", %{conn: conn} do
-    previous_dragonfly_enabled = Application.get_env(:platform_phx, :dragonfly_enabled)
-    Application.put_env(:platform_phx, :dragonfly_enabled, false)
-
-    on_exit(fn ->
-      restore_app_env(:platform_phx, :dragonfly_enabled, previous_dragonfly_enabled)
-    end)
-
     health_conn = get(conn, "/healthz")
     assert response(health_conn, 200) == "ok"
     assert get_resp_header(health_conn, "content-type") == ["text/plain; charset=utf-8"]
@@ -106,7 +120,7 @@ defmodule PlatformPhxWeb.DiscoveryControllerTest do
     ready = json_response(ready_conn, 200)
     assert ready["status"] == "ready"
     assert ready["checks"]["database"] == "ready"
-    assert ready["checks"]["cache"] in ["ready", "disabled"]
+    assert ready["checks"]["cache"] == "ready"
     refute Map.has_key?(ready, "launch")
 
     api_contract_conn =
@@ -138,6 +152,61 @@ defmodule PlatformPhxWeb.DiscoveryControllerTest do
 
     assert response(skill_conn, 200) =~ "# Regents CLI skill"
     assert get_resp_header(skill_conn, "content-type") == ["text/markdown; charset=utf-8"]
+  end
+
+  test "public corpus static assets are served from the app", %{conn: conn} do
+    learn_conn = get(conn, "/learn/what-is-regents/")
+    assert html_response(learn_conn, 200) =~ "Regents is a product family"
+
+    glossary_conn =
+      conn
+      |> recycle()
+      |> get("/glossary/public-proof/")
+
+    assert html_response(glossary_conn, 200) =~ "Public proof is inspectable evidence"
+
+    source_conn =
+      conn
+      |> recycle()
+      |> get("/source/source-of-truth-matrix/")
+
+    assert html_response(source_conn, 200) =~ "The source-of-truth matrix"
+
+    update_conn =
+      conn
+      |> recycle()
+      |> get("/updates/2026-04-29-build-note/")
+
+    assert html_response(update_conn, 200) =~ "Regents started the public corpus"
+
+    pagefind_conn =
+      conn
+      |> recycle()
+      |> get("/pagefind/pagefind.js")
+
+    assert response(pagefind_conn, 200) =~ "pagefind"
+
+    llms_conn =
+      conn
+      |> recycle()
+      |> get("/llms.txt")
+
+    assert response(llms_conn, 200) =~ "Regents is a product family"
+
+    ai_index_conn =
+      conn
+      |> recycle()
+      |> get("/ai-index.md")
+
+    assert response(ai_index_conn, 200) =~ "# Regents AI Index"
+
+    facts_conn =
+      conn
+      |> recycle()
+      |> get("/regents-facts.json")
+
+    facts = response(facts_conn, 200) |> Jason.decode!()
+    assert facts["name"] == "Regents Labs"
   end
 
   test "public entry pages publish discovery link headers", %{conn: conn} do
@@ -204,10 +273,24 @@ defmodule PlatformPhxWeb.DiscoveryControllerTest do
   defp insert_public_agent!(human, slug) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
+    company =
+      %Company{}
+      |> Company.changeset(%{
+        owner_human_id: human.id,
+        name: "Discovery Regent",
+        slug: slug,
+        claimed_label: slug,
+        status: "published",
+        public_summary: "Public discovery test company.",
+        hero_statement: "Discovery should publish the company home page."
+      })
+      |> Repo.insert!()
+
     agent =
       %Agent{}
       |> Agent.changeset(%{
         owner_human_id: human.id,
+        company_id: company.id,
         template_key: "start",
         name: "Discovery Regent",
         slug: slug,
@@ -241,7 +324,4 @@ defmodule PlatformPhxWeb.DiscoveryControllerTest do
 
     agent
   end
-
-  defp restore_app_env(app, key, nil), do: Application.delete_env(app, key)
-  defp restore_app_env(app, key, value), do: Application.put_env(app, key, value)
 end

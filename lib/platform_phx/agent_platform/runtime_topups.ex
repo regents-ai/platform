@@ -59,7 +59,7 @@ defmodule PlatformPhx.AgentPlatform.RuntimeTopups do
 
   defp push_credit_grant(%BillingLedgerEntry{} = entry) do
     next_attempt_count = entry.stripe_sync_attempt_count + 1
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = PlatformPhx.Clock.now()
 
     case StripeBilling.create_credit_grant(
            entry.billing_account,

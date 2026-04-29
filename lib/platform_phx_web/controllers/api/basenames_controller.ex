@@ -1,6 +1,8 @@
 defmodule PlatformPhxWeb.Api.BasenamesController do
   use PlatformPhxWeb, :controller
 
+  action_fallback PlatformPhxWeb.ApiFallbackController
+
   alias PlatformPhx.Basenames
   alias PlatformPhxWeb.ApiErrors
 

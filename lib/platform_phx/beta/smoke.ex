@@ -330,7 +330,7 @@ defmodule PlatformPhx.Beta.Smoke do
   end
 
   defp now_iso do
-    DateTime.utc_now()
+    PlatformPhx.Clock.utc_now()
     |> DateTime.truncate(:second)
     |> DateTime.to_iso8601()
   end

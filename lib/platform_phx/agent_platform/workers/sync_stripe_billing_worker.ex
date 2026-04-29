@@ -3,17 +3,18 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
   use Oban.Worker,
     queue: :billing,
     max_attempts: 10,
-    unique: [period: {7, :days}, fields: [:worker, :args], keys: [:event_id]]
+    unique: [period: {7, :days}, fields: [:worker, :args], keys: [:stripe_event_id]]
 
   import Ecto.Query, warn: false
 
   alias PlatformPhx.Accounts.HumanUser
-  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Agent
+  alias PlatformPhx.AgentPlatform.Billing
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
   alias PlatformPhx.AgentPlatform.RuntimeControl
   alias PlatformPhx.AgentPlatform.RuntimeTopups
+  alias PlatformPhx.AgentPlatform.StripeEvent
   alias PlatformPhx.AgentPlatform.WelcomeCreditGrant
   alias PlatformPhx.AgentPlatform.WelcomeCredits
   alias PlatformPhx.AgentPlatform.Workers.SyncTopupCreditGrantWorker
@@ -21,7 +22,46 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
   alias Oban
 
   @impl true
-  def perform(%Oban.Job{args: args}) do
+  def perform(%Oban.Job{args: %{"stripe_event_id" => stripe_event_id}}) do
+    case Repo.get(StripeEvent, stripe_event_id) do
+      %StripeEvent{} = event ->
+        sync_stripe_event(event)
+
+      nil ->
+        {:cancel, "stripe event not found"}
+    end
+  end
+
+  defp sync_stripe_event(%StripeEvent{processing_status: "processed"}), do: :ok
+
+  defp sync_stripe_event(%StripeEvent{} = event) do
+    args = StripeEvent.worker_args(event)
+
+    result = dispatch_stripe_event(args)
+
+    case result do
+      :ok ->
+        mark_processed!(event)
+        :ok
+
+      {:error, _reason} = error ->
+        error
+
+      {:cancel, _reason} = cancel ->
+        cancel
+    end
+  end
+
+  defp mark_processed!(%StripeEvent{} = event) do
+    event
+    |> StripeEvent.changeset(%{
+      processing_status: "processed",
+      processed_at: PlatformPhx.Clock.now()
+    })
+    |> Repo.update!()
+  end
+
+  defp dispatch_stripe_event(args) do
     case args["event_type"] do
       "checkout.session.completed" ->
         sync_checkout_completed(args)
@@ -54,6 +94,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
             sync_runtime_state(updated_account, "active")
           end
         else
+          {:cancel, _reason} = cancel -> cancel
           {:error, _reason} = error -> error
         end
 
@@ -102,7 +143,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
               amount_usd_cents: amount,
               description: "Runtime credit added through Stripe Checkout.",
               source_ref: source_ref,
-              effective_at: DateTime.utc_now() |> DateTime.truncate(:second),
+              effective_at: PlatformPhx.Clock.now(),
               stripe_sync_status: "pending",
               stripe_sync_attempt_count: 0
             })
@@ -147,6 +188,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
       end
     else
       false -> {:cancel, "top-up amount missing"}
+      {:cancel, _reason} = cancel -> cancel
       {:error, _reason} = error -> error
     end
   end
@@ -165,23 +207,17 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
         sync_runtime_state(updated_account, runtime_target_state(status))
       end
     else
+      {:cancel, _reason} = cancel -> cancel
       {:error, _reason} = error -> error
     end
   end
 
   defp find_billing_account(args) do
-    case billing_account_query(args) do
-      nil ->
-        maybe_bootstrap_billing_account(args)
-
-      query ->
-        case Repo.one(query) do
-          %BillingAccount{} = account ->
-            {:ok, account}
-
-          nil ->
-            maybe_bootstrap_billing_account(args)
-        end
+    with query when not is_nil(query) <- billing_account_query(args),
+         %BillingAccount{} = account <- Repo.one(query) do
+      {:ok, account}
+    else
+      nil -> maybe_bootstrap_billing_account(args)
     end
   end
 
@@ -201,11 +237,6 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
           where: account.human_user_id == ^human_user_id
         )
 
-      is_binary(args["customer_id"]) and args["customer_id"] != "" ->
-        from(account in BillingAccount,
-          where: account.stripe_customer_id == ^args["customer_id"]
-        )
-
       true ->
         nil
     end
@@ -215,7 +246,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker do
     case parse_integer(metadata(args)["human_user_id"]) do
       human_id when is_integer(human_id) ->
         case Repo.get(HumanUser, human_id) do
-          %HumanUser{} = human -> AgentPlatform.ensure_billing_account(human)
+          %HumanUser{} = human -> Billing.ensure_account(human)
           nil -> {:cancel, "billing owner not found"}
         end
 

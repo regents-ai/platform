@@ -7,11 +7,13 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
   alias PlatformPhx.AgentPlatform.Artifact
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
+  alias PlatformPhx.AgentPlatform.Company
   alias PlatformPhx.AgentPlatform.FormationEvent
   alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.AgentPlatform.LlmUsageEvent
   alias PlatformPhx.AgentPlatform.SpriteAdminAction
   alias PlatformPhx.AgentPlatform.SpriteUsageRecord
+  alias PlatformPhx.AgentPlatform.StripeEvent
   alias PlatformPhx.AgentPlatform.WelcomeCreditGrant
   alias PlatformPhx.AgentPlatform.Workers.RunFormationWorker
   alias PlatformPhx.Basenames.Mint
@@ -25,7 +27,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     previous_responses = Application.get_env(:platform_phx, :opensea_fake_responses)
     previous_stripe_client = Application.get_env(:platform_phx, :stripe_billing_client)
     previous_sprite_runner = Application.get_env(:platform_phx, :agent_platform_sprite_runner)
-    previous_sprite_runtime_client = Application.get_env(:platform_phx, :sprite_runtime_client)
+    previous_sprites_client = Application.get_env(:platform_phx, :runtime_registry_sprites_client)
 
     previous_credit_grant_result =
       Application.get_env(:platform_phx, :stripe_fake_credit_grant_result)
@@ -76,8 +78,8 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     Application.put_env(
       :platform_phx,
-      :sprite_runtime_client,
-      PlatformPhx.SpriteRuntimeClientFake
+      :runtime_registry_sprites_client,
+      PlatformPhx.RuntimeRegistrySpritesClientFake
     )
 
     System.put_env("OPENSEA_API_KEY", "test-key")
@@ -104,7 +106,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       restore_app_env(:platform_phx, :opensea_fake_responses, previous_responses)
       restore_app_env(:platform_phx, :stripe_billing_client, previous_stripe_client)
       restore_app_env(:platform_phx, :agent_platform_sprite_runner, previous_sprite_runner)
-      restore_app_env(:platform_phx, :sprite_runtime_client, previous_sprite_runtime_client)
+      restore_app_env(:platform_phx, :runtime_registry_sprites_client, previous_sprites_client)
 
       restore_app_env(
         :platform_phx,
@@ -162,6 +164,15 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert response["readiness"]["ready"] == false
     assert get_in(response, ["readiness", "blocked_step", "key"]) == "identity"
     assert length(response["readiness"]["steps"]) == 8
+
+    assert get_in(response, ["access_eligibility", "rule"]) ==
+             "hold_approved_collection_nft_and_claim_name"
+
+    assert get_in(response, ["access_eligibility", "eligible"]) == false
+    assert get_in(response, ["formation_state", "state"]) == "blocked"
+    assert get_in(response, ["billing_state", "state"]) == "trial"
+    assert get_in(response, ["runtime_cost_state", "phase"]) == "unavailable"
+    assert get_in(response, ["blockers", Access.at(0), "key"]) == "identity"
   end
 
   test "formation shows eligible holdings and claimed names for a signed-in human", %{conn: conn} do
@@ -183,13 +194,154 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     assert response["authenticated"] == true
     assert response["eligible"] == true
+    assert get_in(response, ["access_eligibility", "approved_collection_nft"]) == true
+    assert get_in(response, ["access_eligibility", "claimed_name_ready"]) == true
+    assert get_in(response, ["access_eligibility", "eligible"]) == true
     assert get_in(response, ["collections", "animata1"]) == [7]
     assert Enum.map(response["available_claims"], & &1["label"]) == ["tempo"]
     assert hd(response["available_claims"])["in_use"] == false
+    assert get_in(response, ["formation_state", "state"]) == "blocked"
+    assert get_in(response, ["billing_state", "state"]) == "trial"
+    assert get_in(response, ["runtime_cost_state", "paused_at_zero"]) == false
+    assert get_in(response, ["blockers", Access.at(0), "key"]) == "billing"
     assert get_in(response, ["readiness", "blocked_step", "key"]) == "billing"
 
     assert get_in(response, ["readiness", "blocked_step", "message"]) ==
              "Activate billing before opening a company."
+  end
+
+  test "formation exposes runtime cost phase during the free day", %{conn: conn} do
+    human = insert_human!()
+    insert_claimed_name!(human, "free-day")
+    insert_billing_account!(human, %{runtime_credit_balance_usd_cents: 500})
+
+    free_until =
+      DateTime.utc_now()
+      |> DateTime.add(3_600, :second)
+      |> DateTime.truncate(:second)
+
+    insert_agent!(human, "free-day", %{sprite_free_until: free_until})
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "7"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    response =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> get("/api/agent-platform/formation")
+      |> json_response(200)
+
+    assert get_in(response, ["billing_state", "state"]) == "free_day"
+    assert get_in(response, ["runtime_cost_state", "phase"]) == "free_day"
+    assert get_in(response, ["runtime_cost_state", "hourly_cost_usd_cents"]) == 25
+
+    assert get_in(response, ["runtime_cost_state", "free_day_ends_at"]) ==
+             DateTime.to_iso8601(free_until)
+
+    assert get_in(response, ["runtime_cost_state", "prepaid_drawdown_state"]) == "free_day"
+    assert get_in(response, ["runtime_cost_state", "next_pause_threshold_usd_cents"]) == 0
+
+    assert get_in(response, ["runtime_cost_state", "pause_targets", Access.at(0), "slug"]) ==
+             "free-day"
+  end
+
+  test "formation keeps billing state separate before company opening", %{conn: conn} do
+    human = insert_human!()
+    insert_claimed_name!(human, "funded")
+    insert_billing_account!(human, %{runtime_credit_balance_usd_cents: 500})
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "7"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    response =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> get("/api/agent-platform/formation")
+      |> json_response(200)
+
+    assert get_in(response, ["billing_state", "state"]) == "prepaid"
+    assert get_in(response, ["billing_state", "runtime_allowed"]) == true
+    assert get_in(response, ["formation_state", "state"]) == "pending"
+    assert get_in(response, ["runtime_cost_state", "phase"]) == "unavailable"
+  end
+
+  test "formation doctor explains the current blocker", %{conn: conn} do
+    human = insert_human!()
+    insert_claimed_name!(human, "doctor")
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "7"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    response =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> get("/api/agent-platform/formation/doctor")
+      |> json_response(200)
+
+    assert response["doctor"]["status"] == "blocked"
+    assert response["doctor"]["summary"] == "Blocked: Activate billing before opening a company."
+    assert Enum.map(response["doctor"]["blockers"], & &1["key"]) == ["billing"]
+
+    assert Enum.find(response["doctor"]["checks"], &(&1["key"] == "billing"))["status"] ==
+             "needs_action"
+  end
+
+  test "projection exposes canonical company runtime billing formation and profile state", %{
+    conn: conn
+  } do
+    human = insert_human!()
+    billing_account = insert_billing_account!(human)
+
+    agent =
+      insert_agent!(human, "projection", %{
+        sprite_free_until: nil,
+        runtime_status: "ready",
+        observed_runtime_state: "active"
+      })
+
+    insert_artifact!(agent, %{title: "Public update"})
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    response =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> get("/api/agent-platform/projection")
+      |> json_response(200)
+
+    projection = response["projection"]
+    assert projection["billing_account"]["runtime_credit_balance_usd_cents"] == 0
+    assert projection["billing_usage"]["runtime_credit_balance_usd_cents"] == 0
+
+    assert get_in(projection, ["formation", "owned_companies", Access.at(0), "slug"]) ==
+             "projection"
+
+    company_projection = hd(projection["companies"])
+    assert get_in(company_projection, ["company", "slug"]) == "projection"
+    assert get_in(company_projection, ["runtime", "sprite", "name"]) == agent.sprite_name
+
+    assert get_in(company_projection, ["public_profile", "feed", Access.at(0), "title"]) ==
+             "Public update"
+
+    assert get_in(projection, ["public_profiles", Access.at(0), "slug"]) == "projection"
+
+    assert Repo.get!(BillingAccount, billing_account.id).runtime_credit_balance_usd_cents == 0
   end
 
   test "formation only offers claimed names that are not already in use", %{conn: conn} do
@@ -248,8 +400,54 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
         |> post(path, payload)
         |> json_response(503)
 
-      assert response["statusMessage"] == unavailable_message
+      assert response["error"]["message"] == unavailable_message
     end
+  end
+
+  test "billing setup requires an eligible pass before creating a billing account", %{conn: conn} do
+    human = insert_human!()
+    insert_claimed_name!(human, "quiet")
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    response =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
+      |> post("/api/agent-platform/billing/setup/checkout", %{claimedLabel: "quiet"})
+      |> json_response(403)
+
+    assert response["error"]["message"] ==
+             "You need Animata I, Regent Animata II, or Regents Club to create a company"
+
+    refute Repo.get_by(BillingAccount, human_user_id: human.id)
+  end
+
+  test "billing setup requires a selected claimed name before creating a billing account", %{
+    conn: conn
+  } do
+    human = insert_human!()
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "3"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
+    response =
+      conn
+      |> init_test_session(%{current_human_id: human.id})
+      |> put_csrf_token()
+      |> post("/api/agent-platform/billing/setup/checkout", %{})
+      |> json_response(400)
+
+    assert response["error"]["message"] == "Claim a name before starting Agent Formation"
+    refute Repo.get_by(BillingAccount, human_user_id: human.id)
   end
 
   test "billing setup, top-up, webhook sync, and formation queue a company", %{conn: conn} do
@@ -322,9 +520,10 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     formation =
       Repo.one!(
-        from formation in FormationRun,
+        from(formation in FormationRun,
           join: agent in assoc(formation, :agent),
           where: agent.slug == "startline"
+        )
       )
 
     assert formation.metadata["workspace_path"] == "/app/company"
@@ -403,10 +602,11 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     sprite_actions =
       Repo.all(
-        from action in SpriteAdminAction,
+        from(action in SpriteAdminAction,
           where: action.agent_id == ^formation.agent_id,
           order_by: [asc: action.created_at],
           select: {action.action, action.status, action.actor_type, action.source}
+        )
       )
 
     assert {"create_sprite", "succeeded", "system", "run_formation_worker"} in sprite_actions
@@ -419,6 +619,15 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
   test "billing setup hides missing Stripe setup details", %{conn: conn} do
     human = insert_human!()
+    insert_claimed_name!(human, "quiet")
+
+    Application.put_env(:platform_phx, :opensea_fake_responses, %{
+      request_url(@address, "animata") =>
+        {:ok, %{"nfts" => [%{"collection" => "animata", "identifier" => "3"}], "next" => nil}},
+      request_url(@address, "regent-animata-ii") => {:ok, %{"nfts" => [], "next" => nil}},
+      request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
+    })
+
     System.delete_env("STRIPE_SECRET_KEY")
 
     response =
@@ -428,10 +637,10 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       |> post("/api/agent-platform/billing/setup/checkout", %{claimedLabel: "quiet"})
       |> json_response(503)
 
-    assert response["statusMessage"] == "Billing is unavailable right now."
-    refute response["statusMessage"] =~ "STRIPE_SECRET_KEY"
-    refute response["statusMessage"] =~ "Server missing"
-    refute_public_leak(response["statusMessage"])
+    assert response["error"]["message"] == "Billing is unavailable right now."
+    refute response["error"]["message"] =~ "STRIPE_SECRET_KEY"
+    refute response["error"]["message"] =~ "Server missing"
+    refute_public_leak(response["error"]["message"])
   end
 
   test "top-up checkout stores the Stripe customer for a fresh billing account", %{conn: conn} do
@@ -453,12 +662,14 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
   test "billing usage reports runtime spend and model spend totals", %{conn: conn} do
     human = insert_human!()
-    billing_account = insert_billing_account!(human)
+    billing_account = insert_billing_account!(human, %{runtime_credit_balance_usd_cents: 125})
 
     agent =
       insert_agent!(human, "metered", %{
         sprite_metering_status: "paid"
       })
+
+    reported_at = DateTime.utc_now() |> DateTime.truncate(:second)
 
     %SpriteUsageRecord{}
     |> SpriteUsageRecord.changeset(%{
@@ -470,7 +681,8 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       window_started_at:
         DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second),
       window_ended_at: DateTime.utc_now() |> DateTime.truncate(:second),
-      status: "reported"
+      status: "reported",
+      stripe_reported_at: reported_at
     })
     |> Repo.insert!()
 
@@ -496,8 +708,17 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     assert response["usage"]["runtime_spend_usd_cents"] == 25
     assert response["usage"]["llm_spend_usd_cents"] == 46
+    assert response["usage"]["prepaid_drawdown_state"] == "drawing_down"
+    assert response["usage"]["last_usage_sync_at"] == DateTime.to_iso8601(reported_at)
+    assert response["usage"]["next_pause_threshold_usd_cents"] == 0
+    assert get_in(response, ["usage", "pause_targets", Access.at(0), "slug"]) == "metered"
     assert get_in(response, ["usage", "companies", Access.at(0), "runtime_spend_usd_cents"]) == 25
     assert get_in(response, ["usage", "companies", Access.at(0), "llm_spend_usd_cents"]) == 46
+
+    assert get_in(response, ["usage", "companies", Access.at(0), "last_usage_sync_at"]) ==
+             DateTime.to_iso8601(reported_at)
+
+    assert get_in(response, ["usage", "companies", Access.at(0), "will_pause_at_zero"]) == true
   end
 
   test "workspace seed reads the env file and preserves an existing workspace" do
@@ -603,7 +824,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
     })
 
-    insert_billing_account!(human)
+    insert_billing_account!(human, %{runtime_credit_balance_usd_cents: 500})
     Application.put_env(:platform_phx, :formation, oban_module: PlatformPhx.ObanInsertErrorFake)
 
     response =
@@ -613,10 +834,10 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       |> post("/api/agent-platform/formation/companies", %{claimedLabel: "rollback"})
       |> json_response(503)
 
-    assert response["statusMessage"] =~ "launch queue is unavailable"
+    assert response["error"]["message"] =~ "launch queue is unavailable"
 
     refute Repo.exists?(
-             from agent in PlatformPhx.AgentPlatform.Agent, where: agent.slug == "rollback"
+             from(agent in PlatformPhx.AgentPlatform.Agent, where: agent.slug == "rollback")
            )
 
     refute Repo.get_by!(Mint, label: "rollback").is_in_use
@@ -635,7 +856,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       request_url(@address, "regents-club") => {:ok, %{"nfts" => [], "next" => nil}}
     })
 
-    insert_billing_account!(human)
+    insert_billing_account!(human, %{runtime_credit_balance_usd_cents: 500})
 
     Application.put_env(:platform_phx, :formation,
       oban_module: PlatformPhx.ObanInsertConflictFake
@@ -648,10 +869,10 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       |> post("/api/agent-platform/formation/companies", %{claimedLabel: "duplicate"})
       |> json_response(409)
 
-    assert response["statusMessage"] =~ "already queued"
+    assert response["error"]["message"] =~ "already queued"
 
     refute Repo.exists?(
-             from agent in PlatformPhx.AgentPlatform.Agent, where: agent.slug == "duplicate"
+             from(agent in PlatformPhx.AgentPlatform.Agent, where: agent.slug == "duplicate")
            )
 
     refute Repo.get_by!(Mint, label: "duplicate").is_in_use
@@ -661,7 +882,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     conn: conn
   } do
     human = insert_human!()
-    insert_billing_account!(human)
+    insert_billing_account!(human, %{runtime_credit_balance_usd_cents: 500})
 
     agent =
       insert_agent!(human, "runtime-failure", %{
@@ -672,8 +893,8 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     Application.put_env(
       :platform_phx,
-      :sprite_runtime_client,
-      PlatformPhx.SpriteRuntimeClientRecordingFake
+      :runtime_registry_sprites_client,
+      PlatformPhx.RuntimeRegistrySpritesClientFake
     )
 
     Application.put_env(
@@ -689,8 +910,8 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       |> post("/api/agent-platform/sprites/#{agent.slug}/pause")
       |> json_response(502)
 
-    assert pause_response["statusMessage"] == "Company controls are unavailable right now."
-    refute_public_leak(pause_response["statusMessage"])
+    assert pause_response["error"]["message"] == "Company controls are unavailable right now."
+    refute_public_leak(pause_response["error"]["message"])
     assert Repo.get!(PlatformPhx.AgentPlatform.Agent, agent.id).runtime_status == "failed"
 
     Application.put_env(:platform_phx, :sprite_runtime_stop_result, :ok)
@@ -708,8 +929,8 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       |> post("/api/agent-platform/sprites/#{agent.slug}/resume")
       |> json_response(502)
 
-    assert resume_response["statusMessage"] == "Company controls are unavailable right now."
-    refute_public_leak(resume_response["statusMessage"])
+    assert resume_response["error"]["message"] == "Company controls are unavailable right now."
+    refute_public_leak(resume_response["error"]["message"])
     assert Repo.get!(PlatformPhx.AgentPlatform.Agent, agent.id).runtime_status == "failed"
   end
 
@@ -733,8 +954,8 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     Application.put_env(
       :platform_phx,
-      :sprite_runtime_client,
-      PlatformPhx.SpriteRuntimeClientRecordingFake
+      :runtime_registry_sprites_client,
+      PlatformPhx.RuntimeRegistrySpritesClientFake
     )
 
     Application.put_env(:platform_phx, :sprite_runtime_test_pid, self())
@@ -743,20 +964,23 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     Application.put_env(:platform_phx, :sprite_runtime_stop_result, :ok)
 
     assert :ok ==
-             perform_job(PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker, %{
-               "event_id" => "evt_runtime_resume",
-               "event_type" => "checkout.session.completed",
-               "customer_id" => billing_account.stripe_customer_id,
-               "subscription_id" => billing_account.stripe_pricing_plan_subscription_id,
-               "subscription_status" => "complete",
-               "mode" => "payment",
-               "metadata" => %{
-                 "checkout_kind" => "runtime_topup",
-                 "human_user_id" => Integer.to_string(human.id),
-                 "billing_account_id" => Integer.to_string(billing_account.id),
-                 "amount_usd_cents" => "500"
-               }
-             })
+             perform_job(
+               PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker,
+               worker_args_for_stripe_event(%{
+                 "event_id" => "evt_runtime_resume",
+                 "event_type" => "checkout.session.completed",
+                 "customer_id" => billing_account.stripe_customer_id,
+                 "subscription_id" => billing_account.stripe_pricing_plan_subscription_id,
+                 "subscription_status" => "complete",
+                 "mode" => "payment",
+                 "metadata" => %{
+                   "checkout_kind" => "runtime_topup",
+                   "human_user_id" => Integer.to_string(human.id),
+                   "billing_account_id" => Integer.to_string(billing_account.id),
+                   "amount_usd_cents" => "500"
+                 }
+               })
+             )
 
     paused_sprite_name = "#{paused_agent.slug}-sprite"
     active_sprite_name = "#{active_agent.slug}-sprite"
@@ -764,17 +988,20 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert_receive {:start_service, ^paused_sprite_name, "hermes-workspace"}
 
     assert :ok ==
-             perform_job(PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker, %{
-               "event_id" => "evt_runtime_pause",
-               "event_type" => "customer.subscription.paused",
-               "customer_id" => billing_account.stripe_customer_id,
-               "subscription_id" => billing_account.stripe_pricing_plan_subscription_id,
-               "subscription_status" => "paused",
-               "mode" => "subscription",
-               "metadata" => %{
-                 "human_user_id" => Integer.to_string(human.id)
-               }
-             })
+             perform_job(
+               PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker,
+               worker_args_for_stripe_event(%{
+                 "event_id" => "evt_runtime_pause",
+                 "event_type" => "customer.subscription.paused",
+                 "customer_id" => billing_account.stripe_customer_id,
+                 "subscription_id" => billing_account.stripe_pricing_plan_subscription_id,
+                 "subscription_status" => "paused",
+                 "mode" => "subscription",
+                 "metadata" => %{
+                   "human_user_id" => Integer.to_string(human.id)
+                 }
+               })
+             )
 
     assert_receive {:stop_service, ^paused_sprite_name, "hermes-workspace"}
     assert_receive {:stop_service, ^active_sprite_name, "hermes-workspace"}
@@ -803,7 +1030,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       )
       |> post("/api/agent-platform/stripe/webhooks", raw_body)
 
-    assert json_response(webhook_conn, 401)["statusMessage"] =~ "outside the allowed window"
+    assert json_response(webhook_conn, 401)["error"]["message"] =~ "outside the allowed window"
   end
 
   test "formation leaves the company offline when the sprite service is not ready", %{conn: conn} do
@@ -819,9 +1046,11 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     Application.put_env(
       :platform_phx,
-      :sprite_runtime_client,
-      PlatformPhx.SpriteRuntimeClientPausedFake
+      :runtime_registry_sprites_client,
+      PlatformPhx.RuntimeRegistrySpritesClientFake
     )
+
+    Application.put_env(:platform_phx, :sprite_runtime_service_state, "paused")
 
     conn =
       conn
@@ -884,8 +1113,8 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     Application.put_env(
       :platform_phx,
-      :sprite_runtime_client,
-      PlatformPhx.SpriteRuntimeClientTransitionFake
+      :runtime_registry_sprites_client,
+      PlatformPhx.RuntimeRegistrySpritesClientFake
     )
 
     Application.put_env(:platform_phx, :sprite_runtime_transition_states, ["paused", "active"])
@@ -984,6 +1213,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
 
     account = Repo.get!(BillingAccount, billing_account.id)
     assert account.runtime_credit_balance_usd_cents == 500
+    assert Repo.aggregate(StripeEvent, :count, :id) == 1
   end
 
   test "top-up replay retries when the follow-up credit-grant job cannot be queued", %{
@@ -992,20 +1222,21 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     human = insert_human!()
     billing_account = insert_billing_account!(human)
 
-    args = %{
-      "event_id" => "evt_test_topup",
-      "event_type" => "checkout.session.completed",
-      "customer_id" => billing_account.stripe_customer_id,
-      "subscription_id" => nil,
-      "subscription_status" => "complete",
-      "mode" => "payment",
-      "metadata" => %{
-        "checkout_kind" => "runtime_topup",
-        "human_user_id" => Integer.to_string(human.id),
-        "billing_account_id" => Integer.to_string(billing_account.id),
-        "amount_usd_cents" => "500"
-      }
-    }
+    stripe_event =
+      insert_stripe_event!(%{
+        "event_id" => "evt_test_topup",
+        "event_type" => "checkout.session.completed",
+        "customer_id" => billing_account.stripe_customer_id,
+        "subscription_id" => nil,
+        "subscription_status" => "complete",
+        "mode" => "payment",
+        "metadata" => %{
+          "checkout_kind" => "runtime_topup",
+          "human_user_id" => Integer.to_string(human.id),
+          "billing_account_id" => Integer.to_string(billing_account.id),
+          "amount_usd_cents" => "500"
+        }
+      })
 
     %BillingLedgerEntry{}
     |> BillingLedgerEntry.changeset(%{
@@ -1027,7 +1258,9 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     )
 
     assert {:error, :queue_unavailable} ==
-             perform_job(PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker, args)
+             perform_job(PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker, %{
+               "stripe_event_id" => stripe_event.id
+             })
   end
 
   test "billing setup replay does not duplicate the welcome credit", %{conn: conn} do
@@ -1062,6 +1295,7 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     assert billing_account["runtime_credit_balance_usd_cents"] == 500
     assert billing_account["welcome_credit"]["amount_usd_cents"] == 500
     assert Repo.aggregate(WelcomeCreditGrant, :count, :id) == 1
+    assert Repo.aggregate(StripeEvent, :count, :id) == 1
 
     assert length(all_enqueued(worker: PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker)) ==
              1
@@ -1124,8 +1358,22 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
       runtime_status: "ready"
     }
 
+    agent_attrs = Map.merge(defaults, attrs)
+
+    company =
+      %Company{}
+      |> Company.changeset(%{
+        owner_human_id: human.id,
+        name: agent_attrs.name,
+        slug: agent_attrs.slug,
+        claimed_label: agent_attrs.claimed_label,
+        status: agent_attrs.status,
+        public_summary: agent_attrs.public_summary
+      })
+      |> Repo.insert!()
+
     %PlatformPhx.AgentPlatform.Agent{}
-    |> PlatformPhx.AgentPlatform.Agent.changeset(Map.merge(defaults, attrs))
+    |> PlatformPhx.AgentPlatform.Agent.changeset(Map.put(agent_attrs, :company_id, company.id))
     |> Repo.insert!()
   end
 
@@ -1147,15 +1395,20 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
     "https://api.opensea.io/api/v2/chain/base/account/#{address}/nfts?collection=#{collection}&limit=100"
   end
 
-  defp insert_billing_account!(human) do
+  defp insert_billing_account!(human, attrs \\ %{}) do
     %BillingAccount{}
-    |> BillingAccount.changeset(%{
-      human_user_id: human.id,
-      billing_status: "active",
-      stripe_customer_id: unique_external_id("cus_test_agent_formation"),
-      stripe_pricing_plan_subscription_id: unique_external_id("sub_test_agent_formation"),
-      runtime_credit_balance_usd_cents: 0
-    })
+    |> BillingAccount.changeset(
+      Map.merge(
+        %{
+          human_user_id: human.id,
+          billing_status: "active",
+          stripe_customer_id: unique_external_id("cus_test_agent_formation"),
+          stripe_pricing_plan_subscription_id: unique_external_id("sub_test_agent_formation"),
+          runtime_credit_balance_usd_cents: 0
+        },
+        attrs
+      )
+    )
     |> Repo.insert!()
   end
 
@@ -1226,12 +1479,34 @@ defmodule PlatformPhxWeb.Api.AgentFormationControllerTest do
   defp worker_module(worker) when is_binary(worker), do: Module.concat([worker])
 
   defp find_sync_billing_job!(event_id) do
+    stripe_event = Repo.get_by!(StripeEvent, event_id: event_id)
+
     all_enqueued(worker: PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker)
-    |> Enum.find(fn job -> job.args["event_id"] == event_id end)
+    |> Enum.find(fn job -> job.args["stripe_event_id"] == stripe_event.id end)
     |> case do
       nil -> flunk("expected Stripe billing job for #{event_id}")
       job -> job
     end
+  end
+
+  defp insert_stripe_event!(event) do
+    %StripeEvent{}
+    |> StripeEvent.changeset(%{
+      event_id: event["event_id"],
+      event_type: event["event_type"],
+      customer_id: event["customer_id"],
+      subscription_id: event["subscription_id"],
+      subscription_status: event["subscription_status"],
+      mode: event["mode"],
+      metadata: event["metadata"] || %{},
+      processing_status: "queued"
+    })
+    |> Repo.insert!()
+  end
+
+  defp worker_args_for_stripe_event(event) do
+    stripe_event = insert_stripe_event!(event)
+    %{"stripe_event_id" => stripe_event.id}
   end
 
   defp restore_app_env(app, key, nil), do: Application.delete_env(app, key)

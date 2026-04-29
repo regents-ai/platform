@@ -60,6 +60,11 @@ defmodule PlatformPhx.Basenames do
     Validation.create_mint_message(address, fqdn, chain_id, timestamp)
   end
 
+  @spec create_mark_in_use_message(String.t(), String.t(), integer(), integer()) :: String.t()
+  def create_mark_in_use_message(address, fqdn, chain_id, timestamp) do
+    Validation.create_mark_in_use_message(address, fqdn, chain_id, timestamp)
+  end
+
   @spec validate_label(term()) :: result(String.t())
   def validate_label(raw_label), do: Validation.validate_label(raw_label)
 

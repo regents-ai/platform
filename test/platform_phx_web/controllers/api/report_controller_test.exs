@@ -113,7 +113,7 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
       })
       |> json_response(400)
 
-    assert response["statusMessage"] =~ "can't be blank"
+    assert response["error"]["message"] =~ "can't be blank"
   end
 
   test "public report endpoint is rate limited", %{conn: conn} do
@@ -139,7 +139,7 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
       })
       |> json_response(429)
 
-    assert response["statusMessage"] == "Too many requests. Try again shortly."
+    assert response["error"]["message"] == "Too many requests. Try again shortly."
   end
 
   test "public report rate limit ignores spoofed fly client ip headers on direct requests" do
@@ -167,7 +167,7 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
       })
       |> json_response(429)
 
-    assert response["statusMessage"] == "Too many requests. Try again shortly."
+    assert response["error"]["message"] == "Too many requests. Try again shortly."
   end
 
   test "public report rate limit ignores spoofed forwarded for headers on direct requests" do
@@ -195,7 +195,7 @@ defmodule PlatformPhxWeb.Api.ReportControllerTest do
       })
       |> json_response(429)
 
-    assert response["statusMessage"] == "Too many requests. Try again shortly."
+    assert response["error"]["message"] == "Too many requests. Try again shortly."
   end
 
   test "signed agent bug route stores the verified agent identity", %{conn: conn} do

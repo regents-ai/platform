@@ -31,8 +31,35 @@ defmodule PlatformPhxWeb.ApiErrors do
 
   @spec render_status(Plug.Conn.t(), Plug.Conn.status() | atom(), String.t()) :: Plug.Conn.t()
   def render_status(conn, status, message) do
+    status_code = Plug.Conn.Status.code(status)
+
     conn
     |> put_status(status)
-    |> json(%{"statusMessage" => message})
+    |> json(%{
+      "error" => %{
+        "code" => code_for_status(status),
+        "product" => "platform",
+        "status" => status_code,
+        "path" => conn.request_path,
+        "request_id" => request_id(conn),
+        "message" => message,
+        "next_steps" => nil
+      }
+    })
+  end
+
+  defp code_for_status(status) when is_atom(status), do: Atom.to_string(status)
+
+  defp code_for_status(status) do
+    status
+    |> Plug.Conn.Status.reason_phrase()
+    |> String.downcase()
+    |> String.replace(" ", "_")
+  end
+
+  defp request_id(conn) do
+    conn
+    |> Plug.Conn.get_resp_header("x-request-id")
+    |> List.first()
   end
 end

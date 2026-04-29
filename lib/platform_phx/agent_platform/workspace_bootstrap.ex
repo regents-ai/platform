@@ -36,7 +36,7 @@ defmodule PlatformPhx.AgentPlatform.WorkspaceBootstrap do
     template = TemplateCatalog.get(agent.template_key)
 
     billing_account =
-      agent.owner_human && PlatformPhx.AgentPlatform.get_billing_account(agent.owner_human)
+      agent.owner_human && PlatformPhx.AgentPlatform.Billing.get_account(agent.owner_human)
 
     %{
       "FORMATION_SLUG" => agent.slug,

@@ -1,0 +1,12 @@
+{
+  "name": "regent-bridge",
+  "service_kind": "bridge",
+  "command": "/regent/bin/regent-worker-bridge",
+  "http_port": 8765,
+  "health_path": "/healthz",
+  "env": [
+    "REGENT_RUNTIME_ID",
+    "REGENT_COMPANY_ID",
+    "REGENT_PLATFORM_BASE_URL"
+  ]
+}

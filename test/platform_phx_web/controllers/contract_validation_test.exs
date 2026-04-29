@@ -30,6 +30,11 @@ defmodule PlatformPhxWeb.ContractValidationTest do
            ]
   end
 
+  test "contract release artifacts exist and match the source files" do
+    assert :ok = PlatformPhx.Contracts.validate_release_artifacts!()
+    assert :ok = PlatformPhx.Contracts.validate_source_artifacts_match!()
+  end
+
   test "api contract locks the ENS request and response shape" do
     contract = api_contract()
     schemas = get_in(contract, ["components", "schemas"])
@@ -126,20 +131,123 @@ defmodule PlatformPhxWeb.ContractValidationTest do
     assert MapSet.difference(contract_routes, router_routes) == MapSet.new()
   end
 
+  test "api contract security matches the mounted route groups" do
+    contract = api_contract()
+
+    PlatformPhxWeb.Router.__routes__()
+    |> Enum.filter(&contract_backed_route?/1)
+    |> Enum.each(fn route ->
+      method = route.verb |> Atom.to_string() |> String.downcase()
+      path = normalize_route_path(route.path)
+      expected = expected_security(path, method)
+      actual = security_names(contract, ["paths", path, method, "security"])
+
+      assert actual == expected,
+             "#{String.upcase(method)} #{path} expected #{inspect(expected)} got #{inspect(actual)}"
+    end)
+  end
+
   test "api contract keeps beta response envelopes explicit" do
     contract = api_contract()
     schemas = Map.fetch!(contract, "components") |> Map.fetch!("schemas")
 
-    assert_required(schemas, "StatusMessage", ["statusMessage"])
+    assert_required(schemas, "StatusMessage", ["error"])
     assert_required(schemas, "AgentSessionResponse", ["ok", "session"])
     assert_required(schemas, "AgentbookSessionResponse", ["ok", "session"])
-    assert_required(schemas, "AgentFormationResponse", ["ok", "authenticated", "readiness"])
-    assert_required(schemas, "BillingAccount", ["status", "connected"])
-    assert_required(schemas, "BillingUsageSummary", ["runtime_credit_balance_usd_cents"])
+
+    assert_required(schemas, "AgentFormationResponse", [
+      "ok",
+      "authenticated",
+      "access_eligibility",
+      "formation_state",
+      "billing_state",
+      "runtime_cost_state",
+      "blockers",
+      "readiness"
+    ])
+
+    assert_required(schemas, "AgentFormationDoctorResponse", ["ok", "doctor"])
+    assert_required(schemas, "AgentFormationDoctor", ["status", "summary", "checks", "blockers"])
+    assert_required(schemas, "AgentPlatformProjectionResponse", ["ok", "projection"])
+
+    assert_required(schemas, "AgentPlatformProjection", [
+      "formation",
+      "billing_account",
+      "billing_usage",
+      "companies",
+      "public_profiles"
+    ])
+
+    assert_required(schemas, "PlatformCompanyProjection", [
+      "company",
+      "runtime",
+      "formation",
+      "public_profile"
+    ])
+
+    assert_required(schemas, "AgentAccessEligibility", [
+      "eligible",
+      "rule",
+      "approved_collection_nft",
+      "claimed_name_ready"
+    ])
+
+    assert_required(schemas, "PlatformFormationState", ["state", "blockers"])
+    assert_required(schemas, "PlatformBillingState", ["state", "runtime_allowed"])
+
+    assert_required(schemas, "PlatformRuntimeCostState", [
+      "phase",
+      "paused_at_zero",
+      "prepaid_drawdown_state",
+      "pause_targets"
+    ])
+
+    assert_required(schemas, "BillingAccount", [
+      "status",
+      "connected",
+      "prepaid_drawdown_state",
+      "pause_targets"
+    ])
+
+    assert_required(schemas, "BillingUsageSummary", [
+      "runtime_credit_balance_usd_cents",
+      "prepaid_drawdown_state",
+      "pause_targets"
+    ])
+
     assert_required(schemas, "BasenamesAvailability", ["label", "available", "reserved"])
     assert_required(schemas, "BugReportResponse", ["ok", "message", "report"])
-    assert_required(schemas, "RegentStakingWalletActionResponse", ["ok", "staking", "tx_request"])
-    assert_required(schemas, "RegentStakingTxRequest", ["chain_id", "to", "value", "data"])
+
+    assert get_in(contract, [
+             "paths",
+             "/api/basenames/use",
+             "post",
+             "requestBody",
+             "content",
+             "application/json",
+             "schema",
+             "required"
+           ]) == ["address", "label", "timestamp", "signature"]
+
+    assert_required(schemas, "RegentStakingWalletActionResponse", [
+      "ok",
+      "staking",
+      "wallet_action"
+    ])
+
+    assert_required(schemas, "WalletAction", [
+      "action_id",
+      "resource",
+      "action",
+      "chain_id",
+      "to",
+      "value",
+      "data",
+      "expected_signer",
+      "expires_at",
+      "idempotency_key",
+      "risk_copy"
+    ])
   end
 
   test "public staking promises only use the canonical signed-agent route" do
@@ -176,10 +284,59 @@ defmodule PlatformPhxWeb.ContractValidationTest do
 
     assert security_names(contract, [
              "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runs/{run_id}/events/batch",
+             "post",
+             "security"
+           ]) == MapSet.new(["AgentSiwaHeaders"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runs/{run_id}/events/stream",
+             "get",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runs/{run_id}/tree",
+             "get",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runs/{run_id}/cancel",
+             "post",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runs/{run_id}/retry",
+             "post",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert security_names(contract, [
+             "paths",
              "/api/agent-platform/companies/{company_id}/rwr/runs/{run_id}/delegations",
              "post",
              "security"
            ]) == MapSet.new(["AgentSiwaHeaders"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runs/{run_id}/artifacts/{artifact_id}/publish",
+             "post",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
+
+    assert security_names(contract, [
+             "paths",
+             "/api/agent-platform/companies/{company_id}/rwr/runs/{run_id}/approvals/{approval_id}/resolve",
+             "post",
+             "security"
+           ]) == MapSet.new(["PrivySessionCookie"])
 
     assert security_names(contract, [
              "paths",
@@ -289,6 +446,18 @@ defmodule PlatformPhxWeb.ContractValidationTest do
     assert enum_values(schemas, "BillingMode") ==
              MapSet.new(["platform_hosted", "user_local", "external_self_reported"])
 
+    assert property_enum_values(schemas, "PlatformFormationState", "state") ==
+             MapSet.new(["pending", "blocked", "provisioning", "ready"])
+
+    assert property_enum_values(schemas, "PlatformBillingState", "state") ==
+             MapSet.new(["trial", "free_day", "prepaid", "paused", "zero", "failed"])
+
+    assert property_enum_values(schemas, "PlatformRuntimeCostState", "phase") ==
+             MapSet.new(["free_day", "prepaid", "paused_at_zero", "unavailable"])
+
+    assert property_enum_values(schemas, "PlatformRuntimeCostState", "prepaid_drawdown_state") ==
+             MapSet.new(["free_day", "drawing_down", "paused_at_zero", "unavailable"])
+
     assert enum_values(schemas, "TrustScope") ==
              MapSet.new(["platform_hosted", "local_user_controlled", "external_user_controlled"])
 
@@ -307,6 +476,9 @@ defmodule PlatformPhxWeb.ContractValidationTest do
     restore_schema = Map.fetch!(schemas, "RwrRuntimeRestoreRequest")
     delegation_schema = Map.fetch!(schemas, "RwrDelegationRequest")
     event_schema = Map.fetch!(schemas, "RwrRunEventAppendRequest")
+    event_batch_schema = Map.fetch!(schemas, "RwrRunEventBatchAppendRequest")
+    event_batch_item_schema = Map.fetch!(schemas, "RwrRunEventBatchAppendItem")
+    approval_resolve_schema = Map.fetch!(schemas, "RwrApprovalResolveRequest")
 
     assert MapSet.member?(required_fields(request_schema), "company_id")
 
@@ -334,6 +506,14 @@ defmodule PlatformPhxWeb.ContractValidationTest do
     assert required_fields(event_schema) == MapSet.new(["company_id", "run_id", "kind"])
     assert MapSet.member?(property_names(event_schema), "kind")
     refute MapSet.member?(property_names(event_schema), "event_type")
+
+    assert required_fields(event_batch_schema) == MapSet.new(["company_id", "run_id", "events"])
+    assert required_fields(event_batch_item_schema) == MapSet.new(["kind"])
+    refute MapSet.member?(property_names(event_batch_item_schema), "company_id")
+    refute MapSet.member?(property_names(event_batch_item_schema), "run_id")
+
+    assert required_fields(approval_resolve_schema) ==
+             MapSet.new(["company_id", "run_id", "decision"])
   end
 
   test "CLI contract uses canonical RWR command names" do
@@ -350,6 +530,8 @@ defmodule PlatformPhxWeb.ContractValidationTest do
                "regents work show",
                "regents work run",
                "regents work watch",
+               "regents platform formation doctor",
+               "regents platform projection",
                "regents runtime create",
                "regents runtime show",
                "regents runtime checkpoint",
@@ -405,12 +587,91 @@ defmodule PlatformPhxWeb.ContractValidationTest do
     |> MapSet.new()
   end
 
+  defp property_enum_values(schemas, schema_name, property_name) do
+    schemas
+    |> Map.fetch!(schema_name)
+    |> Map.fetch!("properties")
+    |> Map.fetch!(property_name)
+    |> Map.fetch!("enum")
+    |> MapSet.new()
+  end
+
   defp security_names(contract, path) do
     contract
     |> get_in(path)
     |> List.wrap()
-    |> Enum.flat_map(&Map.keys/1)
+    |> Enum.flat_map(fn
+      value when is_map(value) -> Map.keys(value)
+      _value -> []
+    end)
     |> MapSet.new()
+  end
+
+  defp expected_security(path, method) do
+    cond do
+      path == "/api/auth/privy/session" and method == "post" ->
+        MapSet.new(["PrivyBearerToken"])
+
+      String.starts_with?(path, "/api/auth/privy") and path != "/api/auth/privy/csrf" ->
+        MapSet.new(["PrivySessionCookie"])
+
+      String.starts_with?(path, "/api/auth/agent") and method in ["get", "delete"] ->
+        MapSet.new(["AgentSessionCookie"])
+
+      path == "/api/auth/agent/session" and method == "post" ->
+        MapSet.new(["AgentSiwaHeaders"])
+
+      path == "/api/agentbook/sessions/{id}/submit" ->
+        MapSet.new(["AgentSessionCookie"])
+
+      signed_agent_route?(path, method) ->
+        MapSet.new(["AgentSiwaHeaders"])
+
+      session_route?(path, method) ->
+        MapSet.new(["PrivySessionCookie"])
+
+      true ->
+        MapSet.new()
+    end
+  end
+
+  defp signed_agent_route?(path, method) when is_binary(path) do
+    String.starts_with?(path, "/v1/agent") or
+      (String.starts_with?(path, "/api/agentbook") and
+         path != "/api/agentbook/sessions/{id}/submit") or
+      path == "/api/agent-platform/ens/prepare-primary" or
+      (path == "/api/agent-platform/companies/{company_id}/rwr/workers" and
+         method == "post") or
+      String.contains?(path, "/workers/{worker_id}/heartbeat") or
+      String.contains?(path, "/assignments") or
+      (String.contains?(path, "/events") and String.ends_with?(path, "/events") and
+         method == "post") or
+      String.ends_with?(path, "/events/batch") or
+      (String.ends_with?(path, "/artifacts") and method == "post") or
+      String.ends_with?(path, "/delegations")
+  end
+
+  defp session_route?(path, method) do
+    path == "/api/agentbook/sessions/{id}/submit" or
+      (session_agent_platform_route?(path) and
+         not signed_agent_route?(path, method))
+  end
+
+  defp session_agent_platform_route?(path) do
+    Enum.any?(
+      [
+        "/api/agent-platform/formation",
+        "/api/agent-platform/projection",
+        "/api/agent-platform/billing",
+        "/api/agent-platform/agents/{slug}/runtime",
+        "/api/agent-platform/agents/{slug}/ens",
+        "/api/agent-platform/ens/claims",
+        "/api/agent-platform/sprites",
+        "/api/agent-platform/rwr",
+        "/api/agent-platform/companies"
+      ],
+      &String.starts_with?(path, &1)
+    )
   end
 
   defp assert_required(schemas, schema_name, fields) do

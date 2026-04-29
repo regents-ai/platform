@@ -56,7 +56,7 @@ defmodule PlatformPhx.OperatorReports do
 
   @spec list_bug_reports_page(integer(), integer()) :: bug_report_page()
   def list_bug_reports_page(page, page_size \\ @default_bug_report_page_size) do
-    list_bug_reports_page(page, page_size, %{}, DateTime.utc_now())
+    list_bug_reports_page(page, page_size, %{}, PlatformPhx.Clock.utc_now())
   end
 
   @spec list_bug_reports_page(integer(), integer(), map(), DateTime.t()) :: bug_report_page()

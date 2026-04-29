@@ -65,7 +65,7 @@ defmodule PlatformPhx.RunEvents.RunEvent do
     if get_field(changeset, :occurred_at) do
       changeset
     else
-      put_change(changeset, :occurred_at, DateTime.utc_now() |> DateTime.truncate(:second))
+      put_change(changeset, :occurred_at, PlatformPhx.Clock.now())
     end
   end
 end

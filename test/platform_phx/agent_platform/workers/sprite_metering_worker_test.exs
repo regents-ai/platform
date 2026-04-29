@@ -6,6 +6,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
+  alias PlatformPhx.AgentPlatform.Company
   alias PlatformPhx.AgentPlatform.SpriteUsageRecord
   alias PlatformPhx.AgentPlatform.Workers.SyncSpriteUsageRecordWorker
   alias PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorker
@@ -15,7 +16,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
 
   setup do
     previous_stripe_client = Application.get_env(:platform_phx, :stripe_billing_client)
-    previous_sprite_runtime_client = Application.get_env(:platform_phx, :sprite_runtime_client)
+    previous_sprites_client = Application.get_env(:platform_phx, :runtime_registry_sprites_client)
 
     previous_runtime_usage_result =
       Application.get_env(:platform_phx, :stripe_fake_runtime_usage_result)
@@ -28,8 +29,8 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
 
     Application.put_env(
       :platform_phx,
-      :sprite_runtime_client,
-      PlatformPhx.SpriteRuntimeClientFake
+      :runtime_registry_sprites_client,
+      PlatformPhx.RuntimeRegistrySpritesClientFake
     )
 
     System.put_env("STRIPE_SECRET_KEY", "sk_test_agent_formation")
@@ -37,7 +38,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
 
     on_exit(fn ->
       restore_app_env(:platform_phx, :stripe_billing_client, previous_stripe_client)
-      restore_app_env(:platform_phx, :sprite_runtime_client, previous_sprite_runtime_client)
+      restore_app_env(:platform_phx, :runtime_registry_sprites_client, previous_sprites_client)
 
       restore_app_env(
         :platform_phx,
@@ -80,6 +81,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
       %Agent{}
       |> Agent.changeset(%{
         owner_human_id: human.id,
+        company_id: create_company!(human, "metered").id,
         template_key: "start",
         name: "Metered Regent",
         slug: "metered",
@@ -102,10 +104,11 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
 
     usage_record =
       Repo.one!(
-        from record in SpriteUsageRecord,
+        from(record in SpriteUsageRecord,
           where: record.agent_id == ^agent.id,
           order_by: [desc: record.id],
           limit: 1
+        )
       )
 
     assert :ok ==
@@ -121,8 +124,9 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
 
     ledger_entry =
       Repo.one!(
-        from entry in BillingLedgerEntry,
+        from(entry in BillingLedgerEntry,
           where: entry.source_ref == ^"sprite-usage:#{usage_record.id}"
+        )
       )
 
     assert updated_account.runtime_credit_balance_usd_cents == 0
@@ -164,6 +168,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
       %Agent{}
       |> Agent.changeset(%{
         owner_human_id: human.id,
+        company_id: create_company!(human, "trial-regent").id,
         template_key: "start",
         name: "Trial Regent",
         slug: "trial-regent",
@@ -219,7 +224,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
         billing_status: "active",
         stripe_customer_id: unique_external_id("cus_paid"),
         stripe_pricing_plan_subscription_id: unique_external_id("sub_paid"),
-        runtime_credit_balance_usd_cents: 0
+        runtime_credit_balance_usd_cents: 50
       })
       |> Repo.insert!()
 
@@ -230,6 +235,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
       %Agent{}
       |> Agent.changeset(%{
         owner_human_id: human.id,
+        company_id: create_company!(human, "paid-runtime").id,
         template_key: "start",
         name: "Paid Runtime Regent",
         slug: "paid-runtime",
@@ -255,16 +261,79 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
 
     usage_record =
       Repo.one!(
-        from record in SpriteUsageRecord,
+        from(record in SpriteUsageRecord,
           where: record.agent_id == ^agent.id,
           order_by: [desc: record.id],
           limit: 1
+        )
       )
 
     assert updated_agent.desired_runtime_state == "active"
     assert updated_agent.runtime_status == "ready"
     assert usage_record.status == "pending"
+    assert Repo.get!(BillingAccount, billing_account.id).runtime_credit_balance_usd_cents < 50
+  end
+
+  test "an expired free day with no prepaid credit pauses the runtime without charging usage" do
+    human =
+      %HumanUser{}
+      |> HumanUser.changeset(%{
+        privy_user_id: "privy-expired-free-day",
+        wallet_address: @address,
+        wallet_addresses: [@address]
+      })
+      |> Repo.insert!()
+
+    billing_account =
+      %BillingAccount{}
+      |> BillingAccount.changeset(%{
+        human_user_id: human.id,
+        billing_status: "active",
+        stripe_customer_id: unique_external_id("cus_expired_free_day"),
+        stripe_pricing_plan_subscription_id: unique_external_id("sub_expired_free_day"),
+        runtime_credit_balance_usd_cents: 0
+      })
+      |> Repo.insert!()
+
+    agent =
+      %Agent{}
+      |> Agent.changeset(%{
+        owner_human_id: human.id,
+        company_id: create_company!(human, "expired-free-day").id,
+        template_key: "start",
+        name: "Expired Free Day Regent",
+        slug: "expired-free-day",
+        claimed_label: "expired-free-day",
+        basename_fqdn: "expired-free-day.agent.base.eth",
+        ens_fqdn: "expired-free-day.regent.eth",
+        status: "published",
+        public_summary: "Expired free day company",
+        sprite_name: "expired-free-day-sprite",
+        sprite_service_name: "hermes-workspace",
+        runtime_status: "ready",
+        desired_runtime_state: "active",
+        observed_runtime_state: "active",
+        runtime_last_checked_at:
+          DateTime.utc_now() |> DateTime.add(-3_600, :second) |> DateTime.truncate(:second),
+        sprite_free_until:
+          DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
+      })
+      |> Repo.insert!()
+
+    assert :ok = SpriteMeteringWorker.perform(%Oban.Job{args: %{}})
+
+    updated_agent = Repo.get!(Agent, agent.id)
+
     assert Repo.get!(BillingAccount, billing_account.id).runtime_credit_balance_usd_cents == 0
+    assert updated_agent.desired_runtime_state == "active"
+    assert updated_agent.observed_runtime_state == "paused"
+    assert updated_agent.runtime_status == "paused_for_credits"
+
+    assert Repo.aggregate(
+             from(record in SpriteUsageRecord, where: record.agent_id == ^agent.id),
+             :count,
+             :id
+           ) == 0
   end
 
   test "runtime usage sync worker retries a failed Stripe usage report" do
@@ -295,6 +364,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
       %Agent{}
       |> Agent.changeset(%{
         owner_human_id: human.id,
+        company_id: create_company!(human, "metered-retry").id,
         template_key: "start",
         name: "Metered Retry Regent",
         slug: "metered-retry",
@@ -323,10 +393,11 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
 
     usage_record =
       Repo.one!(
-        from record in SpriteUsageRecord,
+        from(record in SpriteUsageRecord,
           where: record.agent_id == ^agent.id,
           order_by: [desc: record.id],
           limit: 1
+        )
       )
 
     assert {:error, "Stripe runtime reporting unavailable"} ==
@@ -338,10 +409,11 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
 
     failed_record =
       Repo.one!(
-        from record in SpriteUsageRecord,
+        from(record in SpriteUsageRecord,
           where: record.agent_id == ^agent.id,
           order_by: [desc: record.id],
           limit: 1
+        )
       )
 
     assert failed_record.status == "failed"
@@ -391,6 +463,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
       %Agent{}
       |> Agent.changeset(%{
         owner_human_id: human.id,
+        company_id: create_company!(human, "recover-regent").id,
         template_key: "start",
         name: "Recover Regent",
         slug: "recover-regent",
@@ -419,10 +492,11 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
 
     usage_record =
       Repo.one!(
-        from record in SpriteUsageRecord,
+        from(record in SpriteUsageRecord,
           where: record.agent_id == ^agent.id,
           order_by: [desc: record.id],
           limit: 1
+        )
       )
 
     assert :ok ==
@@ -436,16 +510,18 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
 
     recovered_record =
       Repo.one!(
-        from record in SpriteUsageRecord,
+        from(record in SpriteUsageRecord,
           where: record.agent_id == ^agent.id,
           order_by: [desc: record.id],
           limit: 1
+        )
       )
 
     recovery_entry =
       Repo.one!(
-        from entry in BillingLedgerEntry,
+        from(entry in BillingLedgerEntry,
           where: entry.source_ref == ^"sprite-usage-recovery:#{recovered_record.id}"
+        )
       )
 
     assert recovered_record.status == "failed"
@@ -481,4 +557,17 @@ defmodule PlatformPhx.AgentPlatform.Workers.SpriteMeteringWorkerTest do
   defp restore_system_env(key, value), do: System.put_env(key, value)
 
   defp unique_external_id(prefix), do: "#{prefix}_#{System.unique_integer([:positive])}"
+
+  defp create_company!(human, slug) do
+    %Company{}
+    |> Company.changeset(%{
+      owner_human_id: human.id,
+      name: "Runtime #{slug}",
+      slug: slug,
+      claimed_label: slug,
+      status: "published",
+      public_summary: "Runtime metering test company"
+    })
+    |> Repo.insert!()
+  end
 end

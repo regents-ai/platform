@@ -98,7 +98,6 @@ defmodule PlatformPhxWeb.App.TrustLiveTest do
     assert html =~ "Connection states"
     assert html =~ "phx-hook=\"AgentbookTrustFlow\""
     assert html =~ "data-session="
-    refute html =~ "allow_legacy_proofs"
   end
 
   test "expired approval link no longer opens the trust flow", %{

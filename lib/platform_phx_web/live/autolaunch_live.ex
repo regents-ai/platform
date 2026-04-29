@@ -1,22 +1,11 @@
 defmodule PlatformPhxWeb.AutolaunchLive do
   use PlatformPhxWeb, :live_view
 
-  alias PlatformPhx.AgentLaunch
-
   @impl true
   @spec mount(map(), map(), Phoenix.LiveView.Socket.t()) ::
           {:ok, Phoenix.LiveView.Socket.t()}
   def mount(_params, _session, socket) do
-    auctions = AgentLaunch.list_auctions()
-    split = AgentLaunch.split_auctions(auctions)
-
-    {:ok,
-     socket
-     |> assign(:page_title, "Autolaunch")
-     |> assign(:current_auctions, split.current)
-     |> assign(:past_auctions, split.past)
-     |> assign(:current_count, length(split.current))
-     |> assign(:past_count, length(split.past))}
+    {:ok, assign(socket, :page_title, "Autolaunch")}
   end
 
   @impl true
@@ -139,11 +128,11 @@ defmodule PlatformPhxWeb.AutolaunchLive do
                 <section class="rounded-[1.65rem] border border-[color:color-mix(in_oklch,var(--border)_90%,transparent)] bg-[color:color-mix(in_oklch,var(--background)_98%,var(--card)_2%)] p-4 shadow-[0_28px_60px_-50px_color-mix(in_oklch,var(--foreground)_22%,transparent)]">
                   <div class="flex items-center justify-between gap-3">
                     <p class="text-[0.72rem] font-semibold uppercase tracking-[0.34em] text-[color:color-mix(in_oklch,var(--foreground)_58%,var(--muted-foreground)_42%)]">
-                      Launch preview
+                      Preview example
                     </p>
                     <div class="flex items-center gap-2 text-sm text-[color:var(--foreground)]">
                       <span class="h-2.5 w-2.5 rounded-full bg-[#22c55e]" />
-                      <span>Live preview</span>
+                      <span>Example board</span>
                     </div>
                   </div>
 
@@ -259,7 +248,7 @@ defmodule PlatformPhxWeb.AutolaunchLive do
                 </div>
                 <div>
                   <h2 class="font-display text-[1.6rem] leading-none tracking-[-0.04em] text-[color:var(--foreground)]">
-                    Tech stack
+                    Operating rails
                   </h2>
                   <p class="mt-4 text-[0.99rem] leading-8 text-[color:var(--muted-foreground)]">
                     A modern stack that connects capital, execution, and accounting.
@@ -315,29 +304,29 @@ defmodule PlatformPhxWeb.AutolaunchLive do
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <p class="text-[0.72rem] font-semibold uppercase tracking-[0.34em] text-[color:color-mix(in_oklch,var(--foreground)_58%,var(--muted-foreground)_42%)]">
-                    Market activity
+                    Autolaunch preview
                   </p>
                 </div>
               </div>
 
               <div class="mt-6 grid gap-4 border-b border-[color:color-mix(in_oklch,var(--border)_82%,transparent)] pb-5 sm:grid-cols-2">
                 <div>
-                  <p class="text-sm text-[color:var(--muted-foreground)]">Active launches</p>
+                  <p class="text-sm text-[color:var(--muted-foreground)]">Current source</p>
                   <p class="mt-2 font-display text-[2rem] leading-none tracking-[-0.05em] text-[color:var(--foreground)]">
-                    {@current_count}
+                    Autolaunch
                   </p>
-                  <p class="mt-1 text-sm text-[color:#16a394]">▼ 1 this week</p>
+                  <p class="mt-1 text-sm text-[color:#16a394]">Open the launch app for live data</p>
                 </div>
                 <div>
-                  <p class="text-sm text-[color:var(--muted-foreground)]">Total raised (all time)</p>
+                  <p class="text-sm text-[color:var(--muted-foreground)]">Owner</p>
                   <p class="mt-2 font-display text-[2rem] leading-none tracking-[-0.05em] text-[color:var(--foreground)]">
-                    $3.42M
+                    autolaunch.sh
                   </p>
                 </div>
               </div>
 
               <div class="mt-5 flex items-center justify-between gap-3">
-                <p class="text-sm font-medium text-[color:var(--foreground)]">Recently launched</p>
+                <p class="text-sm font-medium text-[color:var(--foreground)]">Example rows</p>
                 <a
                   href="https://autolaunch.sh"
                   target="_blank"
@@ -349,7 +338,7 @@ defmodule PlatformPhxWeb.AutolaunchLive do
               </div>
 
               <div class="mt-3 space-y-2.5">
-                <%= for item <- market_activity_rows(@current_auctions, @past_auctions) do %>
+                <%= for item <- market_activity_rows() do %>
                   <div class="grid grid-cols-[1.8rem_minmax(0,1fr)_auto_auto] items-center gap-3 rounded-[0.9rem] py-1.5">
                     <div class="flex h-7 w-7 items-center justify-center rounded-full bg-[color:color-mix(in_oklch,var(--brand-ink)_92%,black_8%)]">
                       <img
@@ -538,23 +527,23 @@ defmodule PlatformPhxWeb.AutolaunchLive do
     [
       %{
         icon: "hero-command-line",
-        title: "Phoenix LiveView",
-        copy: "Real-time launch experience"
+        title: "Launch app",
+        copy: "Live launch experience"
       },
       %{
         icon: "hero-circle-stack",
-        title: "Ecto + Postgres",
-        copy: "Reliable protocol and ledger data"
+        title: "Auction records",
+        copy: "Launch workflow and market state"
       },
       %{
         icon: "hero-cube",
-        title: "On-chain Treasury",
+        title: "Treasury rails",
         copy: "Transparent fund custody and flows"
       },
       %{
         icon: "hero-arrow-path",
-        title: "Event + Telemetry",
-        copy: "Accountability and performance"
+        title: "Activity timeline",
+        copy: "Status, performance, and history"
       }
     ]
   end
@@ -591,74 +580,36 @@ defmodule PlatformPhxWeb.AutolaunchLive do
     ]
   end
 
-  defp market_activity_rows(current_auctions, past_auctions) do
-    (current_auctions ++ past_auctions)
-    |> Enum.take(4)
-    |> Enum.map(fn auction ->
+  defp market_activity_rows do
+    [
       %{
-        name: auction.agent_name || "Unnamed agent",
-        amount: auction_amount(auction),
-        status: auction_status(auction),
-        status_class: auction_status_class(auction)
+        name: "Sentinel Research Agent",
+        amount: "$162K / $250K",
+        status: "Live",
+        status_class:
+          "bg-[color:color-mix(in_oklch,#22c55e_16%,var(--background)_84%)] text-[#198754] dark:text-[#9ad9cb]"
+      },
+      %{
+        name: "Edge Risk Monitor",
+        amount: "$98K / $160K",
+        status: "Live",
+        status_class:
+          "bg-[color:color-mix(in_oklch,#22c55e_16%,var(--background)_84%)] text-[#198754] dark:text-[#9ad9cb]"
+      },
+      %{
+        name: "Yield Scout Agent",
+        amount: "$74K / $120K",
+        status: "Preview",
+        status_class:
+          "bg-[color:color-mix(in_oklch,#3b82f6_16%,var(--background)_84%)] text-[#2563eb] dark:text-[#93c5fd]"
+      },
+      %{
+        name: "DataPilot Analyst",
+        amount: "$53K / $100K",
+        status: "Closed",
+        status_class:
+          "bg-[color:color-mix(in_oklch,var(--border)_82%,var(--background)_18%)] text-[color:var(--muted-foreground)]"
       }
-    end)
-    |> case do
-      [] ->
-        [
-          %{
-            name: "Sentinel Research Agent",
-            amount: "$162K / $250K",
-            status: "Live",
-            status_class:
-              "bg-[color:color-mix(in_oklch,#22c55e_16%,var(--background)_84%)] text-[#198754] dark:text-[#9ad9cb]"
-          },
-          %{
-            name: "Edge Risk Monitor",
-            amount: "$98K / $160K",
-            status: "Live",
-            status_class:
-              "bg-[color:color-mix(in_oklch,#22c55e_16%,var(--background)_84%)] text-[#198754] dark:text-[#9ad9cb]"
-          },
-          %{
-            name: "Yield Scout Agent",
-            amount: "$74K / $120K",
-            status: "Preview",
-            status_class:
-              "bg-[color:color-mix(in_oklch,#3b82f6_16%,var(--background)_84%)] text-[#2563eb] dark:text-[#93c5fd]"
-          },
-          %{
-            name: "DataPilot Analyst",
-            amount: "$53K / $100K",
-            status: "Closed",
-            status_class:
-              "bg-[color:color-mix(in_oklch,var(--border)_82%,var(--background)_18%)] text-[color:var(--muted-foreground)]"
-          }
-        ]
-
-      rows ->
-        rows
-    end
-  end
-
-  defp auction_amount(auction) do
-    raised = auction.raised_currency || "Raised"
-    target = auction.target_currency || "Target"
-    "#{raised} / #{target}"
-  end
-
-  defp auction_status(%{status: status}) when status in ["active", "ending-soon"], do: "Live"
-  defp auction_status(%{status: "settled"}), do: "Closed"
-  defp auction_status(_auction), do: "Preview"
-
-  defp auction_status_class(%{status: status}) when status in ["active", "ending-soon"] do
-    "bg-[color:color-mix(in_oklch,#22c55e_16%,var(--background)_84%)] text-[#198754] dark:text-[#9ad9cb]"
-  end
-
-  defp auction_status_class(%{status: "settled"}) do
-    "bg-[color:color-mix(in_oklch,var(--border)_82%,var(--background)_18%)] text-[color:var(--muted-foreground)]"
-  end
-
-  defp auction_status_class(_auction) do
-    "bg-[color:color-mix(in_oklch,#3b82f6_16%,var(--background)_84%)] text-[#2563eb] dark:text-[#93c5fd]"
+    ]
   end
 end

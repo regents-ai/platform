@@ -340,7 +340,15 @@ defmodule PlatformPhx.Orchestration do
 
   defp append_delegation_events(parent_run, payload, worker, child_runs, actor_context) do
     with {:ok, _event} <-
-           append_delegation_requested_event(parent_run, payload, worker, actor_context) do
+           append_delegation_requested_event(parent_run, payload, worker, actor_context),
+         {:ok, _event} <-
+           append_delegation_accepted_event(
+             parent_run,
+             payload,
+             worker,
+             child_runs,
+             actor_context
+           ) do
       child_runs
       |> Enum.reduce_while(:ok, fn child_run, :ok ->
         case append_child_run_created_event(parent_run, child_run, worker, actor_context) do
@@ -355,7 +363,7 @@ defmodule PlatformPhx.Orchestration do
     RunEvents.append_event(%{
       company_id: parent_run.company_id,
       run_id: parent_run.id,
-      kind: "delegation_requested",
+      kind: "delegation.requested",
       actor_kind: attr(actor_context, :actor_kind) || "worker",
       actor_id: actor_id(actor_context),
       visibility: parent_run.visibility,
@@ -372,11 +380,32 @@ defmodule PlatformPhx.Orchestration do
     })
   end
 
+  defp append_delegation_accepted_event(parent_run, payload, worker, child_runs, actor_context) do
+    RunEvents.append_event(%{
+      company_id: parent_run.company_id,
+      run_id: parent_run.id,
+      kind: "delegation.accepted",
+      actor_kind: attr(actor_context, :actor_kind) || "worker",
+      actor_id: actor_id(actor_context),
+      visibility: parent_run.visibility,
+      sensitivity: "normal",
+      payload:
+        Redactor.redact_event_payload(%{
+          requested_runner_kind: attr(payload, :requested_runner_kind),
+          strategy: attr(payload, :strategy),
+          child_run_count: length(child_runs),
+          target_worker_id: worker.id,
+          target_agent_profile_id: worker.agent_profile_id,
+          execution_surface: worker.execution_surface
+        })
+    })
+  end
+
   defp append_child_run_created_event(parent_run, child_run, worker, actor_context) do
     RunEvents.append_event(%{
       company_id: parent_run.company_id,
       run_id: parent_run.id,
-      kind: "delegation_child_run_created",
+      kind: "child_run.created",
       actor_kind: attr(actor_context, :actor_kind) || "worker",
       actor_id: actor_id(actor_context),
       visibility: parent_run.visibility,

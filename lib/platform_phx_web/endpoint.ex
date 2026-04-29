@@ -47,6 +47,9 @@ defmodule PlatformPhxWeb.Endpoint do
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],
+    length: 1_000_000,
+    read_length: 64_000,
+    read_timeout: 15_000,
     json_decoder: Phoenix.json_library(),
     body_reader: {PlatformPhxWeb.RawBodyReader, :read_body, []}
 

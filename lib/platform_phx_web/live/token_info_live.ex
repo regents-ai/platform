@@ -36,14 +36,14 @@ defmodule PlatformPhxWeb.TokenInfoLive do
     },
     %{
       title: "Stablecoin Revenues",
-      short: "Revsplit-tracked gross revenue",
+      short: "Rewards-tracked gross revenue",
       body_lines: [
         [
           %{type: :highlight, text: "1%"},
           %{
             type: :text,
             text:
-              " of gross revenue for all agents, from x402, MPP, and other sources. Tracked onchain through the revsplit contract."
+              " of gross revenue for all agents, from x402, MPP, and other sources. Tracked onchain through the rewards contract."
           }
         ]
       ]
@@ -115,11 +115,14 @@ defmodule PlatformPhxWeb.TokenInfoLive do
     params = %{"amount" => socket.assigns.staking_amount}
 
     case staking_action(action, params, socket.assigns.current_human) do
-      {:ok, %{tx_request: tx_request}} ->
+      {:ok, %{wallet_action: wallet_action}} ->
         {:noreply,
          socket
          |> assign(:staking_notice, %{tone: :info, message: staking_pending_copy(action)})
-         |> push_event("regent-staking:tx-request", %{action: action, tx_request: tx_request})}
+         |> push_event("regent-staking:wallet-action", %{
+           action: action,
+           wallet_action: wallet_action
+         })}
 
       {:error, {:unauthorized, _message}} ->
         {:noreply,
@@ -211,13 +214,14 @@ defmodule PlatformPhxWeb.TokenInfoLive do
                     Revenue that stays legible from source to stake.
                   </h1>
                   <p class="max-w-3xl text-[1rem] leading-7 text-[color:var(--muted-foreground)] sm:text-[1.05rem]">
-                    $REGENT is the platform revsplit token. Stakers receive their share of
-                    protocol revenue, and the remaining balance is used to buy back $REGENT.
+                    $REGENT is the platform revenue token. It is separate from agent tokens.
+                    Stakers can claim the contract-defined share after deposits reach the $REGENT
+                    rewards pool, and the remaining balance can be used to buy back $REGENT.
                   </p>
                   <p class="max-w-3xl text-sm leading-6 text-[color:var(--muted-foreground)] sm:text-[0.95rem]">
                     This page is for holders, operators, and technical evaluators who need a clear
-                    view of where revenue comes from, how staking pays, and what the major token
-                    balances represent.
+                    view of where revenue comes from, how staking claims work, and what the major
+                    token balances represent.
                   </p>
                 </div>
 
@@ -303,8 +307,8 @@ defmodule PlatformPhxWeb.TokenInfoLive do
                         body="Autolaunch, Techtree, stablecoin revenue, and Regents Platform feed the token economy."
                       />
                       <.flow_row
-                        title="2. Stakers earn"
-                        body="Stake $REGENT in the revsplit contract to receive your share and claim it when you want."
+                        title="2. Stakers can claim"
+                        body="Stake $REGENT in the contract to claim the contract-defined share when revenue is available."
                       />
                       <.flow_row
                         title="3. Buybacks follow"
@@ -340,10 +344,11 @@ defmodule PlatformPhxWeb.TokenInfoLive do
                     </div>
                     <div class="rounded-[1.5rem] border border-[color:var(--border)] bg-[color:var(--background)] p-4">
                       <p class="font-display text-[1.15rem] leading-none text-[color:var(--foreground)]">
-                        Reward early staking
+                        Add early staking emissions
                       </p>
                       <p class="mt-3 text-sm leading-6 text-[color:var(--muted-foreground)]">
-                        During the first year, stakers also receive a 20% emissions stream.
+                        During the first year, stakers can receive the intended 20% emissions stream
+                        while funded rewards are available.
                       </p>
                     </div>
                   </div>
@@ -382,7 +387,7 @@ defmodule PlatformPhxWeb.TokenInfoLive do
                   <p class="pp-home-kicker">Revenue Sources</p>
                   <h2 class="pp-route-panel-title">Where money enters the Regent system</h2>
                   <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
-                    These are the four current revenue rails feeding staking and buybacks.
+                    These are the four current platform revenue sources feeding staking and buybacks.
                   </p>
                 </div>
 
@@ -396,7 +401,7 @@ defmodule PlatformPhxWeb.TokenInfoLive do
                   <p class="pp-home-kicker">Staking Model</p>
                   <h2 class="pp-route-panel-title">How a dollar moves after it arrives</h2>
                   <p class="text-sm leading-6 text-[color:var(--muted-foreground)]">
-                    The value path is simple on purpose so holders can evaluate it with confidence.
+                    The value path separates platform revenue from agent-token revenue.
                   </p>
                 </div>
 
@@ -408,7 +413,7 @@ defmodule PlatformPhxWeb.TokenInfoLive do
                           Step 1
                         </p>
                         <h3 class="mt-3 font-display text-[1.35rem] leading-none text-[color:var(--foreground)]">
-                          Stake into the revsplit contract
+                          Stake into the $REGENT rewards pool
                         </h3>
                       </div>
                       <div class="rounded-full border border-[color:var(--border)] px-3 py-1 text-[0.7rem] uppercase tracking-[0.18em] text-[color:var(--muted-foreground)]">
@@ -416,7 +421,8 @@ defmodule PlatformPhxWeb.TokenInfoLive do
                       </div>
                     </div>
                     <p class="mt-4 text-sm leading-6 text-[color:var(--muted-foreground)]">
-                      Stake $REGENT in the protocol revsplit contract to earn your share of stablecoin revenue.
+                      Stake $REGENT in the platform rewards pool to claim the contract-defined share
+                      after deposits arrive. Staking does not guarantee yield.
                     </p>
                   </article>
 
@@ -428,9 +434,9 @@ defmodule PlatformPhxWeb.TokenInfoLive do
                       Buybacks happen after the staker share
                     </h3>
                     <p class="mt-4 text-sm leading-6 text-[color:var(--muted-foreground)]">
-                      After the amount owed to stakers is accounted for, the remaining balance is
-                      used to buy back $REGENT. At launch only about 20% of tokens are circulating,
-                      so 80% or more of protocol skim can go to buybacks.
+                      After the staker share is set aside, the remaining platform revenue can be
+                      used to buy back $REGENT. The public buyback amount depends on the balance left
+                      after the staker share.
                     </p>
                   </article>
 
@@ -441,7 +447,7 @@ defmodule PlatformPhxWeb.TokenInfoLive do
                           Step 3
                         </p>
                         <h3 class="mt-3 font-display text-[1.35rem] leading-none text-[color:var(--foreground)]">
-                          Early staking also earns emissions
+                          Early staking can receive emissions
                         </h3>
                       </div>
                       <div class="rounded-full bg-[color:color-mix(in_oklch,var(--ring)_14%,transparent)] px-3 py-1 text-[0.7rem] uppercase tracking-[0.18em] text-[color:var(--foreground)]">
@@ -449,9 +455,9 @@ defmodule PlatformPhxWeb.TokenInfoLive do
                       </div>
                     </div>
                     <p class="mt-4 text-sm leading-6 text-[color:var(--muted-foreground)]">
-                      As the protocol builds during the first year, a 20% staking emissions reward
-                      is streamed to stakers. Platform and Autolaunch open the same staking rail and
-                      the same reward claims.
+                      During the first year, the intended 20% staking emissions stream can reward
+                      stakers while funded rewards are available. Platform and Autolaunch open the
+                      same $REGENT staking rail and the same reward claims.
                     </p>
                   </article>
                 </div>

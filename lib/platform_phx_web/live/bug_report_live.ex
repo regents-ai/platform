@@ -9,7 +9,7 @@ defmodule PlatformPhxWeb.BugReportLive do
   @impl true
   def mount(_params, _session, socket) do
     filters = default_filters()
-    now = DateTime.utc_now()
+    now = PlatformPhx.Clock.utc_now()
     pagination = OperatorReports.list_bug_reports_page(1, @page_size, filters, now)
     stats = report_stats(pagination.entries, now)
 
@@ -56,7 +56,7 @@ defmodule PlatformPhxWeb.BugReportLive do
 
   def handle_event("change-filters", %{"filters" => filter_params}, socket) do
     filters = normalize_filters(filter_params)
-    now = DateTime.utc_now()
+    now = PlatformPhx.Clock.utc_now()
     pagination = OperatorReports.list_bug_reports_page(1, @page_size, filters, now)
 
     {:noreply,
@@ -68,7 +68,7 @@ defmodule PlatformPhxWeb.BugReportLive do
 
   def handle_event("reset-filters", _params, socket) do
     filters = default_filters()
-    now = DateTime.utc_now()
+    now = PlatformPhx.Clock.utc_now()
     pagination = OperatorReports.list_bug_reports_page(1, @page_size, filters, now)
 
     {:noreply,
@@ -556,7 +556,7 @@ defmodule PlatformPhxWeb.BugReportLive do
   end
 
   defp load_report_page(socket, page) do
-    now = DateTime.utc_now()
+    now = PlatformPhx.Clock.utc_now()
 
     pagination =
       OperatorReports.list_bug_reports_page(page, @page_size, socket.assigns.filters, now)

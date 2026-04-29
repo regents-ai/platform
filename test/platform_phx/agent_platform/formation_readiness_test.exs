@@ -105,6 +105,42 @@ defmodule PlatformPhx.AgentPlatform.FormationReadinessTest do
     assert List.last(readiness.steps).message == "Launch can start when you open the company."
   end
 
+  test "readiness treats an opened company as the completed name step" do
+    readiness =
+      Readiness.payload(%{
+        authenticated: true,
+        wallet_connected?: true,
+        eligible: true,
+        available_claims: [],
+        billing_account: %{connected: true, status: "active"},
+        template_ready?: true,
+        owned_companies: [%{slug: "opened"}],
+        active_formations: []
+      })
+
+    assert readiness.ready == true
+    assert readiness.blocked_step == nil
+    assert Enum.find(readiness.steps, &(&1.key == "name")).status == "complete"
+    assert Enum.find(readiness.steps, &(&1.key == "company")).status == "complete"
+  end
+
+  test "readiness treats an active formation as the completed name step" do
+    readiness =
+      Readiness.payload(%{
+        authenticated: true,
+        wallet_connected?: true,
+        eligible: true,
+        available_claims: [],
+        billing_account: %{connected: true, status: "active"},
+        template_ready?: true,
+        owned_companies: [],
+        active_formations: [%{status: "queued"}]
+      })
+
+    assert Enum.find(readiness.steps, &(&1.key == "name")).status == "complete"
+    assert Enum.find(readiness.steps, &(&1.key == "company")).status == "waiting"
+  end
+
   test "formation payload offers unused claimed names and hides used claimed names" do
     human = insert_human!()
     insert_claimed_name!(human, "fresh")

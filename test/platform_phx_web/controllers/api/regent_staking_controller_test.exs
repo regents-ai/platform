@@ -24,7 +24,7 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
       {:ok,
        %{
          staking: %{wallet_address: wallet_address},
-         tx_request: %{
+         wallet_action: %{
            chain_id: 8453,
            to: "0x9999999999999999999999999999999999999999",
            value: "0x0",
@@ -41,7 +41,7 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
     def unstake(_params, _human) do
       {:ok,
        %{
-         tx_request: %{
+         wallet_action: %{
            chain_id: 8453,
            to: "0x9999999999999999999999999999999999999999",
            value: "0x0",
@@ -53,7 +53,7 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
     def claim_usdc(_params, _human) do
       {:ok,
        %{
-         tx_request: %{
+         wallet_action: %{
            chain_id: 8453,
            to: "0x9999999999999999999999999999999999999999",
            value: "0x0",
@@ -65,7 +65,7 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
     def claim_regent(_params, _human) do
       {:ok,
        %{
-         tx_request: %{
+         wallet_action: %{
            chain_id: 8453,
            to: "0x9999999999999999999999999999999999999999",
            value: "0x0",
@@ -77,7 +77,7 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
     def claim_and_restake_regent(_params, _human) do
       {:ok,
        %{
-         tx_request: %{
+         wallet_action: %{
            chain_id: 8453,
            to: "0x9999999999999999999999999999999999999999",
            value: "0x0",
@@ -129,7 +129,7 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
            } = json_response(conn, 200)
   end
 
-  test "stake returns a wallet tx request", %{conn: conn} do
+  test "stake returns a wallet action", %{conn: conn} do
     conn =
       conn
       |> put_siwa_headers()
@@ -140,11 +140,11 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
              "staking" => %{
                "wallet_address" => "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
              },
-             "tx_request" => %{"chain_id" => 8453, "data" => "0x7acb7757"}
+             "wallet_action" => %{"chain_id" => 8453, "data" => "0x7acb7757"}
            } = json_response(conn, 200)
   end
 
-  test "unstake returns a wallet tx request", %{conn: conn} do
+  test "unstake returns a wallet action", %{conn: conn} do
     conn =
       conn
       |> put_siwa_headers()
@@ -152,11 +152,11 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
 
     assert %{
              "ok" => true,
-             "tx_request" => %{"chain_id" => 8453, "data" => "0x8381e182"}
+             "wallet_action" => %{"chain_id" => 8453, "data" => "0x8381e182"}
            } = json_response(conn, 200)
   end
 
-  test "claim usdc returns a wallet tx request", %{conn: conn} do
+  test "claim usdc returns a wallet action", %{conn: conn} do
     conn =
       conn
       |> put_siwa_headers()
@@ -164,11 +164,11 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
 
     assert %{
              "ok" => true,
-             "tx_request" => %{"chain_id" => 8453, "data" => "0x42852610"}
+             "wallet_action" => %{"chain_id" => 8453, "data" => "0x42852610"}
            } = json_response(conn, 200)
   end
 
-  test "claim regent returns a wallet tx request", %{conn: conn} do
+  test "claim regent returns a wallet action", %{conn: conn} do
     conn =
       conn
       |> put_siwa_headers()
@@ -176,11 +176,11 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
 
     assert %{
              "ok" => true,
-             "tx_request" => %{"chain_id" => 8453, "data" => "0x739c8d0d"}
+             "wallet_action" => %{"chain_id" => 8453, "data" => "0x739c8d0d"}
            } = json_response(conn, 200)
   end
 
-  test "claim and restake regent returns a wallet tx request", %{conn: conn} do
+  test "claim and restake regent returns a wallet action", %{conn: conn} do
     conn =
       conn
       |> put_siwa_headers()
@@ -188,7 +188,7 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
 
     assert %{
              "ok" => true,
-             "tx_request" => %{"chain_id" => 8453, "data" => "0xe72a8732"}
+             "wallet_action" => %{"chain_id" => 8453, "data" => "0xe72a8732"}
            } = json_response(conn, 200)
   end
 
@@ -199,7 +199,7 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
       |> post("/v1/agent/regent/staking/stake", %{})
       |> json_response(400)
 
-    assert response["statusMessage"] == "Enter an amount before continuing"
+    assert response["error"]["message"] == "Enter an amount before continuing"
   end
 
   test "stake hides unexpected internal errors", %{conn: conn} do
@@ -209,11 +209,11 @@ defmodule PlatformPhxWeb.Api.RegentStakingControllerTest do
       |> post("/v1/agent/regent/staking/stake", %{"amount" => "explode"})
       |> json_response(400)
 
-    assert response["statusMessage"] == "Could not prepare that staking action right now."
-    refute response["statusMessage"] =~ "external"
-    refute response["statusMessage"] =~ "500"
-    refute response["statusMessage"] =~ "upstream"
-    refute response["statusMessage"] =~ "%{"
+    assert response["error"]["message"] == "Could not prepare that staking action right now."
+    refute response["error"]["message"] =~ "external"
+    refute response["error"]["message"] =~ "500"
+    refute response["error"]["message"] =~ "upstream"
+    refute response["error"]["message"] =~ "%{"
   end
 
   test "stale public staking route is not served", %{conn: conn} do

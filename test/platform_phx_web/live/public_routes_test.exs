@@ -7,6 +7,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.Artifact
   alias PlatformPhx.AgentPlatform.BillingAccount
+  alias PlatformPhx.AgentPlatform.Company
   alias PlatformPhx.AgentPlatform.Subdomain
   alias PlatformPhx.OperatorReports
   alias PlatformPhx.Repo
@@ -280,18 +281,18 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   end
 
   test "signed-in owner sees company controls on the public company page", %{conn: conn} do
-    previous_sprite_runtime_client = Application.get_env(:platform_phx, :sprite_runtime_client)
+    previous_sprites_client = Application.get_env(:platform_phx, :runtime_registry_sprites_client)
 
     Application.put_env(
       :platform_phx,
-      :sprite_runtime_client,
-      PlatformPhx.SpriteRuntimeClientFake
+      :runtime_registry_sprites_client,
+      PlatformPhx.RuntimeRegistrySpritesClientFake
     )
 
     on_exit(fn ->
-      case previous_sprite_runtime_client do
-        nil -> Application.delete_env(:platform_phx, :sprite_runtime_client)
-        value -> Application.put_env(:platform_phx, :sprite_runtime_client, value)
+      case previous_sprites_client do
+        nil -> Application.delete_env(:platform_phx, :runtime_registry_sprites_client)
+        value -> Application.put_env(:platform_phx, :runtime_registry_sprites_client, value)
       end
     end)
 
@@ -580,14 +581,14 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Open Autolaunch"
     assert html =~ "View CLI"
     assert html =~ "The launch pipeline"
-    assert html =~ "Live preview"
+    assert html =~ "Example board"
     assert html =~ "Built for agents, not tokens."
     assert html =~ "Purpose"
-    assert html =~ "Tech stack"
+    assert html =~ "Operating rails"
     assert html =~ "Agent Skill"
-    assert html =~ "Market activity"
-    assert html =~ "Active launches"
-    assert html =~ "Recently launched"
+    assert html =~ "Autolaunch preview"
+    assert html =~ "Current source"
+    assert html =~ "Example rows"
     assert html =~ "Go to App setup"
 
     assert html =~ "regents autolaunch plan"
@@ -633,7 +634,8 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     {:ok, token_info, html} = live(conn, "/token-info")
 
     assert html =~ "Revenue that stays legible from source to stake."
-    assert html =~ "$REGENT is the platform revsplit token."
+    assert html =~ "$REGENT is the platform revenue token."
+    assert html =~ "It is separate from agent tokens."
     assert html =~ "Market cap"
     assert html =~ "Fully diluted"
     assert html =~ "$REGENT on Base"
@@ -641,7 +643,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Why the token exists"
     assert html =~ "Share revenue"
     assert html =~ "Support buybacks"
-    assert html =~ "Reward early staking"
+    assert html =~ "Add early staking emissions"
 
     assert html =~
              "https://app.uniswap.org/explore/tokens/base/0x6f89bca4ea5931edfcb09786267b251dee752b07?inputCurrency=NATIVE"
@@ -659,20 +661,20 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Techtree"
     assert html =~ "20% first-year stream"
 
-    assert html =~ "same staking rail"
+    assert html =~ "same $REGENT staking rail"
     assert html =~ "same reward claims"
 
     assert html =~ "agent token&#39;s trading fees from the Uniswap v4 fee hook"
     assert html =~ "raised USDC in CCA auctions."
     assert html =~ "Stablecoin Revenues"
     assert html =~ "Regents Platform"
-    assert html =~ "protocol revsplit contract"
-    assert html =~ "earn your share of stablecoin revenue"
+    assert html =~ "$REGENT rewards pool"
+    assert html =~ "Staking does not guarantee yield."
     assert html =~ "Buybacks happen after the staker share"
     assert html =~ "Stake from Platform or Autolaunch. The underlying action is the same."
     assert html =~ "Staking Console"
 
-    assert html =~ "protocol skim"
+    assert html =~ "balance left"
     assert html =~ "buybacks"
 
     assert html =~
@@ -694,6 +696,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "40% Clanker Vault - Locked onchain for 1 year then vesting over 2 years"
     assert html =~ "Clanker token deployment"
     assert html =~ "40% growth emissions"
+    assert html =~ "20% staking emissions stream"
     assert html =~ "40% long-term incentives"
     assert html =~ "Sovereign Agent Incentives"
     refute html =~ "token for all platforms"
@@ -746,10 +749,24 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   defp insert_public_agent!(human, slug) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
+    company =
+      %Company{}
+      |> Company.changeset(%{
+        owner_human_id: human.id,
+        name: "Owner Control Regent",
+        slug: slug,
+        claimed_label: slug,
+        status: "published",
+        public_summary: "A company page for launch-flow testing.",
+        hero_statement: "The owner should be able to manage this company from its home page."
+      })
+      |> Repo.insert!()
+
     agent =
       %Agent{}
       |> Agent.changeset(%{
         owner_human_id: human.id,
+        company_id: company.id,
         template_key: "start",
         name: "Owner Control Regent",
         slug: slug,

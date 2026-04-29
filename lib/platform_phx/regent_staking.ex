@@ -5,6 +5,7 @@ defmodule PlatformPhx.RegentStaking do
   alias PlatformPhx.Ethereum
   alias PlatformPhx.RegentStaking.Abi
   alias PlatformPhx.RuntimeConfig
+  alias PlatformPhx.WalletAction
 
   @usdc_decimals 6
   @token_decimals 18
@@ -31,11 +32,14 @@ defmodule PlatformPhx.RegentStaking do
       {:ok,
        %{
          staking: compact_state(cfg, wallet_address),
-         tx_request:
-           serialize_tx_request(%{
+         wallet_action:
+           wallet_action(%{
+             resource: "regent_staking",
+             action: "stake",
+             expected_signer: wallet_address,
              chain_id: cfg.chain_id,
              to: cfg.contract_address,
-             value_hex: "0x0",
+             value: "0x0",
              data: Abi.encode_stake(amount, wallet_address)
            })
        }}
@@ -49,11 +53,14 @@ defmodule PlatformPhx.RegentStaking do
       {:ok,
        %{
          staking: compact_state(cfg, wallet_address),
-         tx_request:
-           serialize_tx_request(%{
+         wallet_action:
+           wallet_action(%{
+             resource: "regent_staking",
+             action: "unstake",
+             expected_signer: wallet_address,
              chain_id: cfg.chain_id,
              to: cfg.contract_address,
-             value_hex: "0x0",
+             value: "0x0",
              data: Abi.encode_unstake(amount, wallet_address)
            })
        }}
@@ -66,11 +73,14 @@ defmodule PlatformPhx.RegentStaking do
       {:ok,
        %{
          staking: compact_state(cfg, wallet_address),
-         tx_request:
-           serialize_tx_request(%{
+         wallet_action:
+           wallet_action(%{
+             resource: "regent_staking",
+             action: "claim_usdc",
+             expected_signer: wallet_address,
              chain_id: cfg.chain_id,
              to: cfg.contract_address,
-             value_hex: "0x0",
+             value: "0x0",
              data: Abi.encode_claim_usdc(wallet_address)
            })
        }}
@@ -83,11 +93,14 @@ defmodule PlatformPhx.RegentStaking do
       {:ok,
        %{
          staking: compact_state(cfg, wallet_address),
-         tx_request:
-           serialize_tx_request(%{
+         wallet_action:
+           wallet_action(%{
+             resource: "regent_staking",
+             action: "claim_regent",
+             expected_signer: wallet_address,
              chain_id: cfg.chain_id,
              to: cfg.contract_address,
-             value_hex: "0x0",
+             value: "0x0",
              data: Abi.encode_claim_regent(wallet_address)
            })
        }}
@@ -100,58 +113,37 @@ defmodule PlatformPhx.RegentStaking do
       {:ok,
        %{
          staking: compact_state(cfg, wallet_address),
-         tx_request:
-           serialize_tx_request(%{
+         wallet_action:
+           wallet_action(%{
+             resource: "regent_staking",
+             action: "claim_and_restake_regent",
+             expected_signer: wallet_address,
              chain_id: cfg.chain_id,
              to: cfg.contract_address,
-             value_hex: "0x0",
+             value: "0x0",
              data: Abi.encode_claim_and_restake_regent()
            })
        }}
     end
   end
 
-  def prepare_deposit_usdc(attrs) do
-    with {:ok, cfg} <- config(),
-         {:ok, amount} <- parse_amount(Map.get(attrs, "amount"), @usdc_decimals),
-         {:ok, source_tag} <- bytes32_param(Map.get(attrs, "source_tag"), :source_tag_required),
-         {:ok, source_ref} <- bytes32_param(Map.get(attrs, "source_ref"), :source_ref_required) do
-      {:ok,
-       %{
-         prepared:
-           prepare_payload(
-             cfg,
-             "deposit_usdc",
-             cfg.contract_address,
-             Abi.encode_deposit_usdc(amount, source_tag, source_ref),
-             %{
-               amount: Integer.to_string(amount),
-               source_tag: source_tag,
-               source_ref: source_ref
-             }
-           )
-       }}
+  def validate_config do
+    with {:ok, cfg} <- config() do
+      validate_rpc(cfg)
     end
   end
 
-  def prepare_withdraw_treasury(attrs) do
-    with {:ok, cfg} <- config(),
-         {:ok, treasury_recipient} <-
-           call_address(cfg.contract_address, Abi.encode_call(:treasury_recipient), cfg.rpc_url),
-         {:ok, amount} <- parse_amount(Map.get(attrs, "amount"), @usdc_decimals),
-         {:ok, recipient} <-
-           normalize_required_address(Map.get(attrs, "recipient") || treasury_recipient) do
-      {:ok,
-       %{
-         prepared:
-           prepare_payload(
-             cfg,
-             "withdraw_treasury",
-             cfg.contract_address,
-             Abi.encode_withdraw_treasury_residual(amount, recipient),
-             %{amount: Integer.to_string(amount), recipient: recipient}
-           )
-       }}
+  def validate_rpc(%{
+        rpc_url: rpc_url,
+        chain_id: expected_chain_id,
+        contract_address: contract_address
+      }) do
+    with {:ok, observed_chain_id} <- rpc_chain_id(rpc_url),
+         :ok <- ensure_chain_id(observed_chain_id, expected_chain_id),
+         {:ok, _owner} <- call_address(contract_address, Abi.encode_call(:owner), rpc_url) do
+      :ok
+    else
+      {:error, _reason} = error -> error
     end
   end
 
@@ -267,18 +259,6 @@ defmodule PlatformPhx.RegentStaking do
     }
   end
 
-  defp prepare_payload(cfg, action, target, calldata, params) do
-    %{
-      resource: "regent_staking",
-      action: action,
-      chain_id: cfg.chain_id,
-      target: target,
-      calldata: calldata,
-      params: params,
-      tx_request: %{chain_id: cfg.chain_id, to: target, value: "0x0", data: calldata}
-    }
-  end
-
   defp config do
     runtime_config = runtime_config_module()
     contract_address = runtime_config.regent_staking_contract_address() |> normalize_address()
@@ -336,6 +316,24 @@ defmodule PlatformPhx.RegentStaking do
     call_uint(to, encoder.(address), rpc_url)
   end
 
+  defp rpc_chain_id(rpc_url) do
+    with {:ok, result} <- ethereum_module().json_rpc(rpc_url, "eth_chainId", []) do
+      {:ok, Ethereum.hex_to_integer(result)}
+    else
+      {:error, _reason} -> {:error, :rpc_unavailable}
+    end
+  rescue
+    _error -> {:error, :rpc_unavailable}
+  end
+
+  defp ensure_chain_id(observed_chain_id, expected_chain_id)
+       when observed_chain_id == expected_chain_id,
+       do: :ok
+
+  defp ensure_chain_id(observed_chain_id, expected_chain_id) do
+    {:error, {:wrong_chain_id, observed: observed_chain_id, expected: expected_chain_id}}
+  end
+
   defp required_wallet(%HumanUser{} = human) do
     case primary_wallet_address(human) do
       nil -> {:error, :unauthorized}
@@ -363,9 +361,7 @@ defmodule PlatformPhx.RegentStaking do
 
   defp primary_wallet_address(_principal), do: nil
 
-  defp serialize_tx_request(%{chain_id: chain_id, to: to, value_hex: value_hex, data: data}) do
-    %{chain_id: chain_id, to: to, value: value_hex, data: data}
-  end
+  defp wallet_action(attrs), do: WalletAction.from_tx(attrs)
 
   defp parse_amount(value, decimals) when is_binary(value) do
     trimmed = String.trim(value)
@@ -385,31 +381,6 @@ defmodule PlatformPhx.RegentStaking do
   end
 
   defp parse_amount(_value, _decimals), do: {:error, :amount_required}
-
-  defp bytes32_param(value, missing_error) when is_binary(value) do
-    trimmed = String.trim(value)
-
-    cond do
-      trimmed == "" ->
-        {:error, missing_error}
-
-      Regex.match?(~r/^0x[0-9a-fA-F]{64}$/, trimmed) ->
-        {:ok, String.downcase(trimmed)}
-
-      byte_size(trimmed) <= 32 ->
-        encoded =
-          trimmed
-          |> Base.encode16(case: :lower)
-          |> String.pad_trailing(64, "0")
-
-        {:ok, "0x" <> encoded}
-
-      true ->
-        {:error, :invalid_source_ref}
-    end
-  end
-
-  defp bytes32_param(_value, missing_error), do: {:error, missing_error}
 
   defp normalize_required_address(value) do
     case normalize_address(value) do

@@ -87,7 +87,7 @@ defmodule PlatformPhx.Beta.Report do
   defp escape_pipe(value), do: value |> to_string() |> String.replace("|", "\\|")
 
   defp now_iso do
-    DateTime.utc_now()
+    PlatformPhx.Clock.utc_now()
     |> DateTime.truncate(:second)
     |> DateTime.to_iso8601()
   end

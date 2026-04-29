@@ -4,6 +4,7 @@ defmodule PlatformPhxWeb.Api.AgentEnsControllerTest do
   alias AgentEns
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform.Agent
+  alias PlatformPhx.AgentPlatform.Company
   alias PlatformPhx.Basenames.Mint
   alias PlatformPhx.Repo
   alias PlatformPhx.TestEthereumAdapter
@@ -432,8 +433,7 @@ defmodule PlatformPhxWeb.Api.AgentEnsControllerTest do
   end
 
   defp insert_agent!(human, slug, attrs) do
-    %Agent{}
-    |> Agent.changeset(%{
+    agent_attrs = %{
       owner_human_id: human.id,
       template_key: "start",
       name: "#{String.capitalize(slug)} Regent",
@@ -449,7 +449,22 @@ defmodule PlatformPhxWeb.Api.AgentEnsControllerTest do
       desired_runtime_state: "active",
       observed_runtime_state: "active",
       sprite_metering_status: "trialing"
-    })
+    }
+
+    company =
+      %Company{}
+      |> Company.changeset(%{
+        owner_human_id: human.id,
+        name: agent_attrs.name,
+        slug: agent_attrs.slug,
+        claimed_label: agent_attrs.claimed_label,
+        status: agent_attrs.status,
+        public_summary: agent_attrs.public_summary
+      })
+      |> Repo.insert!()
+
+    %Agent{}
+    |> Agent.changeset(Map.put(agent_attrs, :company_id, company.id))
     |> Repo.insert!()
   end
 

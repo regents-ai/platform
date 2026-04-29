@@ -148,6 +148,18 @@ defmodule PlatformPhx.Basenames.Validation do
     |> Enum.join("\n")
   end
 
+  @spec create_mark_in_use_message(String.t(), String.t(), integer(), integer()) :: String.t()
+  def create_mark_in_use_message(address, fqdn, chain_id, timestamp) do
+    [
+      "Regent Basenames Use",
+      "Address: #{String.downcase(address)}",
+      "Name: #{String.downcase(fqdn)}",
+      "ChainId: #{chain_id}",
+      "Timestamp: #{timestamp}"
+    ]
+    |> Enum.join("\n")
+  end
+
   @spec validate_label(term()) :: result(String.t())
   def validate_label(raw_label) do
     normalized_label = raw_label |> to_string() |> String.trim() |> String.downcase()

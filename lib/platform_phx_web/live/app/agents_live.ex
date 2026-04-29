@@ -1,7 +1,7 @@
 defmodule PlatformPhxWeb.App.AgentsLive do
   use PlatformPhxWeb, :live_view
 
-  alias PlatformPhx.AgentPlatform
+  alias PlatformPhx.AgentPlatform.Companies
   alias PlatformPhx.AgentRegistry
   import PlatformPhxWeb.App.RwrComponents
 
@@ -228,7 +228,7 @@ defmodule PlatformPhxWeb.App.AgentsLive do
   end
 
   defp load_payload(socket, params) do
-    companies = AgentPlatform.list_owned_companies(socket.assigns.current_human)
+    companies = Companies.list_owned_companies(socket.assigns.current_human)
     company = selected_company(companies, params)
     profiles = profiles(company)
     workers = workers(company)

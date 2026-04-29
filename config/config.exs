@@ -9,9 +9,6 @@ import Config
 
 config :platform_phx,
   ecto_repos: [PlatformPhx.Repo],
-  dragonfly_enabled: true,
-  dragonfly_host: "localhost",
-  dragonfly_port: 6379,
   generators: [timestamp_type: :utc_datetime]
 
 config :platform_phx, PlatformPhxWeb.BrowserSecurity, env: config_env()

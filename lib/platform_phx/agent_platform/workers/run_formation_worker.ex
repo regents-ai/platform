@@ -13,8 +13,8 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
   alias PlatformPhx.AgentPlatform.FormationRun
   alias PlatformPhx.AgentPlatform.SpriteAudit
   alias PlatformPhx.AgentPlatform.SpriteRunner
-  alias PlatformPhx.AgentPlatform.SpriteRuntimeClient
   alias PlatformPhx.Repo
+  alias PlatformPhx.RuntimeRegistry.SpritesClient
 
   @runner_steps [
     "create_sprite",
@@ -134,7 +134,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
     )
 
     with {:ok, runtime_state} <-
-           SpriteRuntimeClient.service_state(
+           SpritesClient.service_state(
              agent.sprite_name,
              agent.sprite_service_name || "hermes-workspace"
            ),
@@ -327,7 +327,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.RunFormationWorker do
   end
 
   defp now do
-    DateTime.utc_now() |> DateTime.truncate(:second)
+    PlatformPhx.Clock.now()
   end
 
   defp audit_started(%Agent{} = agent, %FormationRun{} = formation, action) do

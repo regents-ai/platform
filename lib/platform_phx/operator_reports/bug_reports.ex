@@ -18,7 +18,12 @@ defmodule PlatformPhx.OperatorReports.BugReports do
         }
 
   @spec list_page(integer(), integer(), map(), DateTime.t()) :: page()
-  def list_page(page, page_size \\ @default_page_size, filters \\ %{}, now \\ DateTime.utc_now()) do
+  def list_page(
+        page,
+        page_size \\ @default_page_size,
+        filters \\ %{},
+        now \\ PlatformPhx.Clock.utc_now()
+      ) do
     page = normalize_page(page)
     page_size = normalize_page_size(page_size)
     offset = (page - 1) * page_size

@@ -38,7 +38,6 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
          },
          expires_at: ~U[2999-01-01 00:00:00Z],
          proof_payload: nil,
-         tx_request: nil,
          error_text: nil
        }}
     end
@@ -59,11 +58,7 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
       {:ok,
        session
        |> Map.put(:status, :proof_ready)
-       |> Map.put(:error_text, "manual submission requested")
-       |> Map.put(:tx_request, %{
-         to: "0x8b3f4f36c4564ab38c067ca0d7e2ed7d0d16f987",
-         data: "0x1234"
-       })}
+       |> Map.put(:error_text, "manual submission requested")}
     end
   end
 
@@ -118,7 +113,6 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
     assert create_response["session"]["status"] == "pending"
     assert create_response["session"]["wallet_address"] == @signed_wallet_address
     assert create_response["session"]["approval_url"] =~ "/app/trust?session_id=sess-"
-    refute Map.has_key?(create_response["session"]["frontend_request"], "allow_legacy_proofs")
 
     show_response =
       build_conn()
@@ -167,7 +161,7 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
       |> init_test_session(%{current_human_id: human.id})
       |> put_csrf_token()
       |> post("/api/agentbook/sessions/sess-b92266/submit", %{
-        "token" => token,
+        "session_token" => token,
         "proof" => %{
           "merkle_root" => "0x01",
           "nullifier_hash" => "0x02",
@@ -329,7 +323,7 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
       |> init_test_session(%{current_human_id: second_human.id})
       |> put_csrf_token()
       |> post("/api/agentbook/sessions/sess-second-person/submit", %{
-        "token" => second_token,
+        "session_token" => second_token,
         "proof" => %{
           "merkle_root" => "0x01",
           "nullifier_hash" => "0x02",
@@ -338,7 +332,7 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
       })
       |> json_response(409)
 
-    assert conflict_response["statusMessage"] =~ "already attached to another signed-in person"
+    assert conflict_response["error"]["message"] =~ "already attached to another signed-in person"
   end
 
   test "manual wallet-only follow-up is converted into a failed hosted trust session", %{
@@ -381,7 +375,7 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
       |> init_test_session(%{current_human_id: human.id})
       |> put_csrf_token()
       |> post("/api/agentbook/sessions/#{create_response["session"]["session_id"]}/submit", %{
-        "token" => approval_token(create_response["session"]["approval_url"]),
+        "session_token" => approval_token(create_response["session"]["approval_url"]),
         "proof" => %{
           "merkle_root" => "0x01",
           "nullifier_hash" => "0x02",
@@ -391,7 +385,6 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
       |> json_response(200)
 
     assert submit_response["session"]["status"] == "failed"
-    assert submit_response["session"]["tx_request"] == nil
 
     assert submit_response["session"]["error_text"] ==
              "This trust request needs one more wallet step. Start a new approval."
@@ -422,8 +415,8 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
       |> post("/api/agentbook/sessions", Jason.encode!(%{"source" => "regents-cli"}))
       |> json_response(400)
 
-    assert response["statusMessage"] == "Trust approval could not be completed right now."
-    refute_public_leak(response["statusMessage"])
+    assert response["error"]["message"] == "Trust approval could not be completed right now."
+    refute_public_leak(response["error"]["message"])
   end
 
   defp complete_session_for_human(human_id, session_id, token) do
@@ -431,7 +424,7 @@ defmodule PlatformPhxWeb.Api.AgentbookControllerTest do
     |> init_test_session(%{current_human_id: human_id})
     |> put_csrf_token()
     |> post("/api/agentbook/sessions/#{session_id}/submit", %{
-      "token" => token,
+      "session_token" => token,
       "proof" => %{
         "merkle_root" => "0x01",
         "nullifier_hash" => "0x02",

@@ -2,7 +2,9 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
   use PlatformPhx.DataCase, async: false
 
   alias PlatformPhx.Accounts.HumanUser
+  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Agent
+  alias PlatformPhx.AgentPlatform.Company
   alias PlatformPhx.AgentPlatform.Ens
   alias PlatformPhx.AgentPlatform.Subdomain
   alias PlatformPhx.Basenames.Mint
@@ -128,7 +130,7 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
     assert response.claim.claim_status == "upgrade_pending"
     assert response.prepared.chain_id == 1
     assert response.prepared.expected_name == "tempo.regent.eth"
-    assert response.prepared.tx_request.to == String.downcase(@registrar)
+    assert response.prepared.wallet_action.to == String.downcase(@registrar)
   end
 
   test "confirm_upgrade marks the claim onchain after a successful mainnet receipt" do
@@ -167,7 +169,10 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
     human = insert_human!()
     claim = insert_claim!(human, "tempoalt", %{claim_status: "onchain_live"})
     agent = insert_agent!(human, "tempoattach", %{wallet_address: @wallet})
-    subdomain = insert_subdomain!(agent)
+    subdomain = insert_subdomain!(agent, active: true)
+
+    assert {:ok, cached_payload} = AgentPlatform.resolve_host_payload("#{agent.slug}.regents.sh")
+    assert get_in(cached_payload, [:agent, :ens, :name]) == nil
 
     assert {:ok, attached} =
              Ens.attach(human, agent.slug, %{
@@ -191,6 +196,11 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
     assert reloaded_claim.attached_agent_slug == agent.slug
     assert reloaded_claim.formation_agent_slug == nil
     assert Repo.get!(Subdomain, subdomain.id).ens_fqdn == claim.ens_fqdn
+
+    assert {:ok, attached_payload} =
+             AgentPlatform.resolve_host_payload("#{agent.slug}.regents.sh")
+
+    assert get_in(attached_payload, [:agent, :ens, :name]) == claim.ens_fqdn
 
     assert {:ok, detached} =
              Ens.detach(human, agent.slug, %{
@@ -224,6 +234,11 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
     assert detached_claim.attached_agent_slug == nil
     assert detached_claim.formation_agent_slug == nil
     assert Repo.get!(Subdomain, subdomain.id).ens_fqdn == "#{agent.slug}.regent.eth"
+
+    assert {:ok, detached_payload} =
+             AgentPlatform.resolve_host_payload("#{agent.slug}.regents.sh")
+
+    assert get_in(detached_payload, [:agent, :ens, :name]) == nil
   end
 
   test "prepare_bidirectional returns mainnet ENSIP-25 and reverse actions plus the Base ERC-8004 update" do
@@ -293,7 +308,7 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
 
     assert response.prepared.chain_id == 1
     assert response.prepared.ens_name == "#{slug}.regent.eth"
-    assert response.prepared.tx_request.to =~ "0xa58e81"
+    assert response.prepared.wallet_action.to =~ "0xa58e81"
   end
 
   defp insert_human! do
@@ -339,8 +354,7 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
   end
 
   defp insert_agent!(human, slug, attrs) do
-    %Agent{}
-    |> Agent.changeset(%{
+    agent_attrs = %{
       owner_human_id: human.id,
       template_key: "start",
       name: "#{String.capitalize(slug)} Regent",
@@ -356,11 +370,26 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
       desired_runtime_state: "active",
       observed_runtime_state: "active",
       sprite_metering_status: "trialing"
-    })
+    }
+
+    company =
+      %Company{}
+      |> Company.changeset(%{
+        owner_human_id: human.id,
+        name: agent_attrs.name,
+        slug: agent_attrs.slug,
+        claimed_label: agent_attrs.claimed_label,
+        status: agent_attrs.status,
+        public_summary: agent_attrs.public_summary
+      })
+      |> Repo.insert!()
+
+    %Agent{}
+    |> Agent.changeset(Map.put(agent_attrs, :company_id, company.id))
     |> Repo.insert!()
   end
 
-  defp insert_subdomain!(agent) do
+  defp insert_subdomain!(agent, attrs) do
     %Subdomain{}
     |> Subdomain.changeset(%{
       agent_id: agent.id,
@@ -368,7 +397,7 @@ defmodule PlatformPhx.AgentPlatform.EnsTest do
       hostname: "#{agent.slug}.regents.sh",
       basename_fqdn: agent.basename_fqdn,
       ens_fqdn: "#{agent.slug}.regent.eth",
-      active: false
+      active: Keyword.get(attrs, :active, false)
     })
     |> Repo.insert!()
   end

@@ -47,7 +47,7 @@ defmodule PlatformPhxWeb.Api.BasenamesControllerTest do
       |> get("/api/basenames/allowance", %{address: "nope"})
       |> json_response(400)
 
-    assert response["statusMessage"] == "Invalid address"
+    assert response["error"]["message"] == "Invalid address"
   end
 
   test "allowances endpoint lists the snapshot table", %{conn: conn} do
@@ -93,7 +93,7 @@ defmodule PlatformPhxWeb.Api.BasenamesControllerTest do
       })
       |> json_response(400)
 
-    assert response["statusMessage"] == "Invalid payment tx hash"
+    assert response["error"]["message"] == "Invalid payment tx hash"
   end
 
   test "credit registration hides missing payment setup details", %{conn: conn} do
@@ -111,10 +111,10 @@ defmodule PlatformPhxWeb.Api.BasenamesControllerTest do
       })
       |> json_response(503)
 
-    assert response["statusMessage"] == "Payment verification is unavailable right now."
-    refute response["statusMessage"] =~ "AGENT_BASENAME_PAYMENT_RECIPIENT"
-    refute response["statusMessage"] =~ "%{"
-    refute response["statusMessage"] =~ "{:"
+    assert response["error"]["message"] == "Payment verification is unavailable right now."
+    refute response["error"]["message"] =~ "AGENT_BASENAME_PAYMENT_RECIPIENT"
+    refute response["error"]["message"] =~ "%{"
+    refute response["error"]["message"] =~ "{:"
   end
 
   test "availability endpoint returns an available payload", %{conn: conn} do
@@ -191,7 +191,7 @@ defmodule PlatformPhxWeb.Api.BasenamesControllerTest do
       |> get("/api/basenames/recent", %{limit: "nope"})
       |> json_response(400)
 
-    assert invalid_response["statusMessage"] == "Invalid limit"
+    assert invalid_response["error"]["message"] == "Invalid limit"
   end
 
   test "mint endpoint preserves duplicate-name status", %{conn: conn} do
@@ -208,7 +208,7 @@ defmodule PlatformPhxWeb.Api.BasenamesControllerTest do
       |> post("/api/basenames/mint", mint_params("delta"))
       |> json_response(409)
 
-    assert duplicate_response["statusMessage"] == "Name already taken"
+    assert duplicate_response["error"]["message"] == "Name already taken"
   end
 
   test "mint endpoint rejects expired signatures", %{conn: conn} do
@@ -222,17 +222,13 @@ defmodule PlatformPhxWeb.Api.BasenamesControllerTest do
       )
       |> json_response(400)
 
-    assert expired_response["statusMessage"] == "Signature expired"
+    assert expired_response["error"]["message"] == "Signature expired"
   end
 
   test "use endpoint can create a random in-use claim", %{conn: conn} do
     response =
       conn
-      |> post("/api/basenames/use", %{
-        "address" => @owner_address,
-        "label" => "foxtrot",
-        "isRandom" => true
-      })
+      |> post("/api/basenames/use", use_params("foxtrot", %{"isRandom" => true}))
       |> json_response(200)
 
     assert response["ok"] == true
@@ -258,19 +254,28 @@ defmodule PlatformPhxWeb.Api.BasenamesControllerTest do
       })
       |> json_response(400)
 
-    assert response["statusMessage"] == "Invalid signature"
+    assert response["error"]["message"] == "Invalid signature"
+  end
+
+  test "use endpoint rejects invalid signatures", %{conn: conn} do
+    response =
+      conn
+      |> post(
+        "/api/basenames/use",
+        Map.merge(use_params("kilo"), %{"signature" => "signed:bad"})
+      )
+      |> json_response(400)
+
+    assert response["error"]["message"] == "Invalid signature"
   end
 
   test "use endpoint returns not found for missing owned names", %{conn: conn} do
     response =
       conn
-      |> post("/api/basenames/use", %{
-        "address" => @owner_address,
-        "label" => "ghost"
-      })
+      |> post("/api/basenames/use", use_params("ghost"))
       |> json_response(404)
 
-    assert response["statusMessage"] == "Name not found"
+    assert response["error"]["message"] == "Name not found"
   end
 
   defp mint_params(label, timestamp \\ System.system_time(:millisecond)) do
@@ -283,6 +288,22 @@ defmodule PlatformPhxWeb.Api.BasenamesControllerTest do
       "signature" => sign_message!(message),
       "timestamp" => timestamp
     }
+  end
+
+  defp use_params(label, extra_params \\ %{}) do
+    timestamp = System.system_time(:millisecond)
+    fqdn = "#{label}.#{Basenames.parent_name()}"
+    message = Basenames.create_mark_in_use_message(@owner_address, fqdn, 8453, timestamp)
+
+    Map.merge(
+      %{
+        "address" => @owner_address,
+        "label" => label,
+        "signature" => sign_message!(@owner_address, message),
+        "timestamp" => timestamp
+      },
+      extra_params
+    )
   end
 
   defp insert_allowance!(address, snapshot_total, free_mints_used) do
@@ -337,8 +358,10 @@ defmodule PlatformPhxWeb.Api.BasenamesControllerTest do
     )
   end
 
-  defp sign_message!(message) do
-    PlatformPhx.TestEthereumAdapter.sign_message(@owner_address, message)
+  defp sign_message!(message), do: sign_message!(@owner_address, message)
+
+  defp sign_message!(address, message) do
+    PlatformPhx.TestEthereumAdapter.sign_message(address, message)
   end
 
   defp restore_system_env(key, nil), do: System.delete_env(key)

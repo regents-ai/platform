@@ -22,9 +22,7 @@ defmodule PlatformPhx.RegentStaking.Abi do
     unstake: "0x8381e182",
     claim_usdc: "0x42852610",
     claim_regent: "0x739c8d0d",
-    claim_and_restake_regent: "0xe72a8732",
-    deposit_usdc: "0x7dc6bb98",
-    withdraw_treasury_residual: "0xe13b5822"
+    claim_and_restake_regent: "0xe72a8732"
   }
 
   def selector(name), do: Map.fetch!(@selectors, name)
@@ -42,17 +40,6 @@ defmodule PlatformPhx.RegentStaking.Abi do
   def encode_claim_usdc(recipient), do: encode_call(:claim_usdc, [{:address, recipient}])
   def encode_claim_regent(recipient), do: encode_call(:claim_regent, [{:address, recipient}])
   def encode_claim_and_restake_regent, do: encode_call(:claim_and_restake_regent, [])
-
-  def encode_deposit_usdc(amount, source_tag, source_ref) do
-    encode_call(
-      :deposit_usdc,
-      [{:uint256, amount}, {:bytes32, source_tag}, {:bytes32, source_ref}]
-    )
-  end
-
-  def encode_withdraw_treasury_residual(amount, recipient) do
-    encode_call(:withdraw_treasury_residual, [{:uint256, amount}, {:address, recipient}])
-  end
 
   def encode_address_call(name, address), do: encode_call(name, [{:address, address}])
 

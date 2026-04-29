@@ -15,13 +15,13 @@ defmodule PlatformPhx.AgentPlatform.Formation.Readiness do
     authenticated? = context.authenticated
     wallet_connected? = context.wallet_connected?
     eligible? = context.eligible
-    name_ready? = context.available_claims != []
-    billing_account = context.billing_account
-    billing_ready? = Map.fetch!(billing_account, :connected) == true
-    billing_status = Map.fetch!(billing_account, :status)
     template_ready? = context.template_ready?
     company_opened? = context.owned_companies != []
     launch_active? = active_formation?(context.active_formations)
+    name_ready? = context.available_claims != [] or company_opened? or launch_active?
+    billing_account = context.billing_account
+    billing_ready? = Map.fetch!(billing_account, :connected) == true
+    billing_status = Map.fetch!(billing_account, :status)
 
     [
       identity_step(authenticated?),

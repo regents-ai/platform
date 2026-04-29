@@ -3,6 +3,7 @@ defmodule PlatformPhx.AgentRegistry do
 
   import Ecto.Query, warn: false
 
+  alias Ecto.Multi
   alias PlatformPhx.AgentRegistry.AgentProfile
   alias PlatformPhx.AgentRegistry.AgentRelationship
   alias PlatformPhx.AgentRegistry.AgentWorker
@@ -70,7 +71,7 @@ defmodule PlatformPhx.AgentRegistry do
 
   def register_worker(company_id, attrs, _auth_context) do
     attrs
-    |> Map.new()
+    |> atomize_worker_attrs()
     |> Map.put(:company_id, company_id)
     |> register_worker()
   end
@@ -84,9 +85,53 @@ defmodule PlatformPhx.AgentRegistry do
     register_worker(company_id, attrs, auth_context)
   end
 
-  def list_workers(company_id) do
-    mark_stale_workers(company_id)
+  def register_worker_with_profile(company_id, attrs, auth_context) do
+    attrs = Map.new(attrs)
+    name = worker_display_name(attrs)
 
+    profile_attrs = %{
+      company_id: company_id,
+      name: name,
+      agent_kind: attr(attrs, "agent_kind"),
+      default_runner_kind: attr(attrs, "runner_kind"),
+      default_visibility: "operator",
+      capabilities: attr(attrs, "capabilities", []),
+      public_description: "Connected worker"
+    }
+
+    worker_attrs =
+      attrs
+      |> Map.take([
+        "agent_kind",
+        "worker_role",
+        "execution_surface",
+        "runner_kind",
+        "billing_mode",
+        "trust_scope",
+        "reported_usage_policy"
+      ])
+      |> Map.merge(%{
+        "name" => name,
+        "capabilities" => attr(attrs, "capabilities", []),
+        "connection_metadata" => %{"endpoint_url" => attr(attrs, "endpoint_url")},
+        "siwa_subject" => auth_context || %{}
+      })
+
+    Multi.new()
+    |> Multi.insert(:profile, AgentProfile.changeset(%AgentProfile{}, profile_attrs))
+    |> Multi.insert(:worker, fn %{profile: profile} ->
+      worker_attrs
+      |> Map.merge(%{"company_id" => company_id, "agent_profile_id" => profile.id})
+      |> then(&AgentWorker.changeset(%AgentWorker{}, &1))
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{profile: profile, worker: worker}} -> {:ok, profile, worker}
+      {:error, _step, reason, _changes} -> {:error, reason}
+    end
+  end
+
+  def list_workers(company_id) do
     AgentWorker
     |> where([worker], worker.company_id == ^company_id)
     |> order_by([worker], asc: worker.name)
@@ -94,8 +139,6 @@ defmodule PlatformPhx.AgentRegistry do
   end
 
   def list_workers_with_details(company_id) do
-    mark_stale_workers(company_id)
-
     AgentWorker
     |> where([worker], worker.company_id == ^company_id)
     |> order_by([worker], asc: worker.name)
@@ -104,7 +147,7 @@ defmodule PlatformPhx.AgentRegistry do
   end
 
   def heartbeat_worker(company_id, worker_id, attrs \\ %{}) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = PlatformPhx.Clock.now()
     attrs = Map.new(attrs)
 
     case get_worker(company_id, worker_id) do
@@ -251,7 +294,7 @@ defmodule PlatformPhx.AgentRegistry do
   end
 
   def claim_worker_assignment(company_id, worker_id, assignment_id, opts \\ []) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = PlatformPhx.Clock.now()
     leased_until = Keyword.get(opts, :leased_until)
 
     release_expired_leases(company_id, worker_id)
@@ -306,8 +349,6 @@ defmodule PlatformPhx.AgentRegistry do
   end
 
   def list_execution_pool(company_id, manager_agent_or_worker_id, opts \\ []) do
-    mark_stale_workers(company_id)
-
     company_id
     |> eligible_execution_workers(
       manager_agent_or_worker_id,
@@ -316,9 +357,8 @@ defmodule PlatformPhx.AgentRegistry do
   end
 
   def eligible_execution_workers(company_id, manager_agent_or_worker_id, delegation_payload) do
-    mark_stale_workers(company_id)
-
     relationships = active_execution_relationships(company_id, manager_agent_or_worker_id)
+    now = PlatformPhx.Clock.now()
 
     direct_worker_ids =
       company_id
@@ -342,12 +382,13 @@ defmodule PlatformPhx.AgentRegistry do
     )
     |> order_by([worker], asc: worker.name, asc: worker.id)
     |> Repo.all()
+    |> reject_stale_workers(now)
     |> filter_by_delegation_payload(delegation_payload)
     |> filter_by_relationship_capacity(relationships)
   end
 
   def mark_stale_workers(company_id) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = PlatformPhx.Clock.now()
 
     AgentWorker
     |> where([worker], worker.company_id == ^company_id)
@@ -390,7 +431,7 @@ defmodule PlatformPhx.AgentRegistry do
   end
 
   defp complete_or_release_assignment(company_id, worker_id, assignment_id, status) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = PlatformPhx.Clock.now()
 
     WorkerAssignment
     |> where(
@@ -416,7 +457,7 @@ defmodule PlatformPhx.AgentRegistry do
   end
 
   defp release_expired_leases(company_id, worker_id) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = PlatformPhx.Clock.now()
 
     WorkerAssignment
     |> where(
@@ -439,6 +480,10 @@ defmodule PlatformPhx.AgentRegistry do
 
   defp worker_stale?(%AgentWorker{} = worker, now) do
     DateTime.diff(now, worker.last_heartbeat_at, :second) > worker.heartbeat_ttl_seconds
+  end
+
+  defp reject_stale_workers(workers, now) do
+    Enum.reject(workers, &worker_stale?(&1, now))
   end
 
   defp filter_by_delegation_payload(workers, payload) when is_map(payload) do
@@ -538,6 +583,27 @@ defmodule PlatformPhx.AgentRegistry do
       Map.put_new(normalized, field, value)
     end)
   end
+
+  defp worker_display_name(attrs) do
+    case attr(attrs, "display_name") do
+      name when is_binary(name) and name != "" ->
+        name
+
+      _other ->
+        "#{attr(attrs, "agent_kind", "agent")} #{attr(attrs, "worker_role", "worker")}"
+    end
+  end
+
+  defp attr(attrs, field, default \\ nil) do
+    Map.get(attrs, field, Map.get(attrs, worker_attr_atom(field), default))
+  end
+
+  defp worker_attr_atom("agent_kind"), do: :agent_kind
+  defp worker_attr_atom("worker_role"), do: :worker_role
+  defp worker_attr_atom("runner_kind"), do: :runner_kind
+  defp worker_attr_atom("capabilities"), do: :capabilities
+  defp worker_attr_atom("display_name"), do: :display_name
+  defp worker_attr_atom("endpoint_url"), do: :endpoint_url
 
   defp ensure_relationship_members_same_company(attrs, company_id) do
     checks = [

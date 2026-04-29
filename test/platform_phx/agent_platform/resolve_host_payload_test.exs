@@ -4,28 +4,12 @@ defmodule PlatformPhx.AgentPlatform.ResolveHostPayloadTest do
   alias PlatformPhx.Accounts.HumanUser
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Agent
+  alias PlatformPhx.AgentPlatform.Company
   alias PlatformPhx.AgentPlatform.CompanyProfiles
   alias PlatformPhx.AgentPlatform.Subdomain
   alias PlatformPhx.Repo
 
   @address "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
-
-  setup do
-    previous_dragonfly_enabled = Application.get_env(:platform_phx, :dragonfly_enabled)
-    previous_dragonfly_name = Application.get_env(:platform_phx, :dragonfly_name)
-
-    previous_dragonfly_command_module =
-      Application.get_env(:platform_phx, :dragonfly_command_module)
-
-    on_exit(fn ->
-      restore_app_env(:platform_phx, :dragonfly_enabled, previous_dragonfly_enabled)
-      restore_app_env(:platform_phx, :dragonfly_name, previous_dragonfly_name)
-      restore_app_env(:platform_phx, :dragonfly_command_module, previous_dragonfly_command_module)
-      Process.delete(:dragonfly_values)
-    end)
-
-    :ok
-  end
 
   test "paused companies still keep their public Regent hostnames" do
     insert_public_agent!("paused-host",
@@ -55,26 +39,53 @@ defmodule PlatformPhx.AgentPlatform.ResolveHostPayloadTest do
     assert host_agent.slug == "shared-profile"
   end
 
-  test "public resolve payload uses Dragonfly and can be cleared after writes" do
-    configure_fake_cache(%{})
+  test "public resolve payload uses local cache and can be cleared after writes" do
     agent = insert_public_agent!("cached-profile", name: "Cached Profile")
 
-    assert {:ok, %{agent: %{public_summary: "Public profile test"}}} =
-             AgentPlatform.resolve_host_payload("cached-profile.regents.sh")
+    assert {:ok, payload} = AgentPlatform.resolve_host_payload("cached-profile.regents.sh")
+    assert get_in_either(payload, [:agent, :public_summary]) == "Public profile test"
 
     agent
     |> Agent.changeset(%{public_summary: "Updated profile"})
     |> Repo.update!()
 
-    assert {:ok, %{agent: %{public_summary: "Public profile test"}}} =
-             AgentPlatform.resolve_host_payload("cached-profile.regents.sh")
+    assert {:ok, cached_payload} = AgentPlatform.resolve_host_payload("cached-profile.regents.sh")
+    assert get_in_either(cached_payload, [:agent, :public_summary]) == "Public profile test"
 
     agent
     |> Repo.preload(:subdomain)
     |> AgentPlatform.clear_public_agent_cache()
 
-    assert {:ok, %{agent: %{public_summary: "Updated profile"}}} =
+    assert {:ok, updated_payload} =
              AgentPlatform.resolve_host_payload("cached-profile.regents.sh")
+
+    assert get_in_either(updated_payload, [:agent, :public_summary]) == "Updated profile"
+  end
+
+  test "saving a human avatar clears cached public agent payloads" do
+    agent = insert_public_agent!("cached-avatar", name: "Cached Avatar")
+    human = Repo.get!(HumanUser, agent.owner_human_id)
+
+    assert {:ok, cached_payload} = AgentPlatform.resolve_host_payload("cached-avatar.regents.sh")
+    assert get_in_either(cached_payload, [:agent, :avatar]) == nil
+
+    assert {:ok, _human} =
+             AgentPlatform.save_human_avatar(human, %{
+               "kind" => "custom_shader",
+               "shader_id" => "w3dfWN",
+               "define_values" => %{}
+             })
+
+    assert {:ok, updated_payload} = AgentPlatform.resolve_host_payload("cached-avatar.regents.sh")
+    assert get_in_either(updated_payload, [:agent, :avatar, :shader_id]) == "w3dfWN"
+  end
+
+  defp get_in_either(value, []), do: value
+
+  defp get_in_either(value, [key | rest]) when is_map(value) do
+    value
+    |> Map.get(key, Map.get(value, Atom.to_string(key)))
+    |> get_in_either(rest)
   end
 
   defp insert_public_agent!(slug, attrs) do
@@ -92,6 +103,7 @@ defmodule PlatformPhx.AgentPlatform.ResolveHostPayloadTest do
       |> Enum.into(%{})
       |> Map.merge(%{
         owner_human_id: human.id,
+        company_id: insert_company!(human, slug, attrs).id,
         template_key: "start",
         name: Keyword.get(attrs, :name, "Public Regent"),
         slug: slug,
@@ -121,33 +133,16 @@ defmodule PlatformPhx.AgentPlatform.ResolveHostPayloadTest do
     agent
   end
 
-  defp configure_fake_cache(values) do
-    Application.put_env(:platform_phx, :dragonfly_enabled, true)
-    Application.put_env(:platform_phx, :dragonfly_name, self())
-    Application.put_env(:platform_phx, :dragonfly_command_module, __MODULE__.FakeRedix)
-    Process.put(:dragonfly_values, values)
-  end
-
-  defp restore_app_env(app, key, nil), do: Application.delete_env(app, key)
-  defp restore_app_env(app, key, value), do: Application.put_env(app, key, value)
-
-  defmodule FakeRedix do
-    def command(_owner, ["GET", key]) do
-      {:ok, Map.get(Process.get(:dragonfly_values, %{}), key)}
-    end
-
-    def command(_owner, ["SET", key, value, "EX", _ttl]) do
-      values = Process.get(:dragonfly_values, %{})
-      Process.put(:dragonfly_values, Map.put(values, key, value))
-      {:ok, "OK"}
-    end
-
-    def command(_owner, ["DEL" | keys]) do
-      values = Process.get(:dragonfly_values, %{})
-      Process.put(:dragonfly_values, Map.drop(values, keys))
-      {:ok, length(keys)}
-    end
-
-    def command(_owner, ["PING"]), do: {:ok, "PONG"}
+  defp insert_company!(human, slug, attrs) do
+    %Company{}
+    |> Company.changeset(%{
+      owner_human_id: human.id,
+      name: Keyword.get(attrs, :name, "Public Regent"),
+      slug: slug,
+      claimed_label: slug,
+      status: "published",
+      public_summary: Keyword.get(attrs, :public_summary, "Public profile test")
+    })
+    |> Repo.insert!()
   end
 end

@@ -9,13 +9,15 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorkerTest do
   alias PlatformPhx.AgentPlatform.Agent
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
+  alias PlatformPhx.AgentPlatform.Company
+  alias PlatformPhx.AgentPlatform.StripeEvent
   alias PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorker
   alias PlatformPhx.Repo
 
   @address "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
 
   setup do
-    previous_sprite_runtime_client = Application.get_env(:platform_phx, :sprite_runtime_client)
+    previous_sprites_client = Application.get_env(:platform_phx, :runtime_registry_sprites_client)
     previous_runtime_test_pid = Application.get_env(:platform_phx, :sprite_runtime_test_pid)
 
     previous_service_states =
@@ -26,8 +28,8 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorkerTest do
 
     Application.put_env(
       :platform_phx,
-      :sprite_runtime_client,
-      PlatformPhx.SpriteRuntimeClientSelectiveFake
+      :runtime_registry_sprites_client,
+      PlatformPhx.RuntimeRegistrySpritesClientFake
     )
 
     Application.put_env(:platform_phx, :sprite_runtime_test_pid, self())
@@ -36,7 +38,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorkerTest do
     Application.put_env(:platform_phx, :sprite_runtime_stop_results, %{})
 
     on_exit(fn ->
-      restore_app_env(:platform_phx, :sprite_runtime_client, previous_sprite_runtime_client)
+      restore_app_env(:platform_phx, :runtime_registry_sprites_client, previous_sprites_client)
       restore_app_env(:platform_phx, :sprite_runtime_test_pid, previous_runtime_test_pid)
       restore_app_env(:platform_phx, :sprite_runtime_service_states, previous_service_states)
       restore_app_env(:platform_phx, :sprite_runtime_start_results, previous_start_results)
@@ -101,8 +103,10 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorkerTest do
       }
     }
 
+    worker_args = worker_args_for_stripe_event(args)
+
     assert {:error, {:runtime_sync_failed, result}} =
-             perform_job(SyncStripeBillingWorker, args)
+             perform_job(SyncStripeBillingWorker, worker_args)
 
     assert Enum.map(result.updated_agents, & &1.slug) == [healthy_agent.slug]
 
@@ -136,7 +140,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorkerTest do
 
     Application.put_env(:platform_phx, :sprite_runtime_start_results, %{})
 
-    assert :ok = perform_job(SyncStripeBillingWorker, args)
+    assert :ok = perform_job(SyncStripeBillingWorker, worker_args)
 
     assert_receive {:start_service, ^healthy_sprite_name, "hermes-workspace"}
     assert_receive {:start_service, ^failing_sprite_name, "hermes-workspace"}
@@ -155,7 +159,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorkerTest do
     assert Repo.get!(Agent, failing_agent.id).runtime_status == "ready"
   end
 
-  test "top-up falls back to customer lookup when metadata ids are malformed" do
+  test "top-up cancels when metadata ids are malformed" do
     human = insert_human!()
     billing_account = insert_billing_account!(human)
 
@@ -174,9 +178,10 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorkerTest do
       }
     }
 
-    assert :ok = perform_job(SyncStripeBillingWorker, args)
+    assert {:cancel, "billing account not found"} =
+             perform_job(SyncStripeBillingWorker, worker_args_for_stripe_event(args))
 
-    assert Repo.get!(BillingAccount, billing_account.id).runtime_credit_balance_usd_cents == 125
+    assert Repo.get!(BillingAccount, billing_account.id).runtime_credit_balance_usd_cents == 0
 
     assert Repo.aggregate(
              from(entry in BillingLedgerEntry,
@@ -184,7 +189,7 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorkerTest do
              ),
              :count,
              :id
-           ) == 1
+           ) == 0
   end
 
   defp insert_human! do
@@ -231,9 +236,39 @@ defmodule PlatformPhx.AgentPlatform.Workers.SyncStripeBillingWorkerTest do
         overrides
       )
 
+    company =
+      %Company{}
+      |> Company.changeset(%{
+        owner_human_id: human.id,
+        name: attrs.name,
+        slug: attrs.slug,
+        claimed_label: attrs.claimed_label,
+        status: attrs.status,
+        public_summary: attrs.public_summary
+      })
+      |> Repo.insert!()
+
     %Agent{}
-    |> Agent.changeset(attrs)
+    |> Agent.changeset(Map.put(attrs, :company_id, company.id))
     |> Repo.insert!()
+  end
+
+  defp worker_args_for_stripe_event(event) do
+    stripe_event =
+      %StripeEvent{}
+      |> StripeEvent.changeset(%{
+        event_id: event["event_id"],
+        event_type: event["event_type"],
+        customer_id: event["customer_id"],
+        subscription_id: event["subscription_id"],
+        subscription_status: event["subscription_status"],
+        mode: event["mode"],
+        metadata: event["metadata"] || %{},
+        processing_status: "queued"
+      })
+      |> Repo.insert!()
+
+    %{"stripe_event_id" => stripe_event.id}
   end
 
   defp restore_app_env(app, key, nil), do: Application.delete_env(app, key)

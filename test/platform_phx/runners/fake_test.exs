@@ -3,7 +3,6 @@ defmodule PlatformPhx.Runners.FakeTest do
   use Oban.Testing, repo: PlatformPhx.Repo
 
   alias PlatformPhx.Accounts.HumanUser
-  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.RunEvents
   alias PlatformPhx.Work
   alias PlatformPhx.WorkRuns
@@ -135,7 +134,7 @@ defmodule PlatformPhx.Runners.FakeTest do
 
   defp insert_company!(human, slug) do
     {:ok, company} =
-      AgentPlatform.create_company(human, %{
+      PlatformPhx.AgentPlatform.Companies.create_company(human, %{
         name: "#{slug} Regent",
         slug: slug,
         claimed_label: slug,

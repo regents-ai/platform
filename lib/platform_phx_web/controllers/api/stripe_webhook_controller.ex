@@ -1,6 +1,8 @@
 defmodule PlatformPhxWeb.Api.StripeWebhookController do
   use PlatformPhxWeb, :controller
 
+  action_fallback PlatformPhxWeb.ApiFallbackController
+
   alias PlatformPhx.AgentPlatform.Formation
   alias PlatformPhxWeb.ApiErrors
 

@@ -27,6 +27,52 @@ defmodule PlatformPhxWeb.Router do
       window_ms: :timer.minutes(1)
     ]
   ]
+  @session_rate_limit_rules [
+    [
+      name: :session_api_reads,
+      method: "GET",
+      path_prefixes: ["/api/auth", "/api/agent-platform"],
+      limit: 180,
+      window_ms: :timer.minutes(1)
+    ],
+    [
+      name: :session_api_writes,
+      method: "POST",
+      path_prefixes: ["/api/auth", "/api/agent-platform"],
+      limit: 60,
+      window_ms: :timer.minutes(1)
+    ],
+    [
+      name: :session_api_updates,
+      method: "PUT",
+      path_prefixes: ["/api/auth", "/api/agent-platform"],
+      limit: 30,
+      window_ms: :timer.minutes(1)
+    ],
+    [
+      name: :session_api_deletes,
+      method: "DELETE",
+      path_prefixes: ["/api/auth", "/api/agent-platform"],
+      limit: 30,
+      window_ms: :timer.minutes(1)
+    ]
+  ]
+  @signed_agent_rate_limit_rules [
+    [
+      name: :signed_agent_reads,
+      method: "GET",
+      path_prefixes: ["/api/agentbook", "/api/agent-platform", "/v1/agent"],
+      limit: 240,
+      window_ms: :timer.minutes(1)
+    ],
+    [
+      name: :signed_agent_writes,
+      method: "POST",
+      path_prefixes: ["/api/agentbook", "/api/agent-platform", "/v1/agent"],
+      limit: 120,
+      window_ms: :timer.minutes(1)
+    ]
+  ]
 
   pipeline :browser do
     plug PlatformPhxWeb.PublicEntryPlug
@@ -50,16 +96,19 @@ defmodule PlatformPhxWeb.Router do
     plug :accepts, ["json"]
     plug :fetch_session
     plug PlatformPhxWeb.RequireSessionCsrf
+    plug PlatformPhxWeb.Plugs.RateLimit, rules: @session_rate_limit_rules
   end
 
   pipeline :platform_agent_api do
     plug :accepts, ["json"]
     plug PlatformPhxWeb.Plugs.RequireAgentSiwa, audience: "platform"
+    plug PlatformPhxWeb.Plugs.RateLimit, rules: @signed_agent_rate_limit_rules
   end
 
   pipeline :shared_agent_api do
     plug :accepts, ["json"]
     plug PlatformPhxWeb.Plugs.RequireAgentSiwa, audience: "regent-services"
+    plug PlatformPhxWeb.Plugs.RateLimit, rules: @signed_agent_rate_limit_rules
   end
 
   scope "/", PlatformPhxWeb do
@@ -76,6 +125,10 @@ defmodule PlatformPhxWeb.Router do
     get "/api-contract.openapiv3.yaml", DiscoveryController, :api_contract
     get "/cli-contract.yaml", DiscoveryController, :cli_contract
     get "/agent-skills/regents-cli.md", DiscoveryController, :regents_cli_skill
+    get "/learn/*path", CorpusController, :learn
+    get "/glossary/*path", CorpusController, :glossary
+    get "/source/*path", CorpusController, :source
+    get "/updates/*path", CorpusController, :updates
   end
 
   scope "/", PlatformPhxWeb do
@@ -134,7 +187,6 @@ defmodule PlatformPhxWeb.Router do
     post "/bug-report", Api.ReportController, :bug
     post "/security-report", Api.ReportController, :security
 
-    get "/agentlaunch/auctions", Api.AgentLaunchController, :auctions
     get "/opensea", Api.OpenseaController, :index
     get "/opensea/redeem-stats", Api.OpenseaController, :redeem_stats
     get "/agent-platform/templates", Api.AgentPlatformController, :templates
@@ -202,6 +254,8 @@ defmodule PlatformPhxWeb.Router do
     pipe_through :session_api
 
     get "/formation", AgentFormationController, :formation
+    get "/formation/doctor", AgentFormationController, :formation_doctor
+    get "/projection", AgentFormationController, :projection
     post "/billing/setup/checkout", AgentFormationController, :billing_setup_checkout
     get "/billing/account", AgentFormationController, :billing_account
     get "/billing/usage", AgentFormationController, :billing_usage
@@ -234,11 +288,46 @@ defmodule PlatformPhxWeb.Router do
          :start_run
 
     get "/companies/:company_id/rwr/runs/:run_id", RegentWorkRuntimeController, :run
+    get "/companies/:company_id/rwr/runs/:run_id/tree", RegentWorkRuntimeController, :run_tree
+
+    post "/companies/:company_id/rwr/runs/:run_id/cancel",
+         RegentWorkRuntimeController,
+         :cancel_run
+
+    post "/companies/:company_id/rwr/runs/:run_id/retry", RegentWorkRuntimeController, :retry_run
     get "/companies/:company_id/rwr/runs/:run_id/events", RegentWorkRuntimeController, :run_events
+
+    get "/companies/:company_id/rwr/runs/:run_id/events/stream",
+        RegentWorkRuntimeController,
+        :run_event_stream
 
     get "/companies/:company_id/rwr/runs/:run_id/artifacts",
         RegentWorkRuntimeController,
         :artifacts
+
+    get "/companies/:company_id/rwr/runs/:run_id/artifacts/:artifact_id",
+        RegentWorkRuntimeController,
+        :artifact
+
+    post "/companies/:company_id/rwr/runs/:run_id/artifacts/:artifact_id/publish",
+         RegentWorkRuntimeController,
+         :publish_artifact
+
+    get "/companies/:company_id/rwr/artifacts/:artifact_id",
+        RegentWorkRuntimeController,
+        :company_artifact
+
+    get "/companies/:company_id/rwr/runs/:run_id/approvals",
+        RegentWorkRuntimeController,
+        :approvals
+
+    get "/companies/:company_id/rwr/runs/:run_id/approvals/:approval_id",
+        RegentWorkRuntimeController,
+        :approval
+
+    post "/companies/:company_id/rwr/runs/:run_id/approvals/:approval_id/resolve",
+         RegentWorkRuntimeController,
+         :resolve_approval
 
     get "/companies/:company_id/rwr/workers", RegentWorkRuntimeController, :workers
     get "/companies/:company_id/rwr/runtimes", RegentWorkRuntimeController, :runtimes
@@ -320,6 +409,10 @@ defmodule PlatformPhxWeb.Router do
     post "/companies/:company_id/rwr/runs/:run_id/events",
          RegentWorkRuntimeController,
          :append_event
+
+    post "/companies/:company_id/rwr/runs/:run_id/events/batch",
+         RegentWorkRuntimeController,
+         :append_event_batch
 
     post "/companies/:company_id/rwr/runs/:run_id/artifacts",
          RegentWorkRuntimeController,

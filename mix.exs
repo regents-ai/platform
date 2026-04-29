@@ -101,7 +101,9 @@ defmodule PlatformPhx.MixProject do
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "public.sync": [&sync_public_assets/1],
       "assets.build": ["compile", "public.sync", "tailwind platform_phx", "esbuild platform_phx"],
+      "corpus.build": [&build_corpus/1],
       "assets.deploy": [
+        "corpus.build",
         "public.sync",
         "tailwind platform_phx --minify",
         "esbuild platform_phx --minify",
@@ -145,5 +147,23 @@ defmodule PlatformPhx.MixProject do
           Mix.raise("Failed to sync public assets from #{file}: #{inspect(reason)}")
       end
     end)
+  end
+
+  defp build_corpus(_args) do
+    learn_site_path = Path.expand("learn-site", __DIR__)
+
+    {_, status} =
+      System.cmd("npm", ["ci"], cd: learn_site_path, into: IO.stream())
+
+    if status != 0 do
+      Mix.raise("Failed to install Regents corpus dependencies")
+    end
+
+    {_, status} =
+      System.cmd("npm", ["run", "build"], cd: learn_site_path, into: IO.stream())
+
+    if status != 0 do
+      Mix.raise("Failed to build Regents corpus")
+    end
   end
 end

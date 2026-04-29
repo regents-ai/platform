@@ -2,13 +2,14 @@ defmodule PlatformPhx.SiwaClient.Http do
   @moduledoc false
   @behaviour PlatformPhx.SiwaClient
 
+  alias PlatformPhx.ExternalHttpClient
   alias PlatformPhx.RuntimeConfig
 
   @impl true
   def verify_http_request(payload, opts) when is_map(payload) do
     with {:ok, base_url} <- base_url(),
          {:ok, response} <-
-           Req.post(
+           ExternalHttpClient.post(
              "#{base_url}/v1/agent/siwa/http-verify",
              json: Map.take(payload, ["method", "path", "headers", "body"]),
              headers: audience_headers(opts)
@@ -21,8 +22,11 @@ defmodule PlatformPhx.SiwaClient.Http do
           {:error, decode_error(status, response.body)}
       end
     else
-      {:error, {_, _, _} = error} -> {:error, error}
-      {:error, error} -> {:error, {502, "siwa_service_unreachable", Exception.message(error)}}
+      {:error, {_, _, _} = error} ->
+        {:error, error}
+
+      {:error, error} ->
+        {:error, {502, "siwa_service_unreachable", ExternalHttpClient.format_error(error)}}
     end
   end
 

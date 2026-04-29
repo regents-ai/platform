@@ -1,6 +1,6 @@
 defmodule PlatformPhx.OpenSeaFakeClient do
   @moduledoc false
-  @behaviour PlatformPhx.OpenSea.HttpClient
+  @behaviour PlatformPhx.OpenSea
 
   @impl true
   def get(url, _options) do

@@ -4,8 +4,8 @@ defmodule PlatformPhx.RuntimeRegistry do
   import Ecto.Query, warn: false
 
   alias Ecto.Multi
-  alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Agent
+  alias PlatformPhx.AgentPlatform.Billing
   alias PlatformPhx.AgentPlatform.BillingAccount
   alias PlatformPhx.AgentPlatform.BillingLedgerEntry
   alias PlatformPhx.AgentPlatform.SpriteUsageRecord
@@ -18,6 +18,9 @@ defmodule PlatformPhx.RuntimeRegistry do
   alias PlatformPhx.RuntimeRegistry.SpritesClient
   alias PlatformPhx.RuntimeRegistry.SpritesPolicy
   alias PlatformPhx.RuntimeRegistry.SpritesService
+  alias PlatformPhx.RuntimeRegistry.Workers.RuntimeCheckpointJob
+  alias PlatformPhx.RuntimeRegistry.Workers.RuntimeProvisionJob
+  alias PlatformPhx.RuntimeRegistry.Workers.RuntimeRestoreJob
 
   @hosted_codex_runner_kinds ["codex_exec", "codex_app_server"]
   @hosted_sprite_meter_key "sprite_runtime_seconds"
@@ -29,9 +32,22 @@ defmodule PlatformPhx.RuntimeRegistry do
   def get_runtime_checkpoint(id), do: Repo.get(RuntimeCheckpoint, id)
 
   def create_runtime_profile(attrs) do
-    %RuntimeProfile{}
-    |> RuntimeProfile.changeset(attrs)
-    |> Repo.insert()
+    changeset = RuntimeProfile.changeset(%RuntimeProfile{}, attrs)
+
+    if hosted_sprite_attrs?(attrs) do
+      Multi.new()
+      |> Multi.insert(:runtime_profile, changeset)
+      |> Multi.insert(:provision_job, fn %{runtime_profile: profile} ->
+        RuntimeProvisionJob.new(%{runtime_profile_id: profile.id})
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{runtime_profile: profile}} -> {:ok, profile}
+        {:error, _step, reason, _changes} -> {:error, reason}
+      end
+    else
+      Repo.insert(changeset)
+    end
   end
 
   def list_runtime_profiles(company_id) do
@@ -109,7 +125,7 @@ defmodule PlatformPhx.RuntimeRegistry do
     case profile.platform_agent do
       %Agent{} = agent ->
         billing_account = billing_account_for_agent(agent)
-        metering_status = AgentPlatform.effective_metering_status(agent, billing_account)
+        metering_status = Billing.effective_metering_status(agent, billing_account)
 
         if metering_status in ["paid", "trialing"] and agent.desired_runtime_state != "paused" do
           %{available?: true, status: "available", metering_status: metering_status}
@@ -198,7 +214,7 @@ defmodule PlatformPhx.RuntimeRegistry do
           status: "ready",
           protected: true,
           checkpoint_kind: "filesystem",
-          captured_at: DateTime.utc_now() |> DateTime.truncate(:second),
+          captured_at: PlatformPhx.Clock.now(),
           metadata:
             checkpoint
             |> Map.get("metadata", %{})
@@ -229,7 +245,7 @@ defmodule PlatformPhx.RuntimeRegistry do
         status: "ready",
         protected: true,
         checkpoint_kind: "filesystem",
-        captured_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        captured_at: PlatformPhx.Clock.now(),
         metadata:
           checkpoint.metadata
           |> SpritesPolicy.checkpoint_metadata()
@@ -254,7 +270,7 @@ defmodule PlatformPhx.RuntimeRegistry do
       checkpoint
       |> RuntimeCheckpoint.changeset(%{
         restore_status: "succeeded",
-        restored_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        restored_at: PlatformPhx.Clock.now(),
         metadata:
           Map.merge(checkpoint.metadata || %{}, %{
             "restore" => payload,
@@ -298,10 +314,38 @@ defmodule PlatformPhx.RuntimeRegistry do
         checkpoint_kind: "filesystem",
         metadata: SpritesPolicy.checkpoint_metadata(attr(attrs, :metadata, %{}))
       })
-      |> put_new_attr(:status, "ready")
-      |> create_runtime_checkpoint()
+      |> Map.put(:status, "pending")
+      |> create_runtime_checkpoint_and_enqueue()
     else
       {:error, {:bad_request, "Only hosted Sprite runtimes can create protected checkpoints"}}
+    end
+  end
+
+  def request_hosted_sprite_restore(
+        %RuntimeProfile{} = profile,
+        %RuntimeCheckpoint{} = checkpoint
+      ) do
+    profile = Repo.preload(profile, :platform_agent)
+
+    if hosted_sprite_profile?(profile) and checkpoint.runtime_profile_id == profile.id do
+      Multi.new()
+      |> Multi.update(
+        :checkpoint,
+        RuntimeCheckpoint.changeset(checkpoint, %{
+          restore_status: "pending",
+          metadata: SpritesPolicy.checkpoint_metadata(checkpoint.metadata || %{})
+        })
+      )
+      |> Multi.insert(:restore_job, fn %{checkpoint: checkpoint} ->
+        RuntimeRestoreJob.new(%{runtime_checkpoint_id: checkpoint.id})
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{checkpoint: checkpoint}} -> {:ok, checkpoint}
+        {:error, _step, reason, _changes} -> {:error, reason}
+      end
+    else
+      {:error, {:bad_request, "Only hosted Sprite runtimes can restore hosted checkpoints"}}
     end
   end
 
@@ -319,7 +363,7 @@ defmodule PlatformPhx.RuntimeRegistry do
   end
 
   def create_sprites_usage_snapshot(%RuntimeProfile{} = profile, attrs \\ %{}) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = PlatformPhx.Clock.now()
 
     with {:ok, updated_profile} <- observe_sprites_capacity(profile) do
       create_usage_snapshot(%{
@@ -348,7 +392,7 @@ defmodule PlatformPhx.RuntimeRegistry do
     with true <- hosted_sprite_profile?(profile),
          %Agent{} = agent <- profile.platform_agent,
          %BillingAccount{} = billing_account <- billing_account_for_agent(agent) do
-      now = DateTime.utc_now() |> DateTime.truncate(:second)
+      now = PlatformPhx.Clock.now()
       window_ended_at = attr(attrs, :window_ended_at, now)
       active_seconds = attr(attrs, :active_seconds, 0)
 
@@ -438,7 +482,7 @@ defmodule PlatformPhx.RuntimeRegistry do
         estimated_cost_usd: Decimal.new("0"),
         metadata: Map.merge(attr(attrs, :metadata, %{}), %{"billing_mode" => "user_local"})
       })
-      |> put_new_attr(:snapshot_at, DateTime.utc_now() |> DateTime.truncate(:second))
+      |> put_new_attr(:snapshot_at, PlatformPhx.Clock.now())
 
     create_usage_snapshot(attrs)
   end
@@ -479,6 +523,25 @@ defmodule PlatformPhx.RuntimeRegistry do
        do: true
 
   defp hosted_sprite_profile?(_profile), do: false
+
+  defp hosted_sprite_attrs?(attrs) do
+    attr(attrs, :execution_surface, nil) == "hosted_sprite" and
+      attr(attrs, :billing_mode, nil) == "platform_hosted" and
+      attr(attrs, :runner_kind, nil) in @hosted_codex_runner_kinds
+  end
+
+  defp create_runtime_checkpoint_and_enqueue(attrs) do
+    Multi.new()
+    |> Multi.insert(:checkpoint, RuntimeCheckpoint.changeset(%RuntimeCheckpoint{}, attrs))
+    |> Multi.insert(:checkpoint_job, fn %{checkpoint: checkpoint} ->
+      RuntimeCheckpointJob.new(%{runtime_checkpoint_id: checkpoint.id})
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{checkpoint: checkpoint}} -> {:ok, checkpoint}
+      {:error, _step, reason, _changes} -> {:error, reason}
+    end
+  end
 
   defp default_hosted_codex_name(%Agent{name: name}) when is_binary(name),
     do: "#{name} Hosted Codex"

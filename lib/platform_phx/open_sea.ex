@@ -3,6 +3,7 @@ defmodule PlatformPhx.OpenSea do
   require Logger
 
   alias PlatformPhx.Ethereum
+  alias PlatformPhx.ExternalHttpClient
   alias PlatformPhx.RuntimeConfig
   alias PlatformPhx.PublicErrors
 
@@ -20,6 +21,8 @@ defmodule PlatformPhx.OpenSea do
   @cache_ttl_seconds 60
 
   @type accumulator :: %{ids: [integer()], count: non_neg_integer()}
+  @callback get(URI.t() | String.t(), keyword()) ::
+              {:ok, %{status: integer(), body: map()}} | {:error, term()}
 
   @spec fetch_holdings(term(), collection()) :: {:ok, map()} | {:error, reason()}
   def fetch_holdings(address, collection \\ :all) do
@@ -40,7 +43,7 @@ defmodule PlatformPhx.OpenSea do
 
   @spec fetch_redeem_stats() :: {:ok, map()} | {:error, reason()}
   def fetch_redeem_stats do
-    RegentCache.fetch(:platform_phx, @redeem_stats_cache_key, @cache_ttl_seconds, fn ->
+    PlatformPhx.LocalCache.fetch(@redeem_stats_cache_key, @cache_ttl_seconds, fn ->
       with {:ok, api_key} <- api_key(),
            {:ok, stats} <- fetch_collection_supplies(api_key) do
         {:ok, stats}
@@ -54,7 +57,7 @@ defmodule PlatformPhx.OpenSea do
 
   @spec clear_cache() :: :ok
   def clear_cache do
-    _ = RegentCache.delete(:platform_phx, @redeem_stats_cache_key)
+    _ = PlatformPhx.LocalCache.delete(@redeem_stats_cache_key)
     :ok
   end
 
@@ -148,7 +151,7 @@ defmodule PlatformPhx.OpenSea do
 
       {:error, error} ->
         Logger.warning(
-          "opensea supply request failed #{inspect(%{reason: Exception.message(error)})}"
+          "opensea supply request failed #{inspect(%{reason: ExternalHttpClient.format_error(error)})}"
         )
 
         {:error, {:external, :opensea, PublicErrors.collectible_lookup()}}
@@ -209,7 +212,7 @@ defmodule PlatformPhx.OpenSea do
 
       {:error, error} ->
         Logger.warning(
-          "opensea holdings request failed #{inspect(%{reason: Exception.message(error)})}"
+          "opensea holdings request failed #{inspect(%{reason: ExternalHttpClient.format_error(error)})}"
         )
 
         {:error, {:external, :opensea, PublicErrors.collectible_lookup()}}
@@ -268,6 +271,28 @@ defmodule PlatformPhx.OpenSea do
   end
 
   defp http_client do
-    Application.get_env(:platform_phx, :opensea_http_client, PlatformPhx.OpenSea.ReqClient)
+    Application.get_env(:platform_phx, :opensea_http_client, __MODULE__.HttpClient)
+  end
+
+  @spec get(URI.t() | String.t(), keyword()) ::
+          {:ok, %{status: integer(), body: map()}} | {:error, term()}
+  def get(url, options), do: __MODULE__.HttpClient.get(url, options)
+
+  defmodule HttpClient do
+    @moduledoc false
+    @behaviour PlatformPhx.OpenSea
+
+    alias PlatformPhx.ExternalHttpClient
+
+    @impl true
+    def get(url, options) do
+      case ExternalHttpClient.get(url, options) do
+        {:ok, response} ->
+          {:ok, %{status: response.status, body: response.body}}
+
+        {:error, error} ->
+          {:error, error}
+      end
+    end
   end
 end

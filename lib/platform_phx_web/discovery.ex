@@ -29,6 +29,7 @@ defmodule PlatformPhxWeb.Discovery do
   def sitemap_xml do
     urls =
       PublicPageCatalog.public_entry_paths()
+      |> Kernel.++(corpus_paths())
       |> Enum.map(&SiteUrl.absolute_url/1)
       |> Kernel.++(company_home_urls())
       |> Enum.uniq()
@@ -65,6 +66,22 @@ defmodule PlatformPhxWeb.Discovery do
               "type" => "text/html"
             },
             %{
+              "href" => SiteUrl.absolute_url("/learn/what-is-regents/"),
+              "rel" => "service-doc",
+              "type" => "text/html",
+              "title" => "Regents public corpus"
+            },
+            %{
+              "href" => SiteUrl.absolute_url("/llms.txt"),
+              "rel" => "describedby",
+              "type" => "text/plain"
+            },
+            %{
+              "href" => SiteUrl.absolute_url("/regents-facts.json"),
+              "rel" => "describedby",
+              "type" => "application/json"
+            },
+            %{
               "href" => SiteUrl.absolute_url("/healthz"),
               "rel" => "status",
               "type" => "text/plain"
@@ -82,6 +99,8 @@ defmodule PlatformPhxWeb.Discovery do
       "description" =>
         "Read-only discovery surface for the Regents website, its public contracts, and the published Regents CLI skill.",
       "documentationUrl" => SiteUrl.absolute_url("/docs"),
+      "corpusUrl" => SiteUrl.absolute_url("/learn/what-is-regents/"),
+      "factsUrl" => SiteUrl.absolute_url("/regents-facts.json"),
       "url" => SiteUrl.absolute_url("/"),
       "supportedInterfaces" => [
         %{
@@ -152,6 +171,14 @@ defmodule PlatformPhxWeb.Discovery do
         %{
           "name" => "API contract",
           "url" => SiteUrl.absolute_url("/api-contract.openapiv3.yaml")
+        },
+        %{
+          "name" => "Regents public corpus",
+          "url" => SiteUrl.absolute_url("/learn/what-is-regents/")
+        },
+        %{
+          "name" => "Regents facts",
+          "url" => SiteUrl.absolute_url("/regents-facts.json")
         }
       ]
     }
@@ -159,9 +186,7 @@ defmodule PlatformPhxWeb.Discovery do
 
   def project_file_contents(filename)
       when filename in ["api-contract.openapiv3.yaml", "cli-contract.yaml"] do
-    filename
-    |> project_file_path()
-    |> File.read!()
+    PlatformPhx.Contracts.contents!(filename)
   end
 
   def regents_cli_skill, do: PublicPageCatalog.regents_cli_skill_markdown()
@@ -183,9 +208,38 @@ defmodule PlatformPhxWeb.Discovery do
     |> Enum.map(&SiteUrl.absolute_url("/", &1))
   end
 
-  defp project_file_path(filename) do
-    Path.expand("../..", __DIR__)
-    |> Path.join(filename)
+  def corpus_paths do
+    [
+      "/learn/what-is-regents/",
+      "/learn/agent-companies/",
+      "/learn/sovereign-agents/",
+      "/learn/public-proof/",
+      "/learn/agent-native-capital/",
+      "/learn/continuous-clearing-auctions/",
+      "/learn/recognized-stablecoin-revenue/",
+      "/learn/source-of-truth-discipline/",
+      "/glossary/regent/",
+      "/glossary/agent-company/",
+      "/glossary/sovereign-agent/",
+      "/glossary/public-proof/",
+      "/glossary/siwa/",
+      "/glossary/revsplit/",
+      "/glossary/recognized-revenue/",
+      "/glossary/continuous-clearing-auction/",
+      "/glossary/agent-id/",
+      "/source/regents-purpose/",
+      "/source/platform-purpose/",
+      "/source/regents-cli-purpose/",
+      "/source/techtree-purpose/",
+      "/source/autolaunch-purpose/",
+      "/source/siwa-purpose/",
+      "/source/mobile-status/",
+      "/source/source-of-truth-matrix/",
+      "/updates/2026-04-29-build-note/",
+      "/llms.txt",
+      "/ai-index.md",
+      "/regents-facts.json"
+    ]
   end
 
   defp app_version do

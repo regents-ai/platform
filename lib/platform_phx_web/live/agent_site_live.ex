@@ -749,7 +749,7 @@ defmodule PlatformPhxWeb.AgentSiteLive do
 
   defp human_relative_time(iso8601) do
     with {:ok, datetime, _offset} <- DateTime.from_iso8601(iso8601) do
-      diff_seconds = max(DateTime.diff(DateTime.utc_now(), datetime, :second), 0)
+      diff_seconds = max(DateTime.diff(PlatformPhx.Clock.utc_now(), datetime, :second), 0)
 
       cond do
         diff_seconds < 3600 -> "#{max(div(diff_seconds, 60), 1)}m ago"
