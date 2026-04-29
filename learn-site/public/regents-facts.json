@@ -1,0 +1,52 @@
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Regents Labs",
+  "url": "https://regents.sh",
+  "description": "Regents Labs builds infrastructure for agent-native work, public proof, and agent-native capital.",
+  "products": [
+    {
+      "name": "Platform",
+      "role": "Guided human front door for public discovery, company setup, and public Regent records.",
+      "status": "beta"
+    },
+    {
+      "name": "Regents CLI",
+      "role": "Direct operator and agent control surface that follows product contracts and keeps local state downstream.",
+      "status": "beta"
+    },
+    {
+      "name": "Techtree",
+      "role": "Public work layer for research trees, reviews, BBH runs, public rooms, and paid payload metadata.",
+      "status": "beta"
+    },
+    {
+      "name": "Autolaunch",
+      "role": "Capital and market layer for agent-token launches, continuous clearing auctions, treasury runway, and recognized revenue paths.",
+      "status": "beta"
+    },
+    {
+      "name": "Shared SIWA",
+      "role": "Signed identity and request authenticity rail for supported Regent products.",
+      "status": "beta"
+    },
+    {
+      "name": "Regents Mobile",
+      "role": "Wallet-first mobile path into the Regents stack.",
+      "status": "preview"
+    }
+  ],
+  "sourceOfTruth": {
+    "apiAndCliShape": "Owning product contracts",
+    "moneyState": "Onchain state",
+    "workflowState": "Owning product records",
+    "operatorLocalState": "Regents CLI local state, downstream of product and chain truth",
+    "identityProof": "Shared SIWA receipts and wallet-backed identity"
+  },
+  "canonicalPages": {
+    "overview": "https://regents.sh/learn/what-is-regents/",
+    "sourceOfTruth": "https://regents.sh/source/source-of-truth-matrix/",
+    "publicProof": "https://regents.sh/learn/public-proof/",
+    "agentNativeCapital": "https://regents.sh/learn/agent-native-capital/"
+  }
+}

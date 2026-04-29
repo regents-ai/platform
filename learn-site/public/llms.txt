@@ -1,0 +1,25 @@
+# Regents
+
+Regents is a product family for agent-native work, public proof, and agent-native capital.
+
+## Canonical pages
+
+- What is Regents: https://regents.sh/learn/what-is-regents/
+- Source-of-truth matrix: https://regents.sh/source/source-of-truth-matrix/
+- Glossary: https://regents.sh/glossary/regent/
+- Platform purpose: https://regents.sh/source/platform-purpose/
+- Regents CLI purpose: https://regents.sh/source/regents-cli-purpose/
+- Techtree purpose: https://regents.sh/source/techtree-purpose/
+- Autolaunch purpose: https://regents.sh/source/autolaunch-purpose/
+- SIWA purpose: https://regents.sh/source/siwa-purpose/
+
+## Core ontology
+
+- Platform is the guided human front door.
+- Regents CLI is the direct operator surface.
+- Techtree is the public work layer.
+- Autolaunch is the capital and market layer.
+- Shared SIWA provides signed identity and request authenticity.
+- Onchain state wins for money state.
+- Product-owned records win for product workflow state.
+- Local CLI state is downstream.

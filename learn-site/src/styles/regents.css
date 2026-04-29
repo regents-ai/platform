@@ -1,0 +1,36 @@
+@font-face {
+  font-family: "GeistPixelCircle";
+  src: url("/fonts/GeistPixel-Circle.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "GeistPixelSquare";
+  src: url("/fonts/GeistPixel-Square.woff2") format("woff2");
+  font-display: swap;
+}
+
+:root {
+  --sl-font: "GeistPixelSquare", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --sl-font-system: var(--sl-font);
+  --sl-font-mono: var(--sl-font);
+  --sl-color-accent-low: #fff0c2;
+  --sl-color-accent: #1e5bff;
+  --sl-color-accent-high: #001e62;
+  --sl-color-text-accent: #1e5bff;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.site-title {
+  font-family: "GeistPixelCircle", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0;
+}
+
+.hero img {
+  image-rendering: auto;
+}
