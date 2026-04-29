@@ -1,6 +1,6 @@
 # Fly Security Review
 
-This review covers the Platform Phoenix app planned for Fly (`platform-phx`), plus the shared services it calls from public routes: Privy, SIWA, Stripe, Regent staking RPC, OpenSea, Base RPC, Dragonfly, Postgres, and Sprite runtime control.
+This review covers the Platform Phoenix app planned for Fly (`platform-phx`), plus the shared services it calls from public routes: Privy, SIWA, Stripe, Regent staking RPC, OpenSea, Base RPC, Postgres, Sprite runtime control, and Regent Work Runtime routes.
 
 ## Current Fly Posture
 
@@ -25,9 +25,9 @@ Routes:
 
 These are useful internal design surfaces, but they are not needed for the production app. They are no longer mounted by the release router.
 
-### Resolved: Public Regent staking uses signed Agent account routes
+### Resolved: Regent staking separates browser and signed-agent routes
 
-Regent staking is exposed to the CLI and agent clients through `/v1/agent/regent/staking...` with signed Agent account authentication. The old browser-session staking routes are no longer part of the public route surface.
+Regent staking is visible to people on `/token-info`. The browser page reads chain state directly through the Platform context and only prepares wallet actions for a signed-in human. CLI and agent clients use `/v1/agent/regent/staking...` with signed Agent account authentication. The old browser-session staking API routes are no longer part of the public route surface.
 
 ### Resolved: Public write and expensive read routes are rate-limited
 
@@ -43,6 +43,8 @@ Routes:
 - `GET /api/opensea/redeem-stats`
 
 The app validates and sanitizes the important inputs, and reports cap text length. These routes now also have app-level IP and route-family rate limits.
+
+Autolaunch auction data is not served by Platform. The public Platform page links out to Autolaunch for live launch state.
 
 ### Resolved: Product route contract drift is guarded
 
@@ -95,6 +97,49 @@ Recommendation: keep this route public but only accept signed Stripe payloads. M
 
 Company formation writes check whether formation is enabled. The read routes and pages remain visible, while company-opening and Sprite pause/resume actions show disabled controls when formation is closed.
 
+### Resolved: RWR browser pages are owner-scoped
+
+Routes:
+
+- `GET /app/work`
+- `GET /app/runs/:id`
+- `GET /app/runtimes`
+- `GET /app/agents`
+
+These pages are part of the signed-in app. They show work, runs, runtime profiles, workers, relationships, checkpoints, and proof review state for the owner company only. They must not leak billing setup, runtime spend, private run events, or local machine details onto public company pages.
+
+### Resolved: RWR worker routes use signed worker requests
+
+Routes:
+
+- `POST /api/agent-platform/companies/:company_id/rwr/workers`
+- `POST /api/agent-platform/companies/:company_id/rwr/workers/:worker_id/heartbeat`
+- `GET /api/agent-platform/companies/:company_id/rwr/workers/:worker_id/assignments`
+- `POST /api/agent-platform/companies/:company_id/rwr/assignments/:assignment_id/claim`
+- `POST /api/agent-platform/companies/:company_id/rwr/assignments/:assignment_id/release`
+- `POST /api/agent-platform/companies/:company_id/rwr/assignments/:assignment_id/complete`
+- `POST /api/agent-platform/companies/:company_id/rwr/runs/:run_id/events`
+- `POST /api/agent-platform/companies/:company_id/rwr/runs/:run_id/artifacts`
+- `POST /api/agent-platform/companies/:company_id/rwr/runs/:run_id/delegations`
+
+These routes are not browser-session routes. They require the Platform signed worker guard, a worker that belongs to the company, and the current RWR contract shape. Worker event and artifact payloads must stay bounded and must not include secrets.
+
+### Resolved: OpenClaw stays local-only for v0.1
+
+OpenClaw enters RWR through the same local worker bridge as Hermes. Platform should register local OpenClaw workers with local execution, user-local billing, local user control, and self-reported usage. Do not add hosted OpenClaw secrets, hosted OpenClaw provisioning, or OpenClaw-specific Fly settings for v0.1.
+
+### Resolved: Publishing is explicit
+
+RWR private state includes work items, runs, events, artifacts, worker relationships, runtime profiles, checkpoints, service health, and local usage. None of that should appear on public company pages until an operator reviews it and takes a publish action. Public pages may show only published proof and public company data.
+
+### Resolved: Hosted and local billing stay separate
+
+Hosted Sprite workers use Platform billing, runtime credits, Stripe, metering, and runtime controls. Local Hermes and OpenClaw workers run on the user's machine and may report usage for visibility, but that usage must not become hosted Sprite spend.
+
+### Resolved: Sprite management stays in Platform Elixir code
+
+Platform may use a Sprites SDK or a thin Elixir HTTP client for hosted runtime management. Platform backend code must not shell out to the `sprite` CLI. Sprite CLI examples belong in local or operator smoke checks only.
+
 ### P3: Keep public discovery files aligned
 
 Routes:
@@ -114,10 +159,16 @@ Recommendation: after disabling routes, update the OpenAPI and CLI contracts fir
 - `MIX_ENV=prod mix compile --warnings-as-errors` passes.
 - Demo/design routes disabled in production.
 - `dev_routes` false in production.
-- Regent treasury prepare routes require signed-in operator access.
+- Platform does not expose treasury prepare routes; operator treasury actions stay in the Autolaunch/operator contract path.
 - Public write routes have rate limits.
+- RWR `/app` pages are owner-scoped.
+- RWR signed worker routes reject unsigned worker calls.
+- OpenClaw is registered only through the local worker bridge for v0.1.
+- RWR publishing requires an explicit operator action.
+- Hosted Sprite billing and local worker usage stay separate.
+- Platform manages Sprites through Elixir code, not the sprite CLI.
 - Stripe webhook secret set and webhook test succeeds.
-- `SECRET_KEY_BASE`, `DATABASE_URL`, Privy, SIWA, Stripe, RPC, Dragonfly, and Sprite secrets are set through Fly secrets.
+- `SECRET_KEY_BASE`, `DATABASE_URL`, Privy, SIWA, Stripe, RPC, and enabled Sprite secrets are set through Fly secrets.
 - Metrics port is not publicly exposed.
 - `/healthz` returns `ok`.
 - `/readyz` returns ready without exposing sensitive details.

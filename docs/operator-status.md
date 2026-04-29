@@ -2,7 +2,7 @@
 
 This document defines how Platform should explain company and operator state during stabilization.
 
-Use it for dashboard text, release review, and future page changes that touch billing, company opening, hosted runtime, reports, public records, or trust approval.
+Use it for dashboard text, release review, and future page changes that touch billing, company opening, hosted runtime, RWR work, reports, public records, or trust approval.
 
 Launch, Fly deploy, and cross-product testing commands live in `/Users/sean/Documents/regent/docs/regent-local-and-fly-launch-testing.md`.
 
@@ -38,6 +38,8 @@ Platform stabilization focuses on:
 - billing setup and top-ups
 - company opening progress
 - hosted runtime status
+- RWR work, run, worker, runtime, relationship, checkpoint, and artifact review
+- local Hermes and OpenClaw worker state
 - public company page readiness
 - bug and security report receipts
 - trust approval status
@@ -59,6 +61,10 @@ Before Platform is included in a release:
 - Confirm billing success, billing cancel, and billing still-pending states explain what happens next.
 - Confirm company opening progress shows the current step and does not mark a company live before the hosted service is ready.
 - Confirm dashboard runtime controls show live, paused, pending, and failed states in plain English.
+- Confirm `/app/work`, `/app/runs/:id`, `/app/runtimes`, and `/app/agents` show only the signed-in owner's company state.
+- Confirm local OpenClaw appears as a local worker for v0.1, with user-local billing and self-reported usage.
+- Confirm hosted Sprite workers use Platform billing and runtime credits.
+- Confirm RWR proof stays private until an operator publishes it.
 - Confirm bug and security reports return a receipt the person can use.
 - Confirm public company pages do not show private setup or billing state.
 - Confirm `/healthz` and `/readyz` match the release expectation.

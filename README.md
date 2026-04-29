@@ -72,7 +72,7 @@ Platform is a Phoenix application built for real-time product flows and operatio
 - Bandit as the HTTP server
 - Phoenix PubSub for live launch and room updates
 - Telemetry, Telemetry Metrics, and Prometheus metrics
-- Dragonfly-backed shared cache through `../elixir-utils/cache`
+- Local Cachex-backed cache through `../elixir-utils/cache`
 - XMTP room support through `xmtp_elixir_sdk`
 - Privy session support
 - World AgentBook trust support through `../elixir-utils/world/agentbook`
@@ -98,7 +98,10 @@ These files are the source of truth for external surfaces:
 - `api-contract.openapiv3.yaml` defines the Platform HTTP API.
 - `cli-contract.yaml` defines the Platform CLI surface.
 
-Update these contracts before changing API or CLI behavior.
+Update these contracts before changing API or CLI behavior. Matching release
+copies live in `priv/contracts/`; `mix precommit` fails if those copies are
+missing or out of sync, and the running app serves the release copies at
+`/api-contract.openapiv3.yaml` and `/cli-contract.yaml`.
 
 ## Runtime Services
 
@@ -106,7 +109,7 @@ Platform expects these services in normal development or production work:
 
 - PostgreSQL for application data.
 - Oban tables for background jobs.
-- Dragonfly for shared live cache in production-like environments.
+- Local Cachex for short-lived display data and snapshots.
 - Stripe for billing setup and runtime credit flows.
 - Privy for wallet-backed sessions.
 - OpenSea and GeckoTerminal for holdings and token market data.
@@ -232,6 +235,7 @@ Before public beta, confirm the Fly app has these values set through Fly secrets
 
 - `SECRET_KEY_BASE`
 - `DATABASE_URL`
+- `DATABASE_DIRECT_URL`
 - `REGENT_STAKING_OPERATOR_WALLETS`
 - `REGENT_STAKING_RPC_URL`
 - `REGENT_STAKING_CHAIN_ID`
@@ -239,9 +243,11 @@ Before public beta, confirm the Fly app has these values set through Fly secrets
 - `REGENT_STAKING_CONTRACT_ADDRESS`
 - `SIWA_SERVER_BASE_URL`
 - `STRIPE_WEBHOOK_SECRET` when billing webhooks are enabled
-- Privy, SIWA, Stripe, Dragonfly, Sprite, OpenSea, and RPC values for the enabled surfaces
+- Privy, SIWA, Stripe, Sprite, OpenSea, and RPC values for the enabled surfaces
 
 For the current beta path, `REGENT_STAKING_CHAIN_ID` must be `8453` for Base mainnet and `REGENT_STAKING_CHAIN_LABEL` must be `Base`. `REGENT_STAKING_CONTRACT_ADDRESS` is the `contractAddress` printed by the Base mainnet Regent staking deploy. Autolaunch uses that same address under its own env name, `REGENT_REVENUE_STAKING_ADDRESS`.
+
+Use `DATABASE_URL` for the app pool and `DATABASE_DIRECT_URL` for release migrations. Fly Managed Postgres planning is paused. The likely direction is one shared production database for Platform, Autolaunch, and Techtree, with Platform owning shared users, agent identity records, company records, and other cross-app identity tables. Do not point Platform at a new shared database until the release checklist explicitly moves the app database source.
 
 Keep company opening disabled unless the hosted-company gate in [`../docs/regent-local-and-fly-launch-testing.md`](../docs/regent-local-and-fly-launch-testing.md) is green.
 

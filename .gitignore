@@ -53,11 +53,32 @@ platform_phx-*.tar
 /priv/static/regent/sigils/*-[0-9a-f]*.svg
 /priv/static/robots-[0-9a-f]*.txt
 /priv/static/site-[0-9a-f]*.webmanifest
+/priv/static/ai-index-[0-9a-f]*.md
+/priv/static/llms-[0-9a-f]*.txt
+/priv/static/regents-facts-[0-9a-f]*.json
+/priv/static/ai-index.md
+/priv/static/llms.txt
+/priv/static/regents-facts.json
+/priv/static/_astro/
+/priv/static/learn/
+/priv/static/glossary/
+/priv/static/source/
+/priv/static/updates/
+/priv/static/pagefind/
+/priv/static/_astro/*-[0-9a-f]*.*
+/priv/static/learn/**/*-[0-9a-f]*.html
+/priv/static/glossary/**/*-[0-9a-f]*.html
+/priv/static/source/**/*-[0-9a-f]*.html
+/priv/static/updates/**/*-[0-9a-f]*.html
+/priv/static/pagefind/**/*-[0-9a-f]*.*
 /priv/static/.DS_Store
 
 # In case you use Node.js/npm, you want to ignore these.
 npm-debug.log
 /assets/node_modules/
+/learn-site/node_modules/
+/learn-site/dist/
+/learn-site/.astro/
 
 # Local environment files for direnv / cutover work.
 .env

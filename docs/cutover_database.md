@@ -26,7 +26,7 @@ Allow the Phoenix app in `/platform` to attach to the existing `/platform` Postg
 - `basenames_mint_allowances`
 - `basenames_mints`
 - `basenames_payment_credits`
-- `agentlaunch_auctions`
+- `agentlaunch_auctions` as retained historical data only; live auction state belongs to Autolaunch.
 
 ## Important detail
 

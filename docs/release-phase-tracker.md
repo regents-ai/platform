@@ -11,5 +11,9 @@ Use the guide's **Platform Local And Fly Deploy** section for:
 - required Platform env names
 - Base mainnet `$REGENT` staking configuration
 - disabled hosted-company, billing, top-up, and Sprite controls during public beta
+- RWR local and hosted smoke checks
+- OpenClaw local-only defaults for v0.1
+- hosted Sprite billing versus local worker usage
+- explicit RWR publishing review
 
 Use `/Users/sean/Documents/regent/platform/docs/operator-status.md` for product status wording and page review rules.
