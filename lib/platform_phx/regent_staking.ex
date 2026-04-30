@@ -34,13 +34,13 @@ defmodule PlatformPhx.RegentStaking do
          staking: compact_state(cfg, wallet_address),
          wallet_action:
            wallet_action(%{
-             resource: "regent_staking",
-             action: "stake",
-             expected_signer: wallet_address,
-             chain_id: cfg.chain_id,
-             to: cfg.contract_address,
-             value: "0x0",
-             data: Abi.encode_stake(amount, wallet_address)
+             "resource" => "regent_staking",
+             "action" => "stake",
+             "expected_signer" => wallet_address,
+             "chain_id" => cfg.chain_id,
+             "to" => cfg.contract_address,
+             "value" => "0x0",
+             "data" => Abi.encode_stake(amount, wallet_address)
            })
        }}
     end
@@ -55,13 +55,13 @@ defmodule PlatformPhx.RegentStaking do
          staking: compact_state(cfg, wallet_address),
          wallet_action:
            wallet_action(%{
-             resource: "regent_staking",
-             action: "unstake",
-             expected_signer: wallet_address,
-             chain_id: cfg.chain_id,
-             to: cfg.contract_address,
-             value: "0x0",
-             data: Abi.encode_unstake(amount, wallet_address)
+             "resource" => "regent_staking",
+             "action" => "unstake",
+             "expected_signer" => wallet_address,
+             "chain_id" => cfg.chain_id,
+             "to" => cfg.contract_address,
+             "value" => "0x0",
+             "data" => Abi.encode_unstake(amount, wallet_address)
            })
        }}
     end
@@ -75,13 +75,13 @@ defmodule PlatformPhx.RegentStaking do
          staking: compact_state(cfg, wallet_address),
          wallet_action:
            wallet_action(%{
-             resource: "regent_staking",
-             action: "claim_usdc",
-             expected_signer: wallet_address,
-             chain_id: cfg.chain_id,
-             to: cfg.contract_address,
-             value: "0x0",
-             data: Abi.encode_claim_usdc(wallet_address)
+             "resource" => "regent_staking",
+             "action" => "claim_usdc",
+             "expected_signer" => wallet_address,
+             "chain_id" => cfg.chain_id,
+             "to" => cfg.contract_address,
+             "value" => "0x0",
+             "data" => Abi.encode_claim_usdc(wallet_address)
            })
        }}
     end
@@ -95,13 +95,13 @@ defmodule PlatformPhx.RegentStaking do
          staking: compact_state(cfg, wallet_address),
          wallet_action:
            wallet_action(%{
-             resource: "regent_staking",
-             action: "claim_regent",
-             expected_signer: wallet_address,
-             chain_id: cfg.chain_id,
-             to: cfg.contract_address,
-             value: "0x0",
-             data: Abi.encode_claim_regent(wallet_address)
+             "resource" => "regent_staking",
+             "action" => "claim_regent",
+             "expected_signer" => wallet_address,
+             "chain_id" => cfg.chain_id,
+             "to" => cfg.contract_address,
+             "value" => "0x0",
+             "data" => Abi.encode_claim_regent(wallet_address)
            })
        }}
     end
@@ -115,13 +115,13 @@ defmodule PlatformPhx.RegentStaking do
          staking: compact_state(cfg, wallet_address),
          wallet_action:
            wallet_action(%{
-             resource: "regent_staking",
-             action: "claim_and_restake_regent",
-             expected_signer: wallet_address,
-             chain_id: cfg.chain_id,
-             to: cfg.contract_address,
-             value: "0x0",
-             data: Abi.encode_claim_and_restake_regent()
+             "resource" => "regent_staking",
+             "action" => "claim_and_restake_regent",
+             "expected_signer" => wallet_address,
+             "chain_id" => cfg.chain_id,
+             "to" => cfg.contract_address,
+             "value" => "0x0",
+             "data" => Abi.encode_claim_and_restake_regent()
            })
        }}
     end

@@ -414,7 +414,7 @@ defmodule PlatformPhx.Runners.CodexExecTest do
     def exec(_runtime_id, %{"command" => command}) do
       cond do
         String.contains?(command, Workspaces.test_output_file()) ->
-          {:ok, %{"stdout" => "mix test passed\n"}}
+          {:ok, %{"exit_code" => 0, "stdout" => "mix test passed\n", "stderr" => ""}}
 
         String.starts_with?(command, "cat ") ->
           {:ok,
@@ -430,13 +430,18 @@ defmodule PlatformPhx.Runners.CodexExecTest do
            }}
 
         String.contains?(command, "git status") ->
-          {:ok, %{"stdout" => " M remote.txt\n?? new.txt\n"}}
+          {:ok, %{"exit_code" => 0, "stdout" => " M remote.txt\n?? new.txt\n", "stderr" => ""}}
 
         String.contains?(command, "git diff") ->
-          {:ok, %{"stdout" => "diff --git a/remote.txt b/remote.txt\n"}}
+          {:ok,
+           %{
+             "exit_code" => 0,
+             "stdout" => "diff --git a/remote.txt b/remote.txt\n",
+             "stderr" => ""
+           }}
 
         true ->
-          {:ok, %{"stdout" => ""}}
+          {:ok, %{"exit_code" => 0, "stdout" => "", "stderr" => ""}}
       end
     end
   end

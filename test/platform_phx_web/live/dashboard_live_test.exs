@@ -14,6 +14,9 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
   alias PlatformPhx.Basenames.Mint
   alias PlatformPhx.OpenSea
   alias PlatformPhx.Repo
+  alias PlatformPhx.XMTPMirror
+  alias PlatformPhx.XMTPMirror.Rooms
+  alias PlatformPhx.XMTPMirror.XmtpMembershipCommand
 
   @address "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
 
@@ -275,14 +278,17 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
   end
 
   test "formation page shows a shared setup room and lets a signed-in person post", %{conn: conn} do
-    room_key = PlatformPhx.Xmtp.formation_room_key()
-    PlatformPhx.Xmtp.reset_for_test!(room_key)
+    room_key = Rooms.formation_room_key()
 
-    on_exit(fn ->
-      PlatformPhx.Xmtp.reset_for_test!(room_key)
-    end)
-
-    assert {:ok, _room_info} = PlatformPhx.Xmtp.bootstrap_formation_room!(reuse: true)
+    assert {:ok, room} =
+             XMTPMirror.ensure_room(%{
+               "room_key" => room_key,
+               "xmtp_group_id" => "xmtp-#{room_key}-#{System.unique_integer([:positive])}",
+               "name" => "Formation Room",
+               "status" => "active",
+               "presence_ttl_seconds" => 120,
+               "capacity" => 200
+             })
 
     human = insert_human!("active")
     insert_billing_account!(human, 900)
@@ -310,20 +316,12 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       |> element("#formation-room [phx-click=\"xmtp_join\"]")
       |> render_click()
 
-    [_, request_id] =
-      Regex.run(~r/data-pending-request-id="([^"]+)"/, html) ||
-        flunk("expected a pending join request in the setup room")
+    assert html =~ "Your room seat is being prepared."
 
-    html =
-      view
-      |> element("#formation-room")
-      |> render_hook("xmtp_join_signature_signed", %{
-        "request_id" => request_id,
-        "signature" => "0xsigned"
-      })
-
-    assert html =~ "You are in the room."
-    assert html =~ "1 active now"
+    command = Repo.get_by!(XmtpMembershipCommand, room_id: room.id, human_user_id: human.id)
+    command |> Ecto.Changeset.change(status: "done") |> Repo.update!()
+    send(view.pid, {:public_site_event, %{event: :xmtp_room_membership, room_key: room_key}})
+    assert render(view) =~ "You are in the room."
 
     html =
       view
@@ -333,6 +331,8 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       |> render_submit()
 
     assert html =~ "Getting my launch checklist ready."
+    assert html =~ "You are in the room."
+    assert html =~ "1 active now"
     refute html =~ "XMTP message"
   end
 
@@ -532,6 +532,7 @@ defmodule PlatformPhxWeb.DashboardLiveTest do
       privy_user_id: "privy-#{System.unique_integer([:positive])}",
       wallet_address: @address,
       wallet_addresses: [@address],
+      xmtp_inbox_id: PlatformPhx.XmtpIdentity.deterministic_inbox_id(@address),
       display_name: "operator@regents.sh",
       stripe_llm_billing_status: stripe_status,
       avatar: Map.get(attrs, :avatar)

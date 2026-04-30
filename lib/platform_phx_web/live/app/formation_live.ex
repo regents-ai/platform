@@ -4,7 +4,7 @@ defmodule PlatformPhxWeb.App.FormationLive do
   alias PlatformPhx.Dashboard
   alias PlatformPhx.AgentPlatform.Formation
   alias PlatformPhx.RuntimeConfig
-  alias PlatformPhx.Xmtp
+  alias PlatformPhx.XMTPMirror.Rooms
   alias PlatformPhxWeb.CompanyRoomComponents
   alias PlatformPhxWeb.PublicRoomLive
   import PlatformPhxWeb.AppComponents
@@ -12,7 +12,7 @@ defmodule PlatformPhxWeb.App.FormationLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    room_key = Xmtp.formation_room_key()
+    room_key = Rooms.formation_room_key()
     :ok = PublicRoomLive.subscribe(socket, room_key)
 
     {:ok,
@@ -70,51 +70,40 @@ defmodule PlatformPhxWeb.App.FormationLive do
 
   @impl true
   def handle_event("xmtp_join", _params, socket) do
-    PublicRoomLive.handle_join(socket, Xmtp.formation_room_key())
-  end
-
-  @impl true
-  def handle_event(
-        "xmtp_join_signature_signed",
-        %{"request_id" => request_id, "signature" => signature},
-        socket
-      ) do
-    PublicRoomLive.handle_join_signature_signed(
-      socket,
-      Xmtp.formation_room_key(),
-      request_id,
-      signature
-    )
-  end
-
-  @impl true
-  def handle_event("xmtp_join_signature_failed", %{"message" => message}, socket) do
-    {:noreply, PublicRoomLive.put_status(socket, message)}
+    PublicRoomLive.handle_join(socket, Rooms.formation_room_key())
   end
 
   @impl true
   def handle_event("xmtp_send", %{"xmtp_room" => %{"body" => body}}, socket) do
-    PublicRoomLive.handle_send(socket, Xmtp.formation_room_key(), body)
+    PublicRoomLive.handle_send(socket, Rooms.formation_room_key(), body)
   end
 
   @impl true
   def handle_event("xmtp_delete_message", %{"message_id" => message_id}, socket) do
-    PublicRoomLive.handle_delete_message(socket, Xmtp.formation_room_key(), message_id)
+    PublicRoomLive.handle_delete_message(socket, Rooms.formation_room_key(), message_id)
   end
 
   @impl true
   def handle_event("xmtp_kick_user", %{"target" => target}, socket) do
-    PublicRoomLive.handle_kick_user(socket, Xmtp.formation_room_key(), target)
+    PublicRoomLive.handle_kick_user(socket, Rooms.formation_room_key(), target)
   end
 
   @impl true
   def handle_event("xmtp_heartbeat", _params, socket) do
-    PublicRoomLive.handle_heartbeat(socket, Xmtp.formation_room_key())
+    PublicRoomLive.handle_heartbeat(socket, Rooms.formation_room_key())
   end
 
   @impl true
-  def handle_info({:xmtp_public_room, :refresh}, socket) do
-    {:noreply, PublicRoomLive.assign_room(socket, Xmtp.formation_room_key())}
+  def handle_info(
+        {:public_site_event, %{event: event, room_key: room_key}},
+        socket
+      )
+      when event in [:xmtp_room_message, :xmtp_room_membership] do
+    if room_key == Rooms.formation_room_key() do
+      {:noreply, PublicRoomLive.assign_room(socket, Rooms.formation_room_key())}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true

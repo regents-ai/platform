@@ -23,6 +23,19 @@ defmodule PlatformPhx.RuntimeRegistry do
   alias PlatformPhx.RuntimeRegistry.Workers.RuntimeRestoreJob
 
   @hosted_codex_runner_kinds ["codex_exec", "codex_app_server"]
+  @hosted_runtime_attr_fields [
+    {"name", :name},
+    {"runner_kind", :runner_kind},
+    {"status", :status},
+    {"visibility", :visibility},
+    {"provider_runtime_id", :provider_runtime_id},
+    {"observed_memory_mb", :observed_memory_mb},
+    {"observed_storage_bytes", :observed_storage_bytes},
+    {"observed_capacity_at", :observed_capacity_at},
+    {"rate_limit_upgrade_url", :rate_limit_upgrade_url},
+    {"config", :config},
+    {"metadata", :metadata}
+  ]
   @hosted_sprite_meter_key "sprite_runtime_seconds"
 
   def get_runtime_profile(id), do: Repo.get(RuntimeProfile, id)
@@ -81,18 +94,20 @@ defmodule PlatformPhx.RuntimeRegistry do
 
   def register_hosted_codex_runtime(company_id, platform_agent_id, attrs \\ %{}) do
     with {:ok, %Agent{} = agent} <- fetch_company_agent(company_id, platform_agent_id) do
+      input_attrs = Map.new(attrs)
+
       attrs =
-        attrs
-        |> Map.new()
+        input_attrs
+        |> hosted_runtime_attrs()
         |> Map.merge(%{
           company_id: company_id,
           platform_agent_id: agent.id,
-          runner_kind: Map.get(attrs, :runner_kind, Map.get(attrs, "runner_kind", "codex_exec")),
+          runner_kind: Map.get(input_attrs, "runner_kind", "codex_exec"),
           execution_surface: "hosted_sprite",
           billing_mode: "platform_hosted",
-          status: Map.get(attrs, :status, Map.get(attrs, "status", "active")),
-          visibility: Map.get(attrs, :visibility, Map.get(attrs, "visibility", "operator")),
-          metadata: hosted_codex_metadata(agent, attrs)
+          status: Map.get(input_attrs, "status", "active"),
+          visibility: Map.get(input_attrs, "visibility", "operator"),
+          metadata: hosted_codex_metadata(agent, input_attrs)
         })
         |> put_new_attr(:name, default_hosted_codex_name(agent))
 
@@ -549,13 +564,23 @@ defmodule PlatformPhx.RuntimeRegistry do
   defp default_hosted_codex_name(_agent), do: "Hosted Codex"
 
   defp hosted_codex_metadata(%Agent{} = agent, attrs) do
-    attr(attrs, :metadata, %{})
+    Map.get(attrs, "metadata", %{})
     |> Map.merge(%{
       "billing_mode" => "platform_hosted",
       "platform_agent_id" => agent.id,
       "sprite_name" => agent.sprite_name,
       "sprite_service_name" => agent.sprite_service_name
     })
+  end
+
+  defp hosted_runtime_attrs(attrs) do
+    Enum.reduce(@hosted_runtime_attr_fields, %{}, fn {string_key, atom_key}, normalized ->
+      if Map.has_key?(attrs, string_key) do
+        Map.put(normalized, atom_key, Map.fetch!(attrs, string_key))
+      else
+        normalized
+      end
+    end)
   end
 
   defp put_new_attr(attrs, key, value) do

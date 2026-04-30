@@ -5,6 +5,7 @@ defmodule PlatformPhxWeb.PublicCompanyPage do
 
   alias PlatformPhx.AgentPlatform
   alias PlatformPhx.AgentPlatform.Billing
+  alias PlatformPhx.XMTPMirror.Rooms
   alias PlatformPhxWeb.CompanyRoomSupport
   alias PlatformPhxWeb.PublicRoomLive
 
@@ -12,7 +13,7 @@ defmodule PlatformPhxWeb.PublicCompanyPage do
     room_agent = room_agent(agent, socket.assigns.current_human)
 
     if Phoenix.LiveView.connected?(socket) and room_agent do
-      :ok = PublicRoomLive.subscribe(socket, PlatformPhx.Xmtp.company_room_key(room_agent))
+      :ok = PublicRoomLive.subscribe(socket, Rooms.company_room_key(room_agent))
     end
 
     :ok
@@ -35,20 +36,10 @@ defmodule PlatformPhxWeb.PublicCompanyPage do
     PublicRoomLive.assign_message_form(socket, body)
   end
 
-  def put_xmtp_status(socket, message) do
-    PublicRoomLive.put_status(socket, message)
-  end
-
   def handle_xmtp_join(socket, agent) do
     socket
     |> room_key_for_socket(agent)
     |> then(&PublicRoomLive.handle_join(socket, &1))
-  end
-
-  def handle_xmtp_join_signature_signed(socket, agent, request_id, signature) do
-    socket
-    |> room_key_for_socket(agent)
-    |> then(&PublicRoomLive.handle_join_signature_signed(socket, &1, request_id, signature))
   end
 
   def handle_xmtp_send(socket, agent, body) do
@@ -105,7 +96,7 @@ defmodule PlatformPhxWeb.PublicCompanyPage do
   defp room_key(agent, current_human) do
     case room_agent(agent, current_human) do
       nil -> nil
-      room_agent -> PlatformPhx.Xmtp.company_room_key(room_agent)
+      room_agent -> Rooms.company_room_key(room_agent)
     end
   end
 

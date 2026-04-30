@@ -12,6 +12,9 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   alias PlatformPhx.OperatorReports
   alias PlatformPhx.Repo
   alias PlatformPhx.RuntimeConfig
+  alias PlatformPhx.XMTPMirror
+  alias PlatformPhx.XMTPMirror.Rooms
+  alias PlatformPhx.XMTPMirror.XmtpMembershipCommand
 
   test "home route exposes social share metadata", %{conn: conn} do
     conn = get(conn, "/")
@@ -354,13 +357,17 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
   test "company room lets the owner join and post from the company page", %{conn: conn} do
     human = insert_human!("0xowner222222222222222222222222222222222222")
     agent = insert_public_agent!(human, "owner-room")
-    room_key = PlatformPhx.Xmtp.company_room_key(agent)
+    room_key = Rooms.company_room_key(agent)
 
-    assert {:ok, _room_info} = PlatformPhx.Xmtp.bootstrap_company_room!(agent, reuse: true)
-
-    on_exit(fn ->
-      PlatformPhx.Xmtp.reset_for_test!(room_key)
-    end)
+    assert {:ok, room} =
+             XMTPMirror.ensure_room(%{
+               "room_key" => room_key,
+               "xmtp_group_id" => "xmtp-#{room_key}-#{System.unique_integer([:positive])}",
+               "name" => "#{agent.name} Room",
+               "status" => "active",
+               "presence_ttl_seconds" => 120,
+               "capacity" => 200
+             })
 
     conn = %{conn | host: "owner-room.regents.sh"}
 
@@ -380,21 +387,12 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
         initial_html
       end
 
-    [_, request_id] =
-      Regex.run(~r/data-pending-request-id="([^"]+)"/, html) ||
-        Regex.run(~r/data-pending-request-id="([^"]+)"/, initial_html) ||
-        flunk("expected a pending join request in the company room")
+    assert html =~ "Your room seat is being prepared."
 
-    html =
-      view
-      |> element("#company-room")
-      |> render_hook("xmtp_join_signature_signed", %{
-        "request_id" => request_id,
-        "signature" => "0xsigned"
-      })
-
-    assert html =~ "You are in the room."
-    assert html =~ "1 active now"
+    command = Repo.get_by!(XmtpMembershipCommand, room_id: room.id, human_user_id: human.id)
+    command |> Ecto.Changeset.change(status: "done") |> Repo.update!()
+    send(view.pid, {:public_site_event, %{event: :xmtp_room_membership, room_key: room_key}})
+    assert render(view) =~ "You are in the room."
 
     html =
       view
@@ -404,6 +402,8 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
       |> render_submit()
 
     assert html =~ "Owner update from the company page."
+    assert html =~ "You are in the room."
+    assert html =~ "1 active now"
     assert html =~ "Owner admin"
   end
 
@@ -591,13 +591,14 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "Example rows"
     assert html =~ "Go to App setup"
 
-    assert html =~ "regents autolaunch plan"
-    assert html =~ "--name &quot;Sentinel&quot;"
-    assert html =~ "--target 250000"
-    assert html =~ "--token SRNT"
-    assert html =~ "regents autolaunch preview publish --id srnt"
-    assert html =~ "regents autolaunch launch --id srnt"
+    assert html =~ "regents autolaunch launch create"
+    assert html =~ "regents autolaunch prelaunch publish"
+    assert html =~ "regents autolaunch launch run"
     assert html =~ "https://autolaunch.sh"
+    refute html =~ "regents autolaunch plan"
+    refute html =~ "regents autolaunch preview publish"
+    refute html =~ "regents autolaunch launch --id"
+    refute html =~ "regents shader"
     refute html =~ "Copy prompt"
     refute html =~ "Open app"
     refute html =~ "Why this surface exists"
@@ -622,8 +623,12 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
     assert html =~ "You run a command"
     assert html =~ "For humans"
     assert html =~ "For agents"
-    assert html =~ "regents techtree apply &lt;flow&gt;"
-    assert html =~ "regents autolaunch plan"
+    assert html =~ "regents techtree node create"
+    assert html =~ "regents autolaunch launch create"
+    refute html =~ "regents techtree apply &lt;flow&gt;"
+    refute html =~ "regents autolaunch plan"
+    refute html =~ "regents auth siwa"
+    refute html =~ "regents shader"
     assert html =~ "Go to App setup"
     assert has_element?(regents_cli, "#platform-regents-cli-hero")
     assert has_element?(regents_cli, "#platform-regents-cli-best-first-command")
@@ -726,6 +731,7 @@ defmodule PlatformPhxWeb.PublicRoutesTest do
       privy_user_id: "privy-#{System.unique_integer([:positive])}",
       wallet_address: wallet_address,
       wallet_addresses: [wallet_address],
+      xmtp_inbox_id: PlatformPhx.XmtpIdentity.deterministic_inbox_id(wallet_address),
       display_name: "owner@regents.sh",
       avatar: Map.get(attrs, :avatar)
     })

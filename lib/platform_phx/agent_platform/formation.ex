@@ -27,6 +27,7 @@ defmodule PlatformPhx.AgentPlatform.Formation do
   alias PlatformPhx.Repo
   alias PlatformPhx.RuntimeConfig
   alias PlatformPhxWeb.Endpoint
+  alias PlatformPhx.XMTPMirror.Rooms, as: XMTPRooms
   alias Oban
 
   @default_template_key "start"
@@ -483,6 +484,9 @@ defmodule PlatformPhx.AgentPlatform.Formation do
     end)
     |> Multi.run(:connections, fn _repo, %{agent: agent} ->
       with :ok <- insert_default_connections(agent, template), do: {:ok, :inserted}
+    end)
+    |> Multi.run(:xmtp_room, fn _repo, %{agent: agent} ->
+      XMTPRooms.ensure_company_room(agent)
     end)
     |> Multi.insert(:formation, fn %{agent: agent} ->
       FormationRun.changeset(%FormationRun{}, %{

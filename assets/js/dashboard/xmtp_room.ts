@@ -1,11 +1,10 @@
 import { animate, stagger } from "animejs";
 import type { Hook } from "phoenix_live_view";
 
-import { signDashboardWalletMessage } from "./islands";
-
 type DashboardXmtpRoomElement = HTMLElement & {
   __xmtpSeenKeys?: Set<string>;
   __xmtpLastStatus?: string;
+  __xmtpHeartbeat?: number;
 };
 
 function animateStatus(el: HTMLElement | null, nextStatus: string, force = false) {
@@ -70,37 +69,9 @@ export const DashboardXmtpRoomHook: Hook = {
     root.__xmtpLastStatus = status?.textContent ?? "";
     animateEntries(root, true);
 
-    this.handleEvent("xmtp:sign-request", async (payload) => {
-      const { request_id, signature_text, wallet_address } = payload as {
-        request_id: string;
-        signature_text: string;
-        wallet_address?: string | null;
-      };
-
-      try {
-        animateStatus(status, "Check your wallet to finish joining.", true);
-
-        const signature = await signDashboardWalletMessage(
-          String(signature_text ?? ""),
-          typeof wallet_address === "string" ? wallet_address : null,
-        );
-
-        animateStatus(status, "Joining room...", true);
-
-        this.pushEvent("xmtp_join_signature_signed", {
-          request_id,
-          signature,
-        });
-      } catch (error) {
-        const message =
-          error instanceof Error && error.message
-            ? error.message
-            : "We could not finish joining this room.";
-
-        animateStatus(status, message, true);
-        this.pushEvent("xmtp_join_signature_failed", { message });
-      }
-    });
+    root.__xmtpHeartbeat = window.setInterval(() => {
+      this.pushEvent("xmtp_heartbeat", {});
+    }, 30_000);
   },
 
   updated() {
@@ -114,5 +85,14 @@ export const DashboardXmtpRoomHook: Hook = {
     }
 
     animateEntries(root);
+  },
+
+  destroyed() {
+    const root = this.el as DashboardXmtpRoomElement;
+
+    if (typeof root.__xmtpHeartbeat === "number") {
+      window.clearInterval(root.__xmtpHeartbeat);
+      root.__xmtpHeartbeat = undefined;
+    }
   },
 };

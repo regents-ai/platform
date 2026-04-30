@@ -15,11 +15,11 @@ defmodule PlatformPhx.Application do
         PlatformPhxWeb.Telemetry,
         PlatformPhx.Repo,
         PlatformPhx.LocalCache.child_spec(),
+        PlatformPhx.XmtpIdentity,
         PlatformPhx.RateLimiter,
         {Oban, Application.fetch_env!(:platform_phx, Oban)},
         {DNSCluster, query: Application.get_env(:platform_phx, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: PlatformPhx.PubSub},
-        PlatformPhx.Xmtp,
         # Start a worker by calling: PlatformPhx.Worker.start_link(arg)
         # {PlatformPhx.Worker, arg},
         # Start to serve requests, typically the last entry

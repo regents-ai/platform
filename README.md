@@ -73,7 +73,7 @@ Platform is a Phoenix application built for real-time product flows and operatio
 - Phoenix PubSub for live launch and room updates
 - Telemetry, Telemetry Metrics, and Prometheus metrics
 - Local Cachex-backed cache through `../elixir-utils/cache`
-- XMTP room support through `xmtp_elixir_sdk`
+- Database-backed XMTP room mirror for company and setup chat
 - Privy session support
 - World AgentBook trust support through `../elixir-utils/world/agentbook`
 - ENS support through `../elixir-utils/ens`

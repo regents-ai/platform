@@ -63,25 +63,6 @@ defmodule PlatformPhxWeb.HomeLive do
   end
 
   @impl true
-  def handle_event(
-        "xmtp_join_signature_signed",
-        %{"request_id" => request_id, "signature" => signature},
-        socket
-      ) do
-    PublicCompanyPage.handle_xmtp_join_signature_signed(
-      socket,
-      socket.assigns.public_agent,
-      request_id,
-      signature
-    )
-  end
-
-  @impl true
-  def handle_event("xmtp_join_signature_failed", %{"message" => message}, socket) do
-    {:noreply, PublicCompanyPage.put_xmtp_status(socket, message)}
-  end
-
-  @impl true
   def handle_event("xmtp_send", %{"xmtp_room" => %{"body" => body}}, socket) do
     PublicCompanyPage.handle_xmtp_send(socket, socket.assigns.public_agent, body)
   end
@@ -102,7 +83,8 @@ defmodule PlatformPhxWeb.HomeLive do
   end
 
   @impl true
-  def handle_info({:xmtp_public_room, :refresh}, socket) do
+  def handle_info({:public_site_event, %{event: event}}, socket)
+      when event in [:xmtp_room_message, :xmtp_room_membership] do
     {:noreply, reload_company_page(socket)}
   end
 

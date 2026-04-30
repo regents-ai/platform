@@ -29,8 +29,8 @@ defmodule PlatformPhx.Runners.CodexExec do
              PlatformPhx.RuntimeRegistry.SpritesClient.exec(runtime_id, %{
                "command" => sprite_command(command, workspace)
              }),
-           {:ok, _output} <- command_output(payload) do
-        {:ok, success_result(payload)}
+           {:ok, _output} <- sprite_command_output(payload) do
+        {:ok, sprite_success_result(payload)}
       end
     rescue
       error -> {:error, Exception.message(error)}
@@ -79,49 +79,66 @@ defmodule PlatformPhx.Runners.CodexExec do
     defp run_command(command, args, workspace_path, prompt) do
       case CommandRunner.run(command, args, cd: workspace_path, input: prompt) do
         {:ok, %{exit_status: 0} = result} ->
-          {:ok, success_result(result)}
+          {:ok, local_success_result(result)}
 
         {:ok, result} ->
           {:error,
-           "Codex command failed with status #{result.exit_status}: #{command_error_output(result)}"}
+           "Codex command failed with status #{result.exit_status}: #{local_command_error_output(result)}"}
 
         {:error, reason} ->
           {:error, reason}
       end
     end
 
-    defp success_result(payload) do
-      output = stdout(payload)
+    defp sprite_success_result(payload) do
+      output = sprite_stdout(payload)
 
       %{
         stdout: output,
-        stderr: stderr(payload),
+        stderr: sprite_stderr(payload),
         proof: output,
         summary: "Codex finished the assigned work."
       }
     end
 
-    defp stdout(payload) when is_map(payload),
-      do: Map.get(payload, "stdout", Map.get(payload, :stdout, ""))
+    defp local_success_result(result) do
+      output = local_stdout(result)
 
-    defp stdout(_payload), do: ""
+      %{
+        stdout: output,
+        stderr: local_stderr(result),
+        proof: output,
+        summary: "Codex finished the assigned work."
+      }
+    end
 
-    defp stderr(payload) when is_map(payload),
-      do: Map.get(payload, "stderr", Map.get(payload, :stderr, ""))
+    defp sprite_stdout(%{"stdout" => stdout}) when is_binary(stdout), do: stdout
+    defp sprite_stdout(_payload), do: ""
 
-    defp stderr(_payload), do: ""
+    defp sprite_stderr(%{"stderr" => stderr}) when is_binary(stderr), do: stderr
+    defp sprite_stderr(_payload), do: ""
 
-    defp command_output(%{"exit_code" => 0} = payload), do: {:ok, stdout(payload)}
-    defp command_output(%{exit_code: 0} = payload), do: {:ok, stdout(payload)}
+    defp local_stdout(%{stdout: stdout}) when is_binary(stdout), do: stdout
+    defp local_stdout(_result), do: ""
 
-    defp command_output(%{"exit_code" => status} = payload),
-      do: {:error, "Codex command failed with status #{status}: #{command_error_output(payload)}"}
+    defp local_stderr(%{stderr: stderr}) when is_binary(stderr), do: stderr
+    defp local_stderr(_result), do: ""
 
-    defp command_output(%{exit_code: status} = payload),
-      do: {:error, "Codex command failed with status #{status}: #{command_error_output(payload)}"}
+    defp sprite_command_output(%{"exit_code" => 0} = payload), do: {:ok, sprite_stdout(payload)}
 
-    defp command_error_output(payload) do
-      [stdout(payload), stderr(payload)]
+    defp sprite_command_output(%{"exit_code" => status} = payload),
+      do:
+        {:error,
+         "Codex command failed with status #{status}: #{sprite_command_error_output(payload)}"}
+
+    defp sprite_command_error_output(payload) do
+      [sprite_stdout(payload), sprite_stderr(payload)]
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.join("\n")
+    end
+
+    defp local_command_error_output(result) do
+      [local_stdout(result), local_stderr(result)]
       |> Enum.reject(&(&1 == ""))
       |> Enum.join("\n")
     end

@@ -563,19 +563,19 @@ defmodule PlatformPhxWeb.AutolaunchLive do
         icon: "hero-rectangle-group",
         title: "Plan a launch",
         copy: "Create the blueprint for your agent raise.",
-        command: ~s(regents autolaunch plan --name "Sentinel" --target 250000 --token SRNT)
+        command: "regents autolaunch launch create"
       },
       %{
         icon: "hero-command-line",
         title: "Publish preview",
         copy: "Share your launch preview with early backers.",
-        command: "regents autolaunch preview publish --id srnt"
+        command: "regents autolaunch prelaunch publish"
       },
       %{
         icon: "hero-rocket-launch",
         title: "Run the launch",
         copy: "Start the raise window and open commitments.",
-        command: "regents autolaunch launch --id srnt"
+        command: "regents autolaunch launch run"
       }
     ]
   end

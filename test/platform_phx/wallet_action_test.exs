@@ -6,14 +6,14 @@ defmodule PlatformPhx.WalletActionTest do
   test "wallet action builder uses the canonical internal attribute shape" do
     action =
       WalletAction.from_tx(%{
-        resource: "regent_staking",
-        action: "stake",
-        chain_id: 8453,
-        to: "0x1111111111111111111111111111111111111111",
-        value: "0x0",
-        data: "0x1234",
-        expected_signer: "0x2222222222222222222222222222222222222222",
-        risk_copy: "Review the stake before confirming."
+        "resource" => "regent_staking",
+        "action" => "stake",
+        "chain_id" => 8453,
+        "to" => "0x1111111111111111111111111111111111111111",
+        "value" => "0x0",
+        "data" => "0x1234",
+        "expected_signer" => "0x2222222222222222222222222222222222222222",
+        "risk_copy" => "Review the stake before confirming."
       })
 
     assert action.resource == "regent_staking"

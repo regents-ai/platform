@@ -111,6 +111,11 @@ defmodule PlatformPhxWeb.Router do
     plug PlatformPhxWeb.Plugs.RateLimit, rules: @signed_agent_rate_limit_rules
   end
 
+  pipeline :api_internal do
+    plug :accepts, ["json"]
+    plug PlatformPhxWeb.Plugs.RequireInternalSharedSecret
+  end
+
   scope "/", PlatformPhxWeb do
     pipe_through :public_discovery
 
@@ -195,11 +200,22 @@ defmodule PlatformPhxWeb.Router do
     post "/agent-platform/stripe/webhooks", Api.StripeWebhookController, :create
   end
 
+  scope "/api/internal", PlatformPhxWeb do
+    pipe_through :api_internal
+
+    get "/xmtp/shards", InternalXmtpController, :list_shards
+    post "/xmtp/rooms/ensure", InternalXmtpController, :ensure_room
+    post "/xmtp/messages/ingest", InternalXmtpController, :ingest_message
+    post "/xmtp/commands/lease", InternalXmtpController, :lease_command
+    post "/xmtp/commands/:id/resolve", InternalXmtpController, :resolve_command
+  end
+
   scope "/api/auth/privy", PlatformPhxWeb.Api do
     pipe_through :session_api
 
     get "/csrf", PrivySessionController, :csrf
     post "/session", PrivySessionController, :create
+    post "/xmtp/complete", PrivySessionController, :complete_xmtp
     get "/profile", PrivySessionController, :show
     put "/profile/avatar", PrivySessionController, :update_avatar
     delete "/session", PrivySessionController, :delete

@@ -96,7 +96,7 @@ defmodule PlatformPhx.RuntimeRegistrySpritesClientFake do
   def exec(runtime_id, attrs) do
     notify({:exec, runtime_id, attrs})
 
-    command = Map.get(attrs, "command") || Map.get(attrs, :command) || ""
+    command = Map.get(attrs, "command", "")
 
     cond do
       String.starts_with?(command, "cat ") and String.contains?(command, "REGENT_WORKFLOW.md") ->

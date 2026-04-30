@@ -157,14 +157,9 @@ defmodule PlatformPhx.AgentRegistry do
       worker ->
         worker
         |> AgentWorker.changeset(%{
-          status: Map.get(attrs, :status, Map.get(attrs, "status", "active")),
+          status: Map.get(attrs, "status", "active"),
           last_heartbeat_at: now,
-          connection_metadata:
-            Map.get(
-              attrs,
-              :connection_metadata,
-              Map.get(attrs, "connection_metadata", worker.connection_metadata)
-            )
+          connection_metadata: Map.get(attrs, "connection_metadata", worker.connection_metadata)
         })
         |> Repo.update()
     end
@@ -265,7 +260,7 @@ defmodule PlatformPhx.AgentRegistry do
   end
 
   defp work_run_assignable_to_worker?(company_id, worker_id, attrs) do
-    case Map.get(attrs, :work_run_id) || Map.get(attrs, "work_run_id") do
+    case Map.get(attrs, :work_run_id) do
       nil ->
         {:error, :run_not_found}
 
@@ -497,7 +492,7 @@ defmodule PlatformPhx.AgentRegistry do
   defp filter_by_delegation_payload(workers, _payload), do: workers
 
   defp filter_by_payload_value(workers, payload, field, predicate) do
-    value = Map.get(payload, field) || Map.get(payload, Atom.to_string(field))
+    value = Map.get(payload, Atom.to_string(field))
 
     case value do
       nil -> workers
@@ -508,11 +503,7 @@ defmodule PlatformPhx.AgentRegistry do
   end
 
   defp required_capabilities(payload) do
-    Map.get(payload, :required_capabilities) ||
-      Map.get(payload, "required_capabilities") ||
-      Map.get(payload, :capabilities) ||
-      Map.get(payload, "capabilities") ||
-      []
+    Map.get(payload, "required_capabilities", [])
   end
 
   defp filter_by_required_capabilities(workers, []), do: workers
@@ -625,8 +616,8 @@ defmodule PlatformPhx.AgentRegistry do
   defp ensure_relationship_source_matches_path(attrs, source_id) do
     source_ids =
       [
-        Map.get(attrs, :source_agent_profile_id) || Map.get(attrs, "source_agent_profile_id"),
-        Map.get(attrs, :source_worker_id) || Map.get(attrs, "source_worker_id")
+        Map.get(attrs, :source_agent_profile_id),
+        Map.get(attrs, :source_worker_id)
       ]
       |> Enum.reject(&is_nil/1)
 
@@ -638,7 +629,7 @@ defmodule PlatformPhx.AgentRegistry do
   end
 
   defp member_in_company?(attrs, field, schema, company_id) do
-    case Map.get(attrs, field) || Map.get(attrs, Atom.to_string(field)) do
+    case Map.get(attrs, field) do
       nil ->
         true
 

@@ -731,13 +731,13 @@ defmodule PlatformPhx.AgentPlatform.Ens do
 
   defp serialize_wallet_action(tx) do
     WalletAction.from_tx(%{
-      resource: tx.to,
-      action: "wallet_transaction",
-      chain_id: tx.chain_id,
-      to: tx.to,
-      value: Integer.to_string(tx.value || 0),
-      data: tx.data,
-      risk_copy: tx.description || "Review this wallet action before confirming."
+      "resource" => tx.to,
+      "action" => "wallet_transaction",
+      "chain_id" => tx.chain_id,
+      "to" => tx.to,
+      "value" => Integer.to_string(tx.value || 0),
+      "data" => tx.data,
+      "risk_copy" => tx.description || "Review this wallet action before confirming."
     })
   end
 

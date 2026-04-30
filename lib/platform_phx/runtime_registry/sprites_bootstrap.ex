@@ -207,10 +207,7 @@ defmodule PlatformPhx.RuntimeRegistry.SpritesBootstrap do
            SpritesClient.exec(runtime_id, %{"command" => bootstrap_command(profile)}) do
       case payload do
         %{"exit_code" => 0} -> :ok
-        %{exit_code: 0} -> :ok
         %{"exit_code" => _status} -> {:error, {:sprite_bootstrap_failed, payload}}
-        %{exit_code: _status} -> {:error, {:sprite_bootstrap_failed, payload}}
-        %{} -> :ok
         _payload -> {:error, {:sprite_bootstrap_failed, payload}}
       end
     end

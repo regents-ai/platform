@@ -3,6 +3,12 @@ info:
   title: PlatformPhx API
   version: 0.1.0
   description: HTTP contract for the Platform web product APIs. Shared SIWA auth behavior is owned by the shared Regent services contract.
+x-regent-capability:
+  status: beta
+  owner: platform
+  money_path: true
+  cli_surface: true
+  mobile_surface: false
 x-regent-chat-room-contract:
   owner: platform
   canonical_room_record_fields:
@@ -515,7 +521,7 @@ paths:
                 $ref: '#/components/schemas/AgentSessionResponse'
     post:
       operationId: createPlatformAgentSession
-      security: [{ AgentSiwaHeaders: [] }]
+      security: [{ AgentSiwaHeaders: [], SessionCsrfHeader: [] }]
       description: Local platform session created from a signed agent request using a platform SIWA receipt.
       responses:
         '200':
@@ -528,7 +534,7 @@ paths:
           $ref: '#/components/responses/StatusMessage401'
     delete:
       operationId: deletePlatformAgentSession
-      security: [{ AgentSessionCookie: [] }]
+      security: [{ AgentSessionCookie: [], SessionCsrfHeader: [] }]
       responses:
         '200':
           description: Local platform agent session cleared
@@ -725,6 +731,27 @@ paths:
                   ok: {type: boolean}
         '403':
           $ref: '#/components/responses/StatusMessage403'
+  /api/auth/privy/xmtp/complete:
+    post:
+      operationId: privyXmtpComplete
+      security: [{ PrivySessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrivyXmtpCompleteRequest'
+      responses:
+        '200':
+          description: XMTP identity saved for the signed-in human
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentHumanProfile'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '422':
+          $ref: '#/components/responses/StatusMessage422'
   /api/auth/privy/csrf:
     get:
       operationId: privySessionCsrf
@@ -1499,6 +1526,146 @@ paths:
           $ref: '#/components/responses/StatusMessage502'
         '503':
           $ref: '#/components/responses/StatusMessage503'
+  /api/internal/xmtp/shards:
+    get:
+      operationId: internalXmtpListShards
+      security: [{ InternalSharedSecret: [] }]
+      responses:
+        '200':
+          description: Active mirrored XMTP rooms available to the internal worker
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InternalXmtpRoomShard'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+  /api/internal/xmtp/rooms/ensure:
+    post:
+      operationId: internalXmtpEnsureRoom
+      security: [{ InternalSharedSecret: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InternalXmtpEnsureRoomRequest'
+      responses:
+        '200':
+          description: Mirrored XMTP room record
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/InternalXmtpRoom'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '422':
+          $ref: '#/components/responses/StatusMessage422'
+  /api/internal/xmtp/messages/ingest:
+    post:
+      operationId: internalXmtpIngestMessage
+      security: [{ InternalSharedSecret: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InternalXmtpMessageIngestRequest'
+      responses:
+        '200':
+          description: Saved mirrored message id
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [id]
+                    properties:
+                      id: {type: integer}
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '422':
+          $ref: '#/components/responses/StatusMessage422'
+  /api/internal/xmtp/commands/lease:
+    post:
+      operationId: internalXmtpLeaseCommand
+      security: [{ InternalSharedSecret: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [room_key]
+              properties:
+                room_key: {type: string}
+      responses:
+        '200':
+          description: Next membership command for the room, or null
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    oneOf:
+                      - $ref: '#/components/schemas/InternalXmtpMembershipCommand'
+                      - type: 'null'
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '422':
+          $ref: '#/components/responses/StatusMessage422'
+  /api/internal/xmtp/commands/{id}/resolve:
+    post:
+      operationId: internalXmtpResolveCommand
+      security: [{ InternalSharedSecret: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [done, failed]
+                error: {type: string}
+      responses:
+        '200':
+          description: Membership command resolution accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: {type: boolean}
+        '401':
+          $ref: '#/components/responses/StatusMessage401'
+        '404':
+          $ref: '#/components/responses/StatusMessage404'
+        '422':
+          $ref: '#/components/responses/StatusMessage422'
   /api/agent-platform/rwr/account:
     get:
       operationId: rwrAccount
@@ -2375,6 +2542,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/StatusMessage'
+    StatusMessage422:
+      description: Unprocessable entity
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StatusMessage'
     StatusMessage429:
       description: Too many requests
       content:
@@ -2406,11 +2579,21 @@ components:
       type: apiKey
       in: cookie
       name: _platform_phx_key
+    SessionCsrfHeader:
+      type: apiKey
+      in: header
+      name: x-csrf-token
+      description: Session write token required on unsafe session-backed requests.
     AgentSiwaHeaders:
       type: apiKey
       in: header
       name: x-siwa-receipt
       description: Signed SIWA header bundle used by authenticated agent requests. The required receipt audience depends on the operation description.
+    InternalSharedSecret:
+      type: apiKey
+      in: header
+      name: x-platform-secret
+      description: Shared secret for internal Platform worker calls.
   schemas:
     StatusMessage:
       type: object
@@ -2438,6 +2621,62 @@ components:
               type: string
               nullable: true
           additionalProperties: false
+    InternalXmtpRoom:
+      type: object
+      required: [id, room_key, xmtp_group_id, name, status, presence_ttl_seconds, capacity]
+      properties:
+        id: {type: integer}
+        room_key: {type: string}
+        xmtp_group_id: {type: [string, 'null']}
+        name: {type: string}
+        status: {type: string}
+        presence_ttl_seconds: {type: integer}
+        capacity: {type: integer, enum: [200]}
+    InternalXmtpRoomShard:
+      allOf:
+        - $ref: '#/components/schemas/InternalXmtpRoom'
+        - type: object
+          required: [active_members, joinable]
+          properties:
+            active_members: {type: integer}
+            joinable: {type: boolean}
+    InternalXmtpEnsureRoomRequest:
+      type: object
+      required: [room_key, name]
+      properties:
+        room_key: {type: string}
+        xmtp_group_id: {type: string}
+        name: {type: string}
+        status: {type: string}
+        presence_ttl_seconds: {type: integer}
+        capacity: {type: integer, enum: [200]}
+    InternalXmtpMessageIngestRequest:
+      type: object
+      required: [room_key, xmtp_message_id, sender_inbox_id, sender_type, body, sent_at]
+      properties:
+        room_key: {type: string}
+        xmtp_message_id: {type: string}
+        sender_inbox_id: {type: string}
+        sender_wallet_address: {type: string}
+        sender_label: {type: string}
+        sender_type:
+          type: string
+          enum: [human, agent, system]
+        body: {type: string}
+        sent_at: {type: string, format: date-time}
+        raw_payload: {type: object}
+        moderation_state: {type: string}
+        reply_to_message_id: {type: integer}
+        reactions: {type: object}
+    InternalXmtpMembershipCommand:
+      type: object
+      required: [id, op, xmtp_inbox_id]
+      properties:
+        id: {type: integer}
+        op:
+          type: string
+          enum: [add_member, remove_member]
+        xmtp_inbox_id: {type: string}
     AgentKind:
       type: string
       enum: [hermes, openclaw, codex, custom, human_operator, regent_bridge]
@@ -3767,6 +4006,32 @@ components:
       type: object
       properties:
         display_name: {type: [string, 'null']}
+    PrivyXmtpCompleteRequest:
+      type: object
+      required: [wallet_address, client_id, signature_request_id, signature]
+      properties:
+        wallet_address: {type: string}
+        client_id: {type: string}
+        signature_request_id: {type: string}
+        signature: {type: string}
+    PrivyXmtpState:
+      oneOf:
+        - type: object
+          required: [status, inbox_id, wallet_address]
+          properties:
+            status: {type: string, enum: [ready]}
+            inbox_id: {type: string}
+            wallet_address: {type: string}
+        - type: object
+          required: [status, inbox_id, wallet_address, client_id, signature_request_id, signature_text]
+          properties:
+            status: {type: string, enum: [signature_required]}
+            inbox_id: {type: 'null'}
+            wallet_address: {type: string}
+            client_id: {type: string}
+            signature_request_id: {type: string}
+            signature_text: {type: string}
+        - type: 'null'
     PrivySessionCsrf:
       type: object
       required: [ok, csrf_token]
@@ -4344,7 +4609,7 @@ components:
         runtime_status: {type: string}
     CurrentHuman:
       type: object
-      required: [id, privy_user_id, wallet_addresses, billing_account, avatar]
+      required: [id, privy_user_id, wallet_addresses, xmtp_inbox_id, billing_account, avatar]
       properties:
         id: {type: integer}
         privy_user_id: {type: string}
@@ -4352,6 +4617,7 @@ components:
         wallet_addresses:
           type: array
           items: {type: string}
+        xmtp_inbox_id: {type: [string, 'null']}
         display_name: {type: [string, 'null']}
         avatar:
           oneOf:
@@ -4361,7 +4627,7 @@ components:
           $ref: '#/components/schemas/BillingAccount'
     CurrentHumanProfile:
       type: object
-      required: [ok, authenticated, claimed_names, agents]
+      required: [ok, authenticated, claimed_names, agents, xmtp]
       properties:
         ok: {type: boolean}
         authenticated: {type: boolean}
@@ -4377,6 +4643,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AgentRecord'
+        xmtp:
+          $ref: '#/components/schemas/PrivyXmtpState'
     AgentFormation:
       type: object
       required: [id, status, current_step, attempt_count]

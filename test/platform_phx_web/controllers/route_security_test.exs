@@ -23,6 +23,8 @@ defmodule PlatformPhxWeb.RouteSecurityTest do
 
   @csrf_write_routes [
     {:post, "/api/auth/privy/session", %{}},
+    {:post, "/api/auth/agent/session", %{}},
+    {:delete, "/api/auth/agent/session", %{}},
     {:put, "/api/auth/privy/profile/avatar", %{}},
     {:post, "/api/agentbook/sessions/session-id/submit", %{}},
     {:post, "/api/agent-platform/billing/setup/checkout", %{}},

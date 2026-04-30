@@ -192,13 +192,18 @@ export async function fetchJson<T>(input: string, init?: RequestInit): Promise<T
 
   if (!response.ok) {
     const parsedPayload = payload as {
+      error?: {
+        message?: unknown;
+      };
       statusMessage?: unknown;
       message?: unknown;
     } | null;
 
     const message =
       (parsedPayload &&
-        ((typeof parsedPayload.statusMessage === "string" &&
+        ((typeof parsedPayload.error?.message === "string" &&
+          parsedPayload.error.message) ||
+          (typeof parsedPayload.statusMessage === "string" &&
           parsedPayload.statusMessage) ||
           (typeof parsedPayload.message === "string" &&
             parsedPayload.message))) ||

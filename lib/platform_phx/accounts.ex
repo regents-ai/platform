@@ -43,6 +43,7 @@ defmodule PlatformPhx.Accounts do
       case {normalize_attr_key(key), value} do
         {"wallet_address", value} -> [{:wallet_address, value} | acc]
         {"wallet_addresses", value} -> [{:wallet_addresses, value} | acc]
+        {"xmtp_inbox_id", value} -> [{:xmtp_inbox_id, value} | acc]
         {"world_human_id", value} -> [{:world_human_id, value} | acc]
         {"world_verified_at", value} -> [{:world_verified_at, value} | acc]
         {"display_name", value} -> [{:display_name, value} | acc]
@@ -61,6 +62,9 @@ defmodule PlatformPhx.Accounts do
 
         "wallet_addresses" ->
           Map.put(acc, "wallet_addresses", normalize_addresses(value))
+
+        "xmtp_inbox_id" ->
+          Map.put(acc, "xmtp_inbox_id", normalize_text(value, 160))
 
         "world_human_id" ->
           Map.put(acc, "world_human_id", normalize_text(value, 255))

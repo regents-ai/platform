@@ -615,14 +615,20 @@ defmodule PlatformPhxWeb.ContractValidationTest do
       String.starts_with?(path, "/api/auth/privy") and path != "/api/auth/privy/csrf" ->
         MapSet.new(["PrivySessionCookie"])
 
-      String.starts_with?(path, "/api/auth/agent") and method in ["get", "delete"] ->
+      String.starts_with?(path, "/api/auth/agent") and method == "get" ->
         MapSet.new(["AgentSessionCookie"])
 
       path == "/api/auth/agent/session" and method == "post" ->
-        MapSet.new(["AgentSiwaHeaders"])
+        MapSet.new(["AgentSiwaHeaders", "SessionCsrfHeader"])
+
+      path == "/api/auth/agent/session" and method == "delete" ->
+        MapSet.new(["AgentSessionCookie", "SessionCsrfHeader"])
 
       path == "/api/agentbook/sessions/{id}/submit" ->
         MapSet.new(["AgentSessionCookie"])
+
+      String.starts_with?(path, "/api/internal/") ->
+        MapSet.new(["InternalSharedSecret"])
 
       signed_agent_route?(path, method) ->
         MapSet.new(["AgentSiwaHeaders"])

@@ -40,8 +40,8 @@ defmodule PlatformPhx.RuntimeRegistryTest do
 
     assert {:ok, profile} =
              RuntimeRegistry.register_hosted_codex_runtime(company.id, agent.id, %{
-               name: "Hosted Codex",
-               runner_kind: "codex_exec"
+               "name" => "Hosted Codex",
+               "runner_kind" => "codex_exec"
              })
 
     assert profile.company_id == company.id
@@ -262,7 +262,7 @@ defmodule PlatformPhx.RuntimeRegistryTest do
 
     {:ok, profile} =
       RuntimeRegistry.register_hosted_codex_runtime(company.id, agent.id, %{
-        provider_runtime_id: "sprite-restore"
+        "provider_runtime_id" => "sprite-restore"
       })
 
     {:ok, checkpoint} =
@@ -298,7 +298,7 @@ defmodule PlatformPhx.RuntimeRegistryTest do
 
     {:ok, profile} =
       RuntimeRegistry.register_hosted_codex_runtime(company.id, agent.id, %{
-        metadata: %{"network_policy" => network_policy}
+        "metadata" => %{"network_policy" => network_policy}
       })
 
     assert :ok =
@@ -375,8 +375,8 @@ defmodule PlatformPhx.RuntimeRegistryTest do
 
     {:ok, profile} =
       RuntimeRegistry.register_hosted_codex_runtime(company.id, agent.id, %{
-        provider_runtime_id: "sprite-health",
-        observed_memory_mb: 2_048
+        "provider_runtime_id" => "sprite-health",
+        "observed_memory_mb" => 2_048
       })
 
     assert :ok =
@@ -417,7 +417,7 @@ defmodule PlatformPhx.RuntimeRegistryTest do
 
     {:ok, profile} =
       RuntimeRegistry.register_hosted_codex_runtime(company.id, agent.id, %{
-        provider_runtime_id: "sprite-service"
+        "provider_runtime_id" => "sprite-service"
       })
 
     {:ok, service} =
@@ -453,7 +453,7 @@ defmodule PlatformPhx.RuntimeRegistryTest do
 
     {:ok, profile} =
       RuntimeRegistry.register_hosted_codex_runtime(company.id, agent.id, %{
-        provider_runtime_id: "sprite-checkpoint"
+        "provider_runtime_id" => "sprite-checkpoint"
       })
 
     {:ok, checkpoint} =
@@ -495,7 +495,7 @@ defmodule PlatformPhx.RuntimeRegistryTest do
 
     {:ok, profile} =
       RuntimeRegistry.register_hosted_codex_runtime(company.id, agent.id, %{
-        provider_runtime_id: "sprite-usage"
+        "provider_runtime_id" => "sprite-usage"
       })
 
     assert :ok =

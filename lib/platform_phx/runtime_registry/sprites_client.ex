@@ -107,15 +107,14 @@ defmodule PlatformPhx.RuntimeRegistry.SpritesClient do
     def service_logs(runtime_id, service_name, opts) do
       query =
         opts
-        |> Map.take(["cursor", :cursor])
-        |> Enum.map(fn {key, value} -> {to_string(key), value} end)
+        |> Map.take(["cursor"])
 
       request(:get, "/v1/sprites/#{runtime_id}/services/#{service_name}/logs", params: query)
     end
 
     @impl true
     def create_runtime(attrs) do
-      sprite_name = Map.get(attrs, "name") || Map.get(attrs, :name)
+      sprite_name = Map.get(attrs, "name")
 
       if is_binary(sprite_name) and sprite_name != "" do
         request(:post, "/v1/sprites", json: attrs)

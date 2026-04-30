@@ -4,16 +4,17 @@ defmodule PlatformPhxWeb.CompanyRoomSupport do
   import Phoenix.Component, only: [assign: 3]
 
   alias PlatformPhx.AgentPlatform.Agent
-  alias PlatformPhx.Xmtp
+  alias PlatformPhx.XMTPMirror
+  alias PlatformPhx.XMTPMirror.Rooms
 
   def load_room_panel(nil, _human), do: nil
 
   def load_room_panel(%Agent{} = agent, current_human) do
-    load_public_room_panel(Xmtp.company_room_key(agent), current_human)
+    load_public_room_panel(Rooms.company_room_key(agent), current_human)
   end
 
   def load_public_room_panel(room_key, current_human) when is_binary(room_key) do
-    case Xmtp.room_panel(current_human, room_key, %{}) do
+    case XMTPMirror.room_panel(current_human, room_key) do
       {:ok, panel} -> Map.put(panel, :status_override, nil)
       {:error, _reason} -> nil
     end
@@ -39,6 +40,12 @@ defmodule PlatformPhxWeb.CompanyRoomSupport do
 
   def reason_message(:room_full),
     do: "All seats are filled right now. You can still read along from this page."
+
+  def reason_message(:already_in_room),
+    do: "Leave your current room before joining another one."
+
+  def reason_message(:xmtp_identity_required),
+    do: "Reconnect your wallet before you join this room."
 
   def reason_message(:message_required),
     do: "Write a message before you send it."

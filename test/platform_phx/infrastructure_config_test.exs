@@ -48,5 +48,10 @@ defmodule PlatformPhx.InfrastructureConfigTest do
 
     assert dockerfile =~ "COPY platform/mix.exs platform/mix.lock platform/"
     assert dockerfile =~ "COPY elixir-utils elixir-utils"
+    assert dockerfile =~ "FROM ${FOUNDRY_IMAGE} AS foundry"
+    assert dockerfile =~ "COPY --from=foundry /usr/local/bin/cast /usr/local/bin/cast"
+    assert dockerfile =~ "npm --prefix assets ci"
+    refute dockerfile =~ "foundryup"
+    refute dockerfile =~ "npm --prefix assets install"
   end
 end

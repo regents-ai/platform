@@ -48,6 +48,32 @@ defmodule PlatformPhxWeb.ApiErrors do
     })
   end
 
+  @spec render(Plug.Conn.t(), Plug.Conn.status() | atom(), String.t(), String.t(), map()) ::
+          Plug.Conn.t()
+  def render(conn, status, code, message, meta \\ %{}) do
+    status_code = Plug.Conn.Status.code(status)
+    next_steps = Map.get(meta, "next_steps")
+    meta = Map.delete(meta, "next_steps")
+
+    conn
+    |> put_status(status)
+    |> json(%{
+      "error" =>
+        Map.merge(
+          %{
+            "code" => code,
+            "product" => "platform",
+            "status" => status_code,
+            "path" => conn.request_path,
+            "request_id" => request_id(conn),
+            "message" => message,
+            "next_steps" => next_steps
+          },
+          meta
+        )
+    })
+  end
+
   defp code_for_status(status) when is_atom(status), do: Atom.to_string(status)
 
   defp code_for_status(status) do

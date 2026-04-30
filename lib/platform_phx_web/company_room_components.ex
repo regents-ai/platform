@@ -28,7 +28,6 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
     <section
       id={@id}
       phx-hook="DashboardXmtpRoom"
-      data-pending-request-id={@room.pending_signature_request_id || ""}
       class={[
         "overflow-hidden rounded-[1.8rem] border border-[color:var(--border)] bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_96%,var(--background)_4%),color-mix(in_oklch,var(--background)_90%,transparent))] shadow-[0_28px_90px_-56px_color-mix(in_oklch,var(--brand-ink)_35%,transparent)]",
         @class
@@ -225,10 +224,13 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
 
   def room_status_copy(%{room_id: nil}), do: "This chat is not ready yet."
 
-  def room_status_copy(%{membership_state: :join_pending_signature}),
-    do: "Check your wallet to finish joining."
+  def room_status_copy(%{membership_state: :join_pending}),
+    do: "Your room seat is being prepared."
 
   def room_status_copy(%{membership_state: :joined}), do: "You are in the room."
+
+  def room_status_copy(%{membership_state: :setup_required}),
+    do: "Reconnect your wallet before you join this room."
 
   def room_status_copy(%{membership_state: :full}),
     do: "All seats are filled right now. You can still read along from this page."
@@ -241,14 +243,15 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
   def room_status_copy(%{seats_remaining: seats_remaining}),
     do: "#{seats_remaining} seats are open. Join when you are ready."
 
-  def room_state_label(%{status_override: _message, membership_state: :join_pending_signature}),
-    do: "Waiting"
+  def room_state_label(%{status_override: _message, membership_state: :join_pending}),
+    do: "Joining"
 
   def room_state_label(%{room_id: nil}), do: "Offline"
-  def room_state_label(%{membership_state: :join_pending_signature}), do: "Waiting"
+  def room_state_label(%{membership_state: :join_pending}), do: "Joining"
   def room_state_label(%{membership_state: :joined}), do: "In room"
   def room_state_label(%{membership_state: :full}), do: "Full"
   def room_state_label(%{membership_state: :kicked}), do: "Removed"
+  def room_state_label(%{membership_state: :setup_required}), do: "Wallet needed"
   def room_state_label(%{connected_wallet: nil}), do: "Watch only"
   def room_state_label(_room), do: "Ready"
 
@@ -268,8 +271,11 @@ defmodule PlatformPhxWeb.CompanyRoomComponents do
   def composer_copy(%{can_join?: true}),
     do: "Join the room first if you want to post."
 
-  def composer_copy(%{membership_state: :join_pending_signature}),
-    do: "Finish the wallet check above before posting."
+  def composer_copy(%{membership_state: :join_pending}),
+    do: "Posting opens when your room seat is ready."
+
+  def composer_copy(%{membership_state: :setup_required}),
+    do: "Reconnect your wallet before posting."
 
   def composer_copy(%{membership_state: :full}),
     do: "This room is full right now, so posting is closed."

@@ -1,13 +1,15 @@
 ARG ELIXIR_VERSION=1.19.5
 ARG OTP_VERSION=28
+ARG FOUNDRY_IMAGE=ghcr.io/foundry-rs/foundry:v1.5.1
+
+FROM ${FOUNDRY_IMAGE} AS foundry
 
 FROM elixir:${ELIXIR_VERSION}-otp-${OTP_VERSION} AS build
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV FOUNDRY_DIR=/opt/foundry
 
 RUN apt-get update -y && \
-    apt-get install -y --no-install-recommends build-essential git curl ca-certificates nodejs npm && \
+    apt-get install -y --no-install-recommends build-essential git ca-certificates nodejs npm && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
@@ -15,9 +17,7 @@ WORKDIR /workspace
 ENV MIX_ENV=prod
 
 RUN mix local.hex --force && mix local.rebar --force
-RUN curl -L https://foundry.paradigm.xyz | bash && \
-    "${FOUNDRY_DIR}/bin/foundryup" && \
-    cp "${FOUNDRY_DIR}/bin/cast" /usr/local/bin/cast
+COPY --from=foundry /usr/local/bin/cast /usr/local/bin/cast
 
 COPY platform/mix.exs platform/mix.lock platform/
 COPY elixir-utils elixir-utils
@@ -32,7 +32,7 @@ COPY platform/assets assets
 
 RUN mix deps.get --only prod
 RUN mix deps.compile
-RUN npm --prefix assets install
+RUN npm --prefix assets ci
 RUN mix assets.deploy
 RUN mix compile
 RUN mix release

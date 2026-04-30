@@ -10,6 +10,7 @@ defmodule PlatformPhx.Accounts.HumanUser do
     field :privy_user_id, :string
     field :wallet_address, :string
     field :wallet_addresses, {:array, :string}, default: []
+    field :xmtp_inbox_id, :string
     field :world_human_id, :string
     field :world_verified_at, :utc_datetime
     field :display_name, :string
@@ -30,6 +31,7 @@ defmodule PlatformPhx.Accounts.HumanUser do
       :privy_user_id,
       :wallet_address,
       :wallet_addresses,
+      :xmtp_inbox_id,
       :world_human_id,
       :world_verified_at,
       :display_name,
@@ -39,6 +41,7 @@ defmodule PlatformPhx.Accounts.HumanUser do
       :stripe_pricing_plan_subscription_id
     ])
     |> validate_required([:privy_user_id])
+    |> validate_length(:xmtp_inbox_id, max: 160)
     |> validate_length(:display_name, max: 80)
     |> validate_inclusion(:stripe_llm_billing_status, [
       "not_connected",

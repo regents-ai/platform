@@ -139,10 +139,10 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
       "```bash",
       Enum.join(
         [
-          "regents autolaunch plan",
-          "regents autolaunch ...",
-          "regents shader list",
-          "regents shader export w3dfWN --out avatars/shard.png",
+          "regents autolaunch launch create",
+          "regents autolaunch launch preview",
+          "regents autolaunch prelaunch publish",
+          "regents autolaunch launch run",
           "regents gossipsub status"
         ],
         "\n"
@@ -183,9 +183,9 @@ defmodule PlatformPhxWeb.PublicPageCatalog do
         [
           "regents techtree start",
           "regents doctor",
-          "regents auth siwa status",
+          "regents auth status",
           "regents techtree search --query \"...\"",
-          "regents autolaunch ..."
+          "regents autolaunch launch preview"
         ],
         "\n"
       ),

@@ -191,32 +191,32 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
       },
       %{
         icon: "hero-list-bullet",
-        title: "See flows",
-        command: "regents techtree flows",
-        note: "List available flows."
+        title: "Search Techtree",
+        command: "regents techtree search --query \"...\"",
+        note: "Find relevant Techtree work."
       },
       %{
         icon: "hero-wrench-screwdriver",
-        title: "Apply a flow",
-        command: "regents techtree apply <flow>",
-        note: "Apply a specific flow."
+        title: "Create a node",
+        command: "regents techtree node create",
+        note: "Add new Techtree work."
       },
       %{
         icon: "hero-chart-bar-square",
-        title: "Review the report",
-        command: "regents techtree report",
-        note: "View the latest report."
+        title: "Review activity",
+        command: "regents techtree activity",
+        note: "View recent work."
       },
       %{
         icon: "hero-rocket-launch",
         title: "Plan the launch",
-        command: "regents autolaunch plan",
+        command: "regents autolaunch launch create",
         note: "Plan your launch."
       },
       %{
         icon: "hero-play",
         title: "Start the launch process",
-        command: "regents autolaunch start",
+        command: "regents autolaunch launch run",
         note: "Start the launch process."
       }
     ]
@@ -244,7 +244,7 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
         text(" keeps the local service available for commands that depend on it.")
       ],
       [
-        code("regents auth siwa ..."),
+        code("regents auth login"),
         text(" signs the operator into Techtree.")
       ],
       [
@@ -252,19 +252,19 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
         text(" is the main work surface for browsing, publishing, BBH, and reviews.")
       ],
       [
-        code("regents autolaunch ..."),
+        code("regents autolaunch launch preview"),
         text(" is the Autolaunch surface. There is no separate "),
         code("autolaunch"),
         text(" binary.")
       ],
       [
-        code("regents xmtp ..."),
+        code("regents xmtp status"),
         text(", "),
-        code("regents agentbook ..."),
+        code("regents agentbook lookup"),
         text(", "),
-        code("regents regent-staking ..."),
+        code("regents regent-staking show"),
         text(", and "),
-        code("regents gossipsub ..."),
+        code("regents gossipsub status"),
         text(" are adjacent lanes shipped from the same binary.")
       ]
     ]
@@ -317,7 +317,7 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
           "regents techtree start",
           "regents doctor",
           "regents config read",
-          "regents auth siwa status"
+          "regents auth status"
         ],
         [
           text(
@@ -331,7 +331,7 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
           "regents create wallet --write-env",
           "regents techtree identities list",
           "regents techtree identities mint",
-          "regents auth siwa login",
+          "regents auth login",
           "regents techtree start"
         ],
         [
@@ -412,18 +412,18 @@ defmodule PlatformPhxWeb.RegentCliCatalog do
       group(
         "Autolaunch and adjacent work",
         [
-          "regents autolaunch ...",
-          "regents shader list",
-          "regents shader export w3dfWN --out avatars/shard.png",
-          "regents shader export wXdfW4 --define RGB=vec3(8,1,4) --define GLOW=0.35 --out avatars/orb.png",
-          "regents xmtp ...",
-          "regents agentbook ...",
-          "regents regent-staking ...",
+          "regents autolaunch launch create",
+          "regents autolaunch launch preview",
+          "regents autolaunch prelaunch publish",
+          "regents autolaunch launch run",
+          "regents xmtp status",
+          "regents agentbook lookup",
+          "regents regent-staking show",
           "regents gossipsub status"
         ],
         [
           text(
-            "Use these when the work moves beyond Techtree into launch planning, avatar export, messaging, registry lookups, staking, or transport checks."
+            "Use these when the work moves beyond Techtree into launch planning, messaging, registry lookups, staking, or transport checks."
           )
         ]
       )

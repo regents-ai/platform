@@ -148,7 +148,7 @@ defmodule PlatformPhx.AgentRegistryTest do
 
     assert {:ok, updated} =
              AgentRegistry.heartbeat_worker(company.id, worker.id, %{
-               connection_metadata: %{bridge_pid: "local-1"}
+               "connection_metadata" => %{bridge_pid: "local-1"}
              })
 
     assert updated.status == "active"
@@ -156,7 +156,7 @@ defmodule PlatformPhx.AgentRegistryTest do
     assert updated.connection_metadata == %{bridge_pid: "local-1"}
 
     assert {:error, :not_found} =
-             AgentRegistry.heartbeat_worker(other_company.id, worker.id, %{status: "active"})
+             AgentRegistry.heartbeat_worker(other_company.id, worker.id, %{"status" => "active"})
   end
 
   test "assignment listing and claiming are scoped to the assigned worker" do
@@ -367,7 +367,7 @@ defmodule PlatformPhx.AgentRegistryTest do
 
     pool =
       AgentRegistry.list_execution_pool(company.id, hermes.id,
-        delegation_payload: %{required_capabilities: ["browser"]}
+        delegation_payload: %{"required_capabilities" => ["browser"]}
       )
 
     assert Enum.map(pool, & &1.id) == [capable_worker.id]
